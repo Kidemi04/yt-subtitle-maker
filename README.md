@@ -1,84 +1,81 @@
 # YouTube Subtitle Maker
 
-A desktop GUI application to download YouTube audio, transcribe it locally using OpenAI Whisper, and optionally translate subtitles using Google Gemini.
+A powerful desktop application to download YouTube audio, transcribe it locally using OpenAI Whisper, and translate subtitles using Google Gemini.
+
+**New Architecture**: This project now features a **Python HTTP API Backend** and a modern **Flutter Desktop Frontend**.
 
 ## Features
 
 - **YouTube Download**: Downloads audio from YouTube videos.
 - **Local Transcription**: Uses OpenAI Whisper (Turbo model by default) for high-quality, free, local transcription.
-- **AI Translation**: Uses Google Gemini API (requires your own key) to translate subtitles into various languages.
-  - Default: `gemini-2.5-flash-lite` (Fast/Cheap).
-  - Optional: `gemini-2.5-pro` (High Quality).
-- **GUI**: Simple and easy-to-use interface built with PySide6.
-  - **Video Preview**: Shows title and thumbnail of the YouTube video.
-  - **Title Translation**: Translate video titles with one click.
-  - **History List**: Keeps track of processed videos for easy access.
-  - **MPV Integration**: Play videos with subtitles directly from the app.
-    - *Note*: You can now specify the path to `mpv.exe` in the settings if it's not in your PATH.
-  - **Whisper Device**: Choose between Auto, CPU, or GPU.
-  - **API Key Test**: Verify your Gemini API key directly in the app.
-- **SRT Output**: Generates standard `.srt` subtitle files.
+- **AI Translation**: Uses Google Gemini API to translate subtitles.
+- **Modern GUI**: A clean, responsive Flutter desktop interface.
+  - **Video Preview**: Shows title and thumbnail.
+  - **Title Translation**: Translate video titles instantly.
+  - **MPV Integration**: Play videos with subtitles directly.
+  - **Logs & History**: Track your processing tasks.
 
 ## Prerequisites
 
 1. **Python 3.10+**
-2. **FFmpeg**: Must be installed and added to your system PATH.
-   - Windows: [Download FFmpeg](https://ffmpeg.org/download.html), extract, and add `bin` folder to PATH.
-   - macOS: `brew install ffmpeg`
-   - Linux: `sudo apt install ffmpeg`
-3. **mpv**: Required for the "Play with mpv" feature. Add it to your system PATH.
+2. **Flutter SDK** (for the frontend)
+3. **Visual Studio 2022** (Windows only): Required for building the Windows app.
+   - Install the **"Desktop development with C++"** workload.
+4. **FFmpeg**: Must be in your system PATH.
+5. **mpv**: Must be in your system PATH (for playback).
 
-## Installation
+## Installation & Setup
 
-1. Create a virtual environment (recommended):
+### 1. Python Backend
+
+1. Create and activate virtual environment:
    ```bash
    python -m venv venv
-   # Windows
    venv\Scripts\activate
-   # macOS/Linux
-   source venv/bin/activate
    ```
-
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-   *Note: If you have a GPU, you may want to install PyTorch with CUDA support manually for faster transcription.*
 
-## Usage
+### 2. Flutter Frontend
 
-1. Run the application:
+1. Navigate to `flutter_gui`:
    ```bash
-   python main.py
+   cd flutter_gui
+   ```
+2. Get dependencies:
+   ```bash
+   flutter pub get
    ```
 
-2. **Transcribe Only**:
-   - Paste a YouTube URL (Metadata will load automatically).
-   - Select Whisper model (default: `turbo`) and Device (Auto/CPU/GPU).
-   - Click "Start Processing".
-   - Output: `<video_id>_original.srt` in the output folder.
+## Running the App
 
-3. **Transcribe & Translate**:
-   - Check "Enable translation with Gemini".
-   - Enter your Google Gemini API Key.
-   - Click "Test Key" to verify it.
-   - Select Target Language.
-   - Select Gemini Model (default: `gemini-2.5-flash-lite`).
-   - Click "Start Processing".
-   - Output: `<video_id>_original.srt` AND `<video_id>_<lang>.srt`.
+You need to run both the backend and frontend.
 
-4. **Play with MPV**:
-   - After processing, click "Play with mpv" to watch the video with subtitles.
-   - You can also select a video from the **History** list and play it.
+**Step 1: Start the Backend**
+Open a terminal in the root directory:
+```bash
+venv\Scripts\activate
+uvicorn backend_api:app --reload
+```
+*The API will start at `http://127.0.0.1:8000`.*
 
-5. **Translate Title**:
-   - After loading a video, click "Translate Title" to get the title in your target language.
+**Step 2: Start the Frontend**
+Open a new terminal in `flutter_gui`:
+```bash
+cd flutter_gui
+flutter run -d windows
+```
+*(Or use `-d macos` on Mac).*
+
+## Legacy Mode
+
+You can still run the old PySide6 GUI if preferred:
+```bash
+python main.py
+```
 
 ## Configuration
 
-Settings (API key, output directory, history, etc.) are saved automatically to `~/.yt_subtitle_tool/config.json`.
-
-## Notes
-
-- **First Run**: Whisper will download the model file (approx 1-3GB depending on size) on the first run. The GUI might show "Transcribing..." for a while during this download.
-- **Security**: Your Gemini API key is stored in plain text in the config file. Do not share your config file.
+Settings are saved to `~/.yt_subtitle_tool/config.json`.

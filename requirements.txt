@@ -5,3 +5,6 @@ google-generativeai
 torch
 numpy
 requests
+fastapi
+uvicorn
+pyinstaller
