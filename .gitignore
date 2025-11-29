@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# Project Output
+output/
+*.srt
+*.mp3
+*.m4a
+*.wav
+
+# Config
+.yt_subtitle_tool/
+config.json
+
+# Logs
+*.log

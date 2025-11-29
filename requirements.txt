@@ -1,0 +1,7 @@
+PySide6
+openai-whisper
+yt-dlp
+google-generativeai
+torch
+numpy
+requests
