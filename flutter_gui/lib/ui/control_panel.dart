@@ -139,6 +139,7 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
         titleTranslated: null, // We could store this if we had it from a separate provider
         targetLang: ref.read(enableTranslationProvider) ? ref.read(targetLangProvider) : null,
         subtitlePath: finalSubtitle,
+        thumbnailUrl: meta?.thumbnailUrl,
         lastUsed: DateTime.now().toIso8601String(),
       );
       ref.read(historyProvider.notifier).addToHistory(historyItem);

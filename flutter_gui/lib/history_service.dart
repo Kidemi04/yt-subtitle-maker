@@ -81,15 +81,17 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
       if (existingIndex != -1) {
         // Update existing if path is missing or different
         final existing = state[existingIndex];
-        if (existing.subtitlePath == null && subtitlePath != null) {
-          // Create new item with updated path
+        // Update existing if path is missing or different, OR if thumbnail is missing
+        if ((existing.subtitlePath == null && subtitlePath != null) || existing.thumbnailUrl == null) {
+          // Create new item with updated path/thumbnail
           final updated = HistoryItem(
             url: existing.url,
             videoId: existing.videoId,
             titleOriginal: existing.titleOriginal,
             titleTranslated: existing.titleTranslated,
             targetLang: existing.targetLang ?? targetLang,
-            subtitlePath: subtitlePath,
+            subtitlePath: existing.subtitlePath ?? subtitlePath,
+            thumbnailUrl: existing.thumbnailUrl ?? "https://img.youtube.com/vi/$vid/hqdefault.jpg",
             lastUsed: existing.lastUsed,
           );
           // Replace in state (we need to copy the list)
@@ -106,6 +108,7 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
           titleTranslated: null,
           targetLang: targetLang,
           subtitlePath: subtitlePath,
+          thumbnailUrl: "https://img.youtube.com/vi/$vid/hqdefault.jpg",
           lastUsed: DateTime.now().toIso8601String(),
         ));
       }

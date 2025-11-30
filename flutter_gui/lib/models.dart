@@ -63,6 +63,7 @@ class HistoryItem {
   final String? titleTranslated;
   final String? targetLang;
   final String? subtitlePath;
+  final String? thumbnailUrl;
   final String lastUsed;
 
   HistoryItem({
@@ -72,6 +73,7 @@ class HistoryItem {
     this.titleTranslated,
     this.targetLang,
     this.subtitlePath,
+    this.thumbnailUrl,
     required this.lastUsed,
   });
 
@@ -83,6 +85,7 @@ class HistoryItem {
       'title_translated': titleTranslated,
       'target_lang': targetLang,
       'subtitle_path': subtitlePath,
+      'thumbnail_url': thumbnailUrl,
       'last_used': lastUsed,
     };
   }
@@ -95,6 +98,7 @@ class HistoryItem {
       titleTranslated: json['title_translated'],
       targetLang: json['target_lang'],
       subtitlePath: json['subtitle_path'],
+      thumbnailUrl: json['thumbnail_url'],
       lastUsed: json['last_used'],
     );
   }

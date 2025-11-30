@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../history_service.dart';
 import '../mpv_launcher.dart';
 import '../api_service.dart';
+import '../models.dart';
 import 'control_panel.dart'; // To access logProvider
 
 class HistoryPanel extends ConsumerWidget {
@@ -80,24 +81,65 @@ class HistoryPanel extends ConsumerWidget {
                 itemCount: ref.watch(historyProvider).length,
                 itemBuilder: (context, index) {
                   final item = ref.watch(historyProvider)[index];
-                  return ListTile(
-                    title: Text(item.titleOriginal ?? item.url, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text("${item.targetLang ?? 'No translation'} • ${item.lastUsed.split('T')[0]}"),
-                    dense: true,
-                    onTap: () {
-                      // Reload into Control Panel
-                      ref.read(urlProvider.notifier).state = item.url;
-                      if (item.targetLang != null) {
-                         ref.read(targetLangProvider.notifier).state = item.targetLang!;
-                         ref.read(enableTranslationProvider.notifier).state = true;
-                      }
-                    },
-                    trailing: IconButton(
-                      icon: const Icon(Icons.play_arrow, size: 16),
-                      onPressed: () {
-                         // Quick play logic
-                         MpvLauncher.play(item.url, subtitlePath: item.subtitlePath);
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(8),
+                      leading: item.thumbnailUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.network(item.thumbnailUrl!, width: 80, fit: BoxFit.cover),
+                          )
+                        : const Icon(Icons.video_library, size: 40),
+                      title: Text(
+                        item.titleTranslated ?? item.titleOriginal ?? item.url,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (item.titleTranslated != null && item.titleOriginal != null)
+                            Text(item.titleOriginal!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                          const SizedBox(height: 2),
+                          Text(
+                            "${item.targetLang ?? 'No translation'} • ${item.lastUsed.split('T')[0]}",
+                            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                      dense: false,
+                      onTap: () {
+                        // Reload into Control Panel
+                        ref.read(urlProvider.notifier).state = item.url;
+                        
+                        // Restore metadata (so thumbnail shows in control panel)
+                        if (item.titleOriginal != null) {
+                          ref.read(metadataProvider.notifier).state = VideoMetadata(
+                            ok: true,
+                            videoId: item.videoId,
+                            titleOriginal: item.titleOriginal,
+                            thumbnailUrl: item.thumbnailUrl,
+                            durationSeconds: 0, // We don't store duration yet
+                          );
+                        }
+                        
+                        if (item.targetLang != null) {
+                           ref.read(targetLangProvider.notifier).state = item.targetLang!;
+                           ref.read(enableTranslationProvider.notifier).state = true;
+                        }
+                        
+                        // Also restore subtitle path for MPV button in control panel
+                        ref.read(currentSubtitlePathProvider.notifier).state = item.subtitlePath;
                       },
+                      trailing: IconButton(
+                        icon: const Icon(Icons.play_arrow),
+                        onPressed: () {
+                           // Quick play logic
+                           MpvLauncher.play(item.url, subtitlePath: item.subtitlePath);
+                        },
+                      ),
                     ),
                   );
                 },
