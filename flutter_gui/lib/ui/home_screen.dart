@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'control_panel.dart';
 import 'history_panel.dart';
 import 'download_panel.dart';
+import 'settings_dialog.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -13,6 +14,17 @@ class HomeScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text("YouTube Subtitle Maker"),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const SettingsDialog(),
+                );
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.subtitles), text: "Subtitle Generator"),

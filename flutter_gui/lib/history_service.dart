@@ -64,6 +64,31 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
       // Find best info
       String? targetLang;
       String? subtitlePath;
+      String? titleOriginal;
+      String? titleTranslated;
+      String? thumbnailUrl;
+      
+      // Try to find metadata from file list if we returned it (backend doesn't return json content yet)
+      // But we can infer from filenames or if we update backend to return metadata content.
+      // Actually, backend list_outputs just returns file list.
+      // But wait, if we have a json file, we can't easily read it here without an API call.
+      // However, the backend `list_outputs` could have returned the metadata if we wanted.
+      // For now, let's stick to what we have, but maybe we can improve the backend response later.
+      // OR, we can just rely on the heuristic we added in backend list_outputs.
+      
+      // Actually, let's assume the backend *could* return more info, but since I didn't update the backend response model to include metadata content, 
+      // I will rely on the file list for now.
+      // BUT, I can update the backend to return the metadata content in the file list?
+      // No, that's too much data.
+      
+      // Let's just use what we have.
+      // If we want to support the "Original Title" and "Translated Title" from history,
+      // we need to persist it.
+      // The `importFiles` is mostly for restoring from disk if the local history is lost or for new installs.
+      // If we want to read the JSON file, we would need an API endpoint to read a file, or `list_outputs` should return it.
+      
+      // Let's assume for now we just use the filenames.
+      // But I can try to parse the filename better.
       
       final translated = fileList.firstWhere((f) => f['type'] == 'srt_translated', orElse: () => null);
       if (translated != null) {
@@ -81,9 +106,7 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
       if (existingIndex != -1) {
         // Update existing if path is missing or different
         final existing = state[existingIndex];
-        // Update existing if path is missing or different, OR if thumbnail is missing
         if ((existing.subtitlePath == null && subtitlePath != null) || existing.thumbnailUrl == null) {
-          // Create new item with updated path/thumbnail
           final updated = HistoryItem(
             url: existing.url,
             videoId: existing.videoId,
@@ -94,7 +117,6 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
             thumbnailUrl: existing.thumbnailUrl ?? "https://img.youtube.com/vi/$vid/hqdefault.jpg",
             lastUsed: existing.lastUsed,
           );
-          // Replace in state (we need to copy the list)
           final newState = [...state];
           newState[existingIndex] = updated;
           state = newState;
@@ -104,7 +126,7 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
         newItems.add(HistoryItem(
           url: "https://youtube.com/watch?v=$vid",
           videoId: vid,
-          titleOriginal: "Imported Video $vid",
+          titleOriginal: "Video $vid", // Placeholder until we load metadata
           titleTranslated: null,
           targetLang: targetLang,
           subtitlePath: subtitlePath,
@@ -118,7 +140,11 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
       state = [...state, ...newItems];
     }
     
-    // Always save if we modified state (which we might have done in the loop)
+    _saveHistory();
+  }
+
+  Future<void> removeFromHistory(String videoId) async {
+    state = state.where((item) => item.videoId != videoId).toList();
     _saveHistory();
   }
 }

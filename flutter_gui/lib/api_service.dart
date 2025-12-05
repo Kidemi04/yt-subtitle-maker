@@ -160,31 +160,35 @@ class ApiService {
     }
   }
 
-  Stream<Map<String, dynamic>> downloadMedia(String url, String type) async* {
+  Stream<Map<String, dynamic>> downloadMedia(String url, String type, {String quality = 'best', String format = 'mp4'}) async* {
     try {
       final request = http.Request('POST', Uri.parse('$baseUrl/api/download'));
       request.headers['Content-Type'] = 'application/json';
-      request.body = jsonEncode({'url': url, 'type': type});
+      request.body = jsonEncode({
+        'url': url,
+        'type': type,
+        'quality': quality,
+        'format': format,
+      });
 
       final response = await http.Client().send(request);
 
-      if (response.statusCode != 200) {
-        yield {'status': 'error', 'error': 'HTTP ${response.statusCode}'};
-        return;
-      }
+      if (response.statusCode == 200) {
+        final stream = response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter());
 
-      final stream = response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
-
-      await for (final line in stream) {
-        if (line.trim().isNotEmpty) {
-          try {
-            yield jsonDecode(line) as Map<String, dynamic>;
-          } catch (e) {
-            print("Error parsing JSON line: $e");
+        await for (final line in stream) {
+          if (line.isNotEmpty) {
+            try {
+              yield jsonDecode(line) as Map<String, dynamic>;
+            } catch (e) {
+              yield {'status': 'error', 'error': 'Parse error: $e'};
+            }
           }
         }
+      } else {
+        yield {'status': 'error', 'error': 'HTTP ${response.statusCode}'};
       }
     } catch (e) {
       yield {'status': 'error', 'error': e.toString()};
@@ -195,14 +199,74 @@ class ApiService {
     try {
       final response = await http.get(Uri.parse('$baseUrl/api/downloads'));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['ok'] == true) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['ok']) {
           return data['files'];
         }
       }
-      return [];
     } catch (e) {
-      return [];
+      print("Error fetching downloads: $e");
     }
+    return [];
+  }
+
+  Future<bool> deleteOutput(String videoId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/delete_output'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'video_id': videoId}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      print("Error deleting output: $e");
+    }
+    return false;
+  }
+
+  Future<bool> openFolder(String path) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/open_folder'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'path': path}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      print("Error opening folder: $e");
+    }
+    return false;
+  }
+
+  Future<Map<String, dynamic>?> getConfig() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/api/config'));
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      }
+    } catch (e) {
+      print("Error fetching config: $e");
+    }
+    return null;
+  }
+
+  Future<bool> updateConfig({String? downloadDir}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/config'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'download_dir': downloadDir}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error updating config: $e");
+    }
+    return false;
   }
 }

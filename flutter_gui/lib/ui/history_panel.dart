@@ -81,6 +81,8 @@ class HistoryPanel extends ConsumerWidget {
                 itemCount: ref.watch(historyProvider).length,
                 itemBuilder: (context, index) {
                   final item = ref.watch(historyProvider)[index];
+                  final langName = languageMap[item.targetLang] ?? item.targetLang ?? 'No translation';
+                  
                   return Card(
                     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: ListTile(
@@ -104,7 +106,7 @@ class HistoryPanel extends ConsumerWidget {
                             Text(item.titleOriginal!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
                           const SizedBox(height: 2),
                           Text(
-                            "${item.targetLang ?? 'No translation'} • ${item.lastUsed.split('T')[0]}",
+                            "$langName • ${item.lastUsed.split('T')[0]}",
                             style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         ],
@@ -133,12 +135,49 @@ class HistoryPanel extends ConsumerWidget {
                         // Also restore subtitle path for MPV button in control panel
                         ref.read(currentSubtitlePathProvider.notifier).state = item.subtitlePath;
                       },
-                      trailing: IconButton(
-                        icon: const Icon(Icons.play_arrow),
-                        onPressed: () {
-                           // Quick play logic
-                           MpvLauncher.play(item.url, subtitlePath: item.subtitlePath);
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.play_arrow),
+                            onPressed: () {
+                               // Quick play logic
+                               MpvLauncher.play(item.url, subtitlePath: item.subtitlePath);
+                            },
+                            tooltip: "Play",
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Delete Output?"),
+                                  content: const Text("This will delete the generated subtitles and audio files for this video."),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+                                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
+                                  ],
+                                ),
+                              );
+                              
+                              if (confirm == true && item.videoId != null) {
+                                final success = await ref.read(apiServiceProvider).deleteOutput(item.videoId!);
+                                if (success) {
+                                  await ref.read(historyProvider.notifier).removeFromHistory(item.videoId!);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deleted")));
+                                  }
+                                } else {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to delete")));
+                                  }
+                                }
+                              }
+                            },
+                            tooltip: "Delete",
+                          ),
+                        ],
                       ),
                     ),
                   );

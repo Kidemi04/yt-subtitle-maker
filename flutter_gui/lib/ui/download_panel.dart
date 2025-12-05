@@ -16,6 +16,8 @@ class DownloadPanel extends ConsumerStatefulWidget {
 class _DownloadPanelState extends ConsumerState<DownloadPanel> {
   final TextEditingController _urlController = TextEditingController();
   String _selectedType = 'video'; // video or audio
+  String _selectedQuality = 'best';
+  String _selectedFormat = 'mp4';
   
   // Progress State
   double _progress = 0.0;
@@ -46,7 +48,12 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
       _statusMessage = "Initializing...";
     });
 
-    final stream = ref.read(apiServiceProvider).downloadMedia(url, _selectedType);
+    final stream = ref.read(apiServiceProvider).downloadMedia(
+      url, 
+      _selectedType,
+      quality: _selectedQuality,
+      format: _selectedFormat,
+    );
     
     await for (final event in stream) {
       if (!mounted) break;
@@ -55,7 +62,6 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
       
       if (status == 'downloading') {
         final percentStr = event['percent'].toString();
-        // percent comes as string "12.5" or similar
         final percentVal = double.tryParse(percentStr) ?? 0.0;
         
         final speedVal = event['speed']; // bytes/s
@@ -87,7 +93,7 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
       } else if (status == 'processing') {
          setState(() {
            _statusMessage = "Processing (Converting)...";
-           _progress = 1.0; // Indeterminate or full
+           _progress = 1.0; 
          });
       } else if (status == 'finished') {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Downloaded: ${event['filename']}")));
@@ -145,22 +151,61 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  
+                  // Options Row
                   Row(
                     children: [
-                      const Text("Format: "),
-                      const SizedBox(width: 8),
+                      // Type
                       SegmentedButton<String>(
                         segments: const [
-                          ButtonSegment(value: 'video', label: Text('Video (MP4)'), icon: Icon(Icons.videocam)),
-                          ButtonSegment(value: 'audio', label: Text('Audio Only'), icon: Icon(Icons.audiotrack)),
+                          ButtonSegment(value: 'video', label: Text('Video'), icon: Icon(Icons.videocam)),
+                          ButtonSegment(value: 'audio', label: Text('Audio'), icon: Icon(Icons.audiotrack)),
                         ],
                         selected: {_selectedType},
                         onSelectionChanged: isDownloading ? null : (Set<String> newSelection) {
                           setState(() {
                             _selectedType = newSelection.first;
+                            // Reset format defaults based on type
+                            if (_selectedType == 'video') {
+                              _selectedFormat = 'mp4';
+                            } else {
+                              _selectedFormat = 'mp3';
+                            }
                           });
                         },
                       ),
+                      const SizedBox(width: 16),
+                      
+                      // Quality (Video only)
+                      if (_selectedType == 'video') ...[
+                        DropdownButton<String>(
+                          value: _selectedQuality,
+                          items: const [
+                            DropdownMenuItem(value: 'best', child: Text("Best Quality")),
+                            DropdownMenuItem(value: '1080p', child: Text("1080p")),
+                            DropdownMenuItem(value: '720p', child: Text("720p")),
+                            DropdownMenuItem(value: '480p', child: Text("480p")),
+                          ],
+                          onChanged: isDownloading ? null : (v) => setState(() => _selectedQuality = v!),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                      
+                      // Format
+                      DropdownButton<String>(
+                        value: _selectedFormat,
+                        items: _selectedType == 'video' 
+                          ? const [
+                              DropdownMenuItem(value: 'mp4', child: Text("MP4")),
+                              DropdownMenuItem(value: 'mkv', child: Text("MKV")),
+                            ]
+                          : const [
+                              DropdownMenuItem(value: 'mp3', child: Text("MP3")),
+                              DropdownMenuItem(value: 'm4a', child: Text("M4A")),
+                            ],
+                        onChanged: isDownloading ? null : (v) => setState(() => _selectedFormat = v!),
+                      ),
+                      
                       const Spacer(),
                       FilledButton.icon(
                         onPressed: isDownloading ? null : _startDownload,
@@ -194,10 +239,28 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text("Downloaded Files", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              IconButton(
-                onPressed: _refreshList,
-                icon: const Icon(Icons.refresh),
-                tooltip: "Refresh List",
+              Row(
+                children: [
+                   OutlinedButton.icon(
+                    onPressed: () async {
+                      // We need to know the download dir. 
+                      // For now, let's just open the default 'downloads' folder relative to backend?
+                      // Or we can get it from config.
+                      final config = await ref.read(apiServiceProvider).getConfig();
+                      if (config != null) {
+                         await ref.read(apiServiceProvider).openFolder(config['download_dir']);
+                      }
+                    },
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text("Open Folder"),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _refreshList,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "Refresh List",
+                  ),
+                ],
               ),
             ],
           ),
@@ -213,14 +276,27 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
                       final filename = file['filename'] as String;
                       final path = file['path'] as String;
                       final sizeMb = (file['size'] as int) / (1024 * 1024);
+                      final thumbnail = file['thumbnail'] as String?;
                       
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          leading: Icon(
-                            filename.endsWith('.mp4') ? Icons.movie : Icons.music_note,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                          leading: thumbnail != null 
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.network("file:///$thumbnail", width: 80, height: 45, fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => const Icon(Icons.broken_image),
+                                ),
+                              ) // Note: file:/// might not work directly in network image on all platforms, but on Windows desktop it usually works if we use FileImage. 
+                              // Actually Image.network doesn't support file scheme. We should use Image.file.
+                              // But we need to pass a File object.
+                              // Let's try to use a custom widget or just Image.file if we can import dart:io.
+                              // Since we are in pure dart/flutter, we can use Image.file.
+                            : Icon(
+                                filename.endsWith('.mp4') ? Icons.movie : Icons.music_note,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 40,
+                              ),
                           title: Text(filename, maxLines: 1, overflow: TextOverflow.ellipsis),
                           subtitle: Text("${sizeMb.toStringAsFixed(1)} MB"),
                           trailing: Row(
@@ -236,13 +312,9 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
                               IconButton(
                                 icon: const Icon(Icons.folder_open),
                                 onPressed: () {
-                                  // Open folder logic (Windows specific)
-                                  // We can use Process.run but we are in Flutter.
-                                  // Since we don't have a direct 'open folder' tool easily accessible without plugins like url_launcher
-                                  // We can try to rely on the user knowing where it is, or just skip this for now.
-                                  // Actually, we can use MpvLauncher to play, which is good enough.
+                                  ref.read(apiServiceProvider).openFolder(path);
                                 },
-                                tooltip: "Open Folder (Not Implemented)",
+                                tooltip: "Show in Folder",
                               ),
                             ],
                           ),

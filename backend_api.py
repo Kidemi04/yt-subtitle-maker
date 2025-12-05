@@ -111,7 +111,33 @@ def process_video(req: ProcessRequest):
         
         # 1. Download
         print(f"Downloading {req.url}...")
-        audio_path, duration = download_audio(req.url, output_dir)
+        # We use a temporary location or the final location?
+        # Let's download to the main output dir first, then move?
+        # Or just download directly.
+        # But we need video title for the folder name.
+        # Let's fetch metadata first.
+        meta = fetch_video_metadata(req.url)
+        video_id = get_video_id(req.url)
+        title = meta.get("title", video_id)
+        
+        # Sanitize title for folder name
+        safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c==' ' or c=='_']).strip()
+        folder_name = f"{safe_title}_{video_id}"
+        video_output_dir = os.path.join(output_dir, folder_name)
+        os.makedirs(video_output_dir, exist_ok=True)
+        
+        # Save metadata json
+        metadata_path = os.path.join(video_output_dir, f"{video_id}.json")
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "video_id": video_id,
+                "title_original": title,
+                "thumbnail_url": meta.get("thumbnail_url"),
+                "url": req.url,
+                "timestamp": str(datetime.datetime.now())
+            }, f, indent=4)
+            
+        audio_path, duration = download_audio(req.url, video_output_dir)
         
         # 2. Transcribe
         print(f"Transcribing {audio_path}...")
@@ -126,8 +152,8 @@ def process_video(req: ProcessRequest):
         )
         
         # 3. Save Original
-        video_id = os.path.splitext(os.path.basename(audio_path))[0]
-        original_srt_path = os.path.join(output_dir, f"{video_id}_original.srt")
+        # video_id is already known
+        original_srt_path = os.path.join(video_output_dir, f"{video_id}_original.srt")
         write_srt(segments, original_srt_path, field="text")
         original_srt_path = os.path.abspath(original_srt_path)
         
@@ -142,22 +168,28 @@ def process_video(req: ProcessRequest):
                 req.gemini_api_key,
                 req.gemini_model
             )
-            translated_srt_path = os.path.join(output_dir, f"{video_id}_{req.target_lang}.srt")
+            translated_srt_path = os.path.join(video_output_dir, f"{video_id}_{req.target_lang}.srt")
             write_srt(segments, translated_srt_path, field="translated")
             translated_srt_path = os.path.abspath(translated_srt_path)
             
-        # 5. Update History (Optional, but good for consistency)
-        # We can update the config file history if we want the Python side to track it too.
-        # But the Flutter app might manage its own history.
-        # Let's update it here just in case the legacy GUI is used later.
-        # (Skipping for now to keep API stateless-ish, Flutter will manage history)
+            # Update metadata with translation info
+            try:
+                with open(metadata_path, "r", encoding="utf-8") as f:
+                    meta_data = json.load(f)
+                meta_data["target_lang"] = req.target_lang
+                # We don't have translated title here unless we call translate_title separately
+                # But we can store it if we did.
+                with open(metadata_path, "w", encoding="utf-8") as f:
+                    json.dump(meta_data, f, indent=4)
+            except:
+                pass
             
         return ProcessResponse(
             ok=True,
             video_id=video_id,
             original_srt_path=original_srt_path,
             translated_srt_path=translated_srt_path,
-            video_file_path=audio_path # It's audio, but MPV can play it
+            video_file_path=audio_path 
         )
         
     except Exception as e:
@@ -207,44 +239,54 @@ def list_outputs():
             return ListOutputsResponse(ok=True, files=[])
             
         files = []
-        for f in os.listdir(output_dir):
-            path = os.path.join(output_dir, f)
-            if not os.path.isfile(path):
-                continue
+        
+        # Walk through subdirectories
+        for root, dirs, filenames in os.walk(output_dir):
+            for f in filenames:
+                path = os.path.join(root, f)
                 
-            # Heuristic parsing
-            # Format: {video_id}.mp3, {video_id}_original.srt, {video_id}_{lang}.srt
-            name, ext = os.path.splitext(f)
-            if ext.lower() not in ['.mp3', '.m4a', '.wav', '.srt']:
-                continue
+                # Heuristic parsing
+                name, ext = os.path.splitext(f)
+                if ext.lower() not in ['.mp3', '.m4a', '.wav', '.srt']:
+                    continue
+                    
+                video_id = "unknown"
+                ftype = "unknown"
+                lang = None
                 
-            video_id = name
-            ftype = "unknown"
-            lang = None
-            
-            if ext.lower() == '.srt':
-                if name.endswith("_original"):
-                    ftype = "srt_original"
-                    video_id = name.replace("_original", "")
-                else:
-                    # Try to find lang code at end (e.g. _zh-CN)
-                    parts = name.split('_')
-                    if len(parts) > 1:
-                        lang = parts[-1]
-                        ftype = "srt_translated"
-                        video_id = "_".join(parts[:-1])
+                # Try to find metadata json in the same folder
+                meta_path = os.path.join(root, f"{name}.json") # if name is video_id
+                # But name might be {video_id}_original or {video_id}_{lang}
+                
+                # Simple parsing based on suffix
+                if ext.lower() == '.srt':
+                    if name.endswith("_original"):
+                        ftype = "srt_original"
+                        video_id = name.replace("_original", "")
                     else:
-                        ftype = "srt_original" # Fallback
-            else:
-                ftype = "audio"
+                        parts = name.split('_')
+                        if len(parts) > 1:
+                            lang = parts[-1]
+                            ftype = "srt_translated"
+                            video_id = "_".join(parts[:-1])
+                        else:
+                            ftype = "srt_original"
+                else:
+                    ftype = "audio"
+                    video_id = name
                 
-            files.append(OutputFile(
-                filename=f,
-                path=os.path.abspath(path),
-                video_id=video_id,
-                type=ftype,
-                lang=lang
-            ))
+                # If we have a metadata file for this video_id in this folder, we can read it?
+                # Actually, the frontend just needs the list of files, and it will group them.
+                # But we can also return the metadata file content if needed?
+                # For now, let's just return the files.
+                
+                files.append(OutputFile(
+                    filename=f,
+                    path=os.path.abspath(path),
+                    video_id=video_id,
+                    type=ftype,
+                    lang=lang
+                ))
             
         return ListOutputsResponse(ok=True, files=files)
     except Exception as e:
@@ -319,9 +361,91 @@ def install_dependencies(model_name: str = None):
 
 # --- Download Feature ---
 
+class DeleteOutputRequest(BaseModel):
+    video_id: str
+
+@app.post("/api/delete_output")
+def delete_output(req: DeleteOutputRequest):
+    try:
+        config = load_config()
+        output_dir = config.output_dir
+        
+        # Find the folder or files
+        deleted = False
+        
+        # Check for subfolder first
+        for root, dirs, filenames in os.walk(output_dir):
+            for d in dirs:
+                if d.endswith(f"_{req.video_id}"):
+                    import shutil
+                    shutil.rmtree(os.path.join(root, d))
+                    deleted = True
+                    break
+            if deleted: break
+            
+        if not deleted:
+            # Fallback for legacy flat files
+            for f in os.listdir(output_dir):
+                if req.video_id in f:
+                    os.remove(os.path.join(output_dir, f))
+                    deleted = True
+                    
+        return {"ok": True, "deleted": deleted}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+class OpenFolderRequest(BaseModel):
+    path: str
+
+@app.post("/api/open_folder")
+def open_folder(req: OpenFolderRequest):
+    try:
+        path = req.path
+        if not os.path.exists(path):
+            return {"ok": False, "error": "Path does not exist"}
+            
+        if os.path.isfile(path):
+            path = os.path.dirname(path)
+            
+        os.startfile(path)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+# --- Config Endpoints ---
+
+class ConfigResponse(BaseModel):
+    output_dir: str
+    download_dir: str
+    whisper_model: str
+
+class UpdateConfigRequest(BaseModel):
+    download_dir: Optional[str] = None
+
+@app.get("/api/config", response_model=ConfigResponse)
+def get_config_endpoint():
+    config = load_config()
+    return ConfigResponse(
+        output_dir=config.output_dir,
+        download_dir=config.download_dir,
+        whisper_model=config.whisper_model
+    )
+
+@app.post("/api/config")
+def update_config_endpoint(req: UpdateConfigRequest):
+    config = load_config()
+    if req.download_dir:
+        config.download_dir = req.download_dir
+    save_config(config)
+    return {"ok": True}
+
+# --- Download Feature ---
+
 class DownloadRequest(BaseModel):
     url: str
     type: str = "video" # video or audio
+    quality: str = "best"
+    format: str = "mp4"
 
 class DownloadResponse(BaseModel):
     ok: bool
@@ -336,15 +460,12 @@ def download_media_endpoint(req: DownloadRequest):
     """
     def event_generator():
         try:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            if getattr(sys, 'frozen', False):
-                 base_dir = os.path.dirname(sys.executable)
-            
-            downloads_dir = os.path.join(base_dir, "downloads")
+            config = load_config()
+            downloads_dir = config.download_dir
             
             from core.audio_downloader import download_media_generator
             
-            for event in download_media_generator(req.url, downloads_dir, req.type):
+            for event in download_media_generator(req.url, downloads_dir, req.type, req.quality, req.format):
                 yield json.dumps(event) + "\n"
                 
         except Exception as e:
@@ -355,24 +476,35 @@ def download_media_endpoint(req: DownloadRequest):
 @app.get("/api/downloads")
 def list_downloads():
     try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        if getattr(sys, 'frozen', False):
-             base_dir = os.path.dirname(sys.executable)
+        config = load_config()
+        downloads_dir = config.download_dir
         
-        downloads_dir = os.path.join(base_dir, "downloads")
-        
-        if not os.path.exists(downloads_dir):
-            return {"ok": True, "files": []}
-            
         files = []
-        for f in os.listdir(downloads_dir):
-            full_path = os.path.join(downloads_dir, f)
-            if os.path.isfile(full_path):
+        
+        # Walk through video and audio subfolders
+        for root, dirs, filenames in os.walk(downloads_dir):
+            for f in filenames:
+                full_path = os.path.join(root, f)
+                
+                # Filter for media files
+                ext = os.path.splitext(f)[1].lower()
+                if ext not in ['.mp4', '.mkv', '.mp3', '.m4a', '.webm']:
+                    continue
+                    
+                # Try to find thumbnail
+                thumb_path = None
+                base_name = os.path.splitext(full_path)[0]
+                for t_ext in ['.jpg', '.webp', '.png']:
+                    if os.path.exists(base_name + t_ext):
+                        thumb_path = base_name + t_ext
+                        break
+                
                 files.append({
                     "filename": f,
                     "path": full_path,
                     "size": os.path.getsize(full_path),
-                    "time": os.path.getmtime(full_path)
+                    "time": os.path.getmtime(full_path),
+                    "thumbnail": thumb_path
                 })
         
         # Sort by time desc

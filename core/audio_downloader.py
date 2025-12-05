@@ -101,7 +101,7 @@ def download_media(youtube_url: str, out_dir: str, media_type: str = 'video') ->
     except Exception as e:
         raise Exception(f"Download failed: {str(e)}")
 
-def download_media_generator(youtube_url: str, out_dir: str, media_type: str = 'video'):
+def download_media_generator(youtube_url: str, out_dir: str, media_type: str = 'video', quality: str = 'best', format: str = 'mp4'):
     """
     Download media from YouTube and yield progress updates.
     Yields dicts:
@@ -110,8 +110,12 @@ def download_media_generator(youtube_url: str, out_dir: str, media_type: str = '
     {'status': 'error', 'error': ...}
     """
     
-    out_path = Path(out_dir)
+    # Separate folders for video and audio
+    subfolder = "video" if media_type == 'video' else "audio"
+    out_path = Path(out_dir) / subfolder
     out_path.mkdir(parents=True, exist_ok=True)
+    
+    # Output template: title.ext
     output_template = str(out_path / "%(title)s.%(ext)s")
     
     q = queue.Queue()
@@ -135,19 +139,31 @@ def download_media_generator(youtube_url: str, out_dir: str, media_type: str = '
         'quiet': True,
         'no_warnings': True,
         'progress_hooks': [progress_hook],
+        'writethumbnail': True, # Save thumbnail
     }
 
     if media_type == 'audio':
+        # Audio format selection
+        codec = 'mp3' if format == 'mp3' else 'm4a'
         ydl_opts.update({
             'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'm4a',
+                'preferredcodec': codec,
             }],
         })
     else:
+        # Video quality selection
+        # quality can be 'best', '1080p', '720p', '480p'
+        if quality == 'best':
+            format_str = f'bestvideo[ext={format}]+bestaudio[ext=m4a]/best[ext={format}]/best'
+        else:
+            height = quality.replace('p', '')
+            format_str = f'bestvideo[height<={height}][ext={format}]+bestaudio[ext=m4a]/best[height<={height}][ext={format}]/best'
+
         ydl_opts.update({
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': format_str,
+            'merge_output_format': format,
         })
 
     def run_download():
@@ -163,13 +179,24 @@ def download_media_generator(youtube_url: str, out_dir: str, media_type: str = '
                 else:
                     filename = ydl.prepare_filename(info)
                 
+                # Check if thumbnail was downloaded
+                # yt-dlp saves it as filename.jpg/webp
+                # We can try to find it
+                thumb_path = None
+                base_name = os.path.splitext(filename)[0]
+                for ext in ['.jpg', '.webp', '.png']:
+                    if os.path.exists(base_name + ext):
+                        thumb_path = base_name + ext
+                        break
+                
                 duration = info.get('duration', 0.0)
                 
                 q.put({
                     'status': 'finished',
                     'filename': os.path.basename(filename),
                     'path': str(Path(filename).absolute()),
-                    'duration': float(duration)
+                    'duration': float(duration),
+                    'thumbnail': str(Path(thumb_path).absolute()) if thumb_path else None
                 })
         except Exception as e:
             q.put({'status': 'error', 'error': str(e)})

@@ -24,6 +24,25 @@ final geminiApiKeyProvider = StateProvider<String>((ref) => '');
 final enableTranslationProvider = StateProvider<bool>((ref) => true);
 final apiKeyStatusProvider = StateProvider<String>((ref) => 'Not tested');
 
+final languageMap = {
+  'zh-CN': 'Chinese (Simplified)',
+  'zh-TW': 'Chinese (Traditional)',
+  'en': 'English',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'it': 'Italian',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+  'vi': 'Vietnamese',
+  'th': 'Thai',
+  'id': 'Indonesian',
+  'ms': 'Malay',
+  'hi': 'Hindi',
+};
+
 class ControlPanel extends ConsumerStatefulWidget {
   const ControlPanel({super.key});
 
@@ -264,11 +283,7 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
           DropdownButtonFormField<String>(
             value: ref.watch(targetLangProvider),
             decoration: const InputDecoration(labelText: "Target Language", border: OutlineInputBorder()),
-            items: const [
-              DropdownMenuItem(value: "zh-CN", child: Text("Chinese (Simplified)")),
-              DropdownMenuItem(value: "en", child: Text("English")),
-              DropdownMenuItem(value: "ja", child: Text("Japanese")),
-            ],
+            items: languageMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
             onChanged: (v) => ref.read(targetLangProvider.notifier).state = v!,
           ),
           const SizedBox(height: 12),
