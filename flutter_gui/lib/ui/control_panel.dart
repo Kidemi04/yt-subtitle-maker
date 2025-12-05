@@ -6,7 +6,7 @@ import '../mpv_launcher.dart';
 import '../history_service.dart';
 
 // Providers
-final apiServiceProvider = Provider((ref) => ApiService());
+// apiServiceProvider is now in api_service.dart
 
 final urlProvider = StateProvider<String>((ref) => '');
 final metadataProvider = StateProvider<VideoMetadata?>((ref) => null);
@@ -21,7 +21,7 @@ final whisperDeviceProvider = StateProvider<String>((ref) => 'auto');
 final whisperModelProvider = StateProvider<String>((ref) => 'turbo');
 final geminiModelProvider = StateProvider<String>((ref) => 'gemini-2.5-flash-lite');
 final geminiApiKeyProvider = StateProvider<String>((ref) => '');
-final enableTranslationProvider = StateProvider<bool>((ref) => false);
+final enableTranslationProvider = StateProvider<bool>((ref) => true);
 final apiKeyStatusProvider = StateProvider<String>((ref) => 'Not tested');
 
 class ControlPanel extends ConsumerStatefulWidget {

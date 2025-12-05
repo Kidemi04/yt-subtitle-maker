@@ -15,19 +15,6 @@ A powerful desktop application to download YouTube audio, transcribe it locally 
   - **MPV Integration**: Play videos with subtitles directly.
   - **Logs & History**: Track your processing tasks.
 
-## Prerequisites
-
-1. **Python 3.10+**
-2. **Flutter SDK** (for the frontend)
-3. **Visual Studio 2022** (Windows only): Required for building the Windows app.
-   - Install the **"Desktop development with C++"** workload.
-4. **FFmpeg**: Must be in your system PATH.
-5. **mpv**: Must be in your system PATH (for playback).
-
-## Installation & Setup
-
-### 1. Python Backend
-
 1. Create and activate virtual environment:
    ```bash
    python -m venv venv

@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'models.dart';
+
+final apiServiceProvider = Provider((ref) => ApiService());
 
 class ApiService {
   final String baseUrl;
@@ -111,9 +114,86 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>?> checkDependencies() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/api/dependencies/status'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print("Check dependencies error: $e");
+    }
+    return null;
+  }
+
+  Stream<Map<String, dynamic>> installDependencies(String modelName) async* {
+    try {
+      final request = http.Request('POST', Uri.parse('$baseUrl/api/dependencies/install?model_name=$modelName'));
+      final response = await request.send();
+
+      await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (chunk.isNotEmpty) {
+          try {
+            yield jsonDecode(chunk);
+          } catch (e) {
+            print("Parse error: $e");
+          }
+        }
+      }
+    } catch (e) {
+      yield {"status": "error", "message": e.toString()};
+    }
+  }
+
   Future<List<dynamic>> fetchOutputs() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/api/outputs'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['ok'] == true) {
+          return data['files'];
+        }
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Stream<Map<String, dynamic>> downloadMedia(String url, String type) async* {
+    try {
+      final request = http.Request('POST', Uri.parse('$baseUrl/api/download'));
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode({'url': url, 'type': type});
+
+      final response = await http.Client().send(request);
+
+      if (response.statusCode != 200) {
+        yield {'status': 'error', 'error': 'HTTP ${response.statusCode}'};
+        return;
+      }
+
+      final stream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      await for (final line in stream) {
+        if (line.trim().isNotEmpty) {
+          try {
+            yield jsonDecode(line) as Map<String, dynamic>;
+          } catch (e) {
+            print("Error parsing JSON line: $e");
+          }
+        }
+      }
+    } catch (e) {
+      yield {'status': 'error', 'error': e.toString()};
+    }
+  }
+
+  Future<List<dynamic>> fetchDownloads() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/api/downloads'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['ok'] == true) {

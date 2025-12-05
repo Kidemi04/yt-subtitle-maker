@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import uvicorn
 import threading
+import sys
 
 # Import existing core logic
 from core.audio_downloader import download_audio
@@ -11,7 +12,7 @@ from core.transcriber import transcribe_audio
 from core.subtitles import write_srt
 from core.translator_gemini import translate_segments_with_gemini, test_gemini_api_key, translate_title_with_gemini
 from core.youtube_metadata import fetch_video_metadata
-from core.config import load_config, save_config, AppConfig
+from core.config import load_config, save_config, save_config, AppConfig
 
 app = FastAPI(title="YouTube Subtitle Maker API")
 
@@ -248,6 +249,137 @@ def list_outputs():
         return ListOutputsResponse(ok=True, files=files)
     except Exception as e:
         return ListOutputsResponse(ok=False, error=str(e))
+
+# --- Dependency Endpoints ---
+
+from core.dependency_manager import check_whisper_model, check_ffmpeg, check_mpv
+from fastapi.responses import StreamingResponse
+import json
+
+class DependencyStatus(BaseModel):
+    whisper_model: str
+    whisper_exists: bool
+    ffmpeg_exists: bool
+    mpv_exists: bool
+
+@app.get("/api/dependencies/status", response_model=DependencyStatus)
+def get_dependency_status():
+    # We check the default model 'turbo' or read from config
+    # For init screen, we enforce the default 'turbo' model for now, 
+    # or we could check the one in config.
+    config = load_config()
+    model = config.whisper_model # Default 'turbo'
+    
+    return DependencyStatus(
+        whisper_model=model,
+        whisper_exists=check_whisper_model(model),
+        ffmpeg_exists=check_ffmpeg(),
+        mpv_exists=check_mpv()
+    )
+
+@app.post("/api/dependencies/install")
+def install_dependencies(model_name: str = None):
+    """
+    Streams download progress for the Whisper model.
+    """
+    config = load_config()
+    
+    # If model_name is provided, update config and use it
+    if model_name:
+        config.whisper_model = model_name
+        save_config(config)
+    
+    target_model = config.whisper_model
+    
+    def event_generator():
+        from core.dependency_manager import check_whisper_model, download_whisper_model_generator
+
+        try:
+            # Check if already exists
+            if check_whisper_model(target_model):
+                yield json.dumps({"status": "done", "message": "Model already exists"}) + "\n"
+                return
+
+            for downloaded, total, speed in download_whisper_model_generator(target_model):
+                data = {
+                    "status": "downloading",
+                    "downloaded": downloaded,
+                    "total": total,
+                    "speed": speed,
+                    "percent": (downloaded / total * 100) if total > 0 else 0
+                }
+                yield json.dumps(data) + "\n"
+
+            yield json.dumps({"status": "done"}) + "\n"
+            
+        except Exception as e:
+            yield json.dumps({"status": "error", "message": str(e)}) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+# --- Download Feature ---
+
+class DownloadRequest(BaseModel):
+    url: str
+    type: str = "video" # video or audio
+
+class DownloadResponse(BaseModel):
+    ok: bool
+    error: Optional[str] = None
+    filename: Optional[str] = None
+    path: Optional[str] = None
+
+@app.post("/api/download")
+def download_media_endpoint(req: DownloadRequest):
+    """
+    Streams download progress.
+    """
+    def event_generator():
+        try:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            if getattr(sys, 'frozen', False):
+                 base_dir = os.path.dirname(sys.executable)
+            
+            downloads_dir = os.path.join(base_dir, "downloads")
+            
+            from core.audio_downloader import download_media_generator
+            
+            for event in download_media_generator(req.url, downloads_dir, req.type):
+                yield json.dumps(event) + "\n"
+                
+        except Exception as e:
+            yield json.dumps({"status": "error", "error": str(e)}) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+@app.get("/api/downloads")
+def list_downloads():
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        if getattr(sys, 'frozen', False):
+             base_dir = os.path.dirname(sys.executable)
+        
+        downloads_dir = os.path.join(base_dir, "downloads")
+        
+        if not os.path.exists(downloads_dir):
+            return {"ok": True, "files": []}
+            
+        files = []
+        for f in os.listdir(downloads_dir):
+            full_path = os.path.join(downloads_dir, f)
+            if os.path.isfile(full_path):
+                files.append({
+                    "filename": f,
+                    "path": full_path,
+                    "size": os.path.getsize(full_path),
+                    "time": os.path.getmtime(full_path)
+                })
+        
+        # Sort by time desc
+        files.sort(key=lambda x: x['time'], reverse=True)
+        return {"ok": True, "files": files}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

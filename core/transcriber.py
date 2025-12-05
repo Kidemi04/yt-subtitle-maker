@@ -75,7 +75,8 @@ def transcribe_audio(
             run_device = "cpu"
         
         print(f"Loading Whisper model '{model_name}' on {run_device}...")
-        model = whisper.load_model(model_name, device=run_device)
+        from core.dependency_manager import get_whisper_cache_dir
+        model = whisper.load_model(model_name, device=run_device, download_root=get_whisper_cache_dir())
 
         print(f"Transcribing '{audio_path}'...")
         # Map "Auto detect" to None for Whisper

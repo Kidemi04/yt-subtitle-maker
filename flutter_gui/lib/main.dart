@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
-import 'ui/home_screen.dart';
+import 'ui/init_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
         ),
         fontFamily: 'Segoe UI', // Good for Windows
       ),
-      home: const HomeScreen(),
+      home: const InitScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

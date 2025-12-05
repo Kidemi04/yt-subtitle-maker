@@ -25,3 +25,17 @@ config.json
 
 # Logs
 *.log
+
+# Models
+models/
+
+# Downloads
+downloads/
+
+# Release
+release/
+
+# Video Files
+*.mp4
+*.mkv
+*.avi
