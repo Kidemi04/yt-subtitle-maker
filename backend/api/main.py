@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.routes import config as config_route
 from api.routes import metadata, process, translator, version
 
 app = FastAPI(title="yt-subtitle-maker API", version="2.0.0a1")
@@ -19,6 +20,7 @@ app.include_router(metadata.router)
 app.include_router(process.router)
 app.include_router(translator.router)
 app.include_router(version.router)
+app.include_router(config_route.router)
 
 
 @app.get("/")
