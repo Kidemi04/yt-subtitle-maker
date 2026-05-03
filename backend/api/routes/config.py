@@ -44,20 +44,33 @@ _CAMEL_TO_SNAKE = {
 }
 _SNAKE_TO_CAMEL = {v: k for k, v in _CAMEL_TO_SNAKE.items()}
 
+# API keys are masked on GET so they aren't leaked over the wire (V2 ngrok).
+# POST ignores the mask sentinel so the frontend can GET → render → POST
+# without re-entering the key.
+SECRET_KEYS = {"geminiApiKey", "localOpenaiApiKey", "openaiApiKey"}
+MASK = "***"
+
 
 def _to_camel(d: dict) -> dict:
     return {_SNAKE_TO_CAMEL.get(k, k): v for k, v in d.items()}
 
 
+def _mask_secrets(d: dict) -> dict:
+    return {k: (MASK if k in SECRET_KEYS and v else v) for k, v in d.items()}
+
+
 @router.get("/config")
 def get_config() -> dict:
-    return _to_camel(asdict(load_config()))
+    return _mask_secrets(_to_camel(asdict(load_config())))
 
 
 @router.post("/config")
 def update_config(payload: dict[str, Any] = Body(...)) -> dict:  # noqa: B008
     cfg = load_config()
     for camel_key, value in payload.items():
+        # Don't overwrite real keys with the GET-side mask
+        if camel_key in SECRET_KEYS and value == MASK:
+            continue
         snake_key = _CAMEL_TO_SNAKE.get(camel_key)
         if snake_key and hasattr(cfg, snake_key):
             setattr(cfg, snake_key, value)
