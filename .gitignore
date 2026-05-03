@@ -39,3 +39,13 @@ release/
 *.mp4
 *.mkv
 *.avi
+
+# Frontend / Tauri
+frontend-tauri/node_modules/
+frontend-tauri/dist/
+
+# Tauri build artifacts
+src-tauri/target/
+
+# Misc
+*.log

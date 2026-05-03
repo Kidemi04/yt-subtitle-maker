@@ -27,9 +27,6 @@ def translate_segments_with_gemini(
     total_batches = (total_segments + BATCH_SIZE - 1) // BATCH_SIZE
     
     for batch_idx, i in enumerate(range(0, total_segments, BATCH_SIZE)):
-        if progress_callback:
-            progress_callback(batch_idx, total_batches)
-            
         batch = segments[i : i + BATCH_SIZE]
         
         # Prepare input for Gemini
@@ -82,12 +79,17 @@ def translate_segments_with_gemini(
             # Rate limiting / politeness
             time.sleep(1)
             
+            if progress_callback:
+                progress_callback(batch_idx + 1, total_batches)
+            
         except Exception as e:
             # If a batch fails, we mark them as failed but continue?
             # Or raise? Let's log and mark as error in text.
             print(f"Batch translation failed: {e}")
             for seg in batch:
                 seg["translated"] = f"[Translation Failed: {str(e)}]"
+            if progress_callback:
+                progress_callback(batch_idx + 1, total_batches)
             # We might want to re-raise if it's an auth error, but for now continue
             if "API_KEY" in str(e).upper():
                 raise e

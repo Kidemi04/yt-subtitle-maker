@@ -1,4 +1,5 @@
 import os
+import datetime
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List
@@ -81,121 +82,187 @@ def get_video_id(url: str) -> str:
 @app.post("/api/metadata", response_model=MetadataResponse)
 def get_metadata(req: MetadataRequest):
     try:
-        # fetch_video_metadata currently returns title/thumb. 
-        # We might need to update it or just use it as is.
-        # It doesn't return duration or ID explicitly, but we can extract ID from URL.
-        # Let's use the existing function.
-        meta = fetch_video_metadata(req.url)
+        config = load_config()
+        meta = fetch_video_metadata(
+            req.url,
+            cookie_browser=config.cookie_browser,
+            cookies_txt_path=config.cookies_txt_path,
+            cookie_profile=config.cookie_profile,
+        )
         video_id = get_video_id(req.url)
         
         # We don't have duration from fetch_video_metadata yet (it uses extract_flat=False but doesn't return it).
         # We can accept that for now.
         
+        thumbnail_url = meta.get("thumbnail_url")
+        if video_id != "unknown_id" and (not thumbnail_url or "maxresdefault" in thumbnail_url):
+            thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+
         return MetadataResponse(
             ok=True,
             video_id=video_id,
             title_original=meta.get("title"),
-            thumbnail_url=meta.get("thumbnail_url"),
-            duration_seconds=0 # Placeholder
+            thumbnail_url=thumbnail_url,
+            duration_seconds=meta.get("duration") or 0
         )
     except Exception as e:
         return MetadataResponse(ok=False, error=str(e))
 
-@app.post("/api/process", response_model=ProcessResponse)
+@app.post("/api/process")
 def process_video(req: ProcessRequest):
-    # This is a blocking call for now, as requested.
-    try:
-        # Load config to get output dir (or use default)
-        config = load_config()
-        output_dir = config.output_dir
-        
-        # 1. Download
-        print(f"Downloading {req.url}...")
-        # We use a temporary location or the final location?
-        # Let's download to the main output dir first, then move?
-        # Or just download directly.
-        # But we need video title for the folder name.
-        # Let's fetch metadata first.
-        meta = fetch_video_metadata(req.url)
-        video_id = get_video_id(req.url)
-        title = meta.get("title", video_id)
-        
-        # Sanitize title for folder name
-        safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c==' ' or c=='_']).strip()
-        folder_name = f"{safe_title}_{video_id}"
-        video_output_dir = os.path.join(output_dir, folder_name)
-        os.makedirs(video_output_dir, exist_ok=True)
-        
-        # Save metadata json
-        metadata_path = os.path.join(video_output_dir, f"{video_id}.json")
-        with open(metadata_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "video_id": video_id,
-                "title_original": title,
-                "thumbnail_url": meta.get("thumbnail_url"),
-                "url": req.url,
-                "timestamp": str(datetime.datetime.now())
-            }, f, indent=4)
-            
-        audio_path, duration = download_audio(req.url, video_output_dir)
-        
-        # 2. Transcribe
-        print(f"Transcribing {audio_path}...")
-        lang_arg = req.source_lang if req.source_lang.lower() not in ["auto", "auto detect"] else None
-        
-        segments = transcribe_audio(
-            audio_path,
-            model_name=req.whisper_model,
-            language=lang_arg,
-            device=req.whisper_device,
-            duration=duration
-        )
-        
-        # 3. Save Original
-        # video_id is already known
-        original_srt_path = os.path.join(video_output_dir, f"{video_id}_original.srt")
-        write_srt(segments, original_srt_path, field="text")
-        original_srt_path = os.path.abspath(original_srt_path)
-        
-        translated_srt_path = None
-        
-        # 4. Translate
-        if req.enable_translation and req.gemini_api_key:
-            print(f"Translating to {req.target_lang}...")
-            translate_segments_with_gemini(
-                segments,
-                req.target_lang,
-                req.gemini_api_key,
-                req.gemini_model
+    """Stream processing progress as newline-delimited JSON."""
+    def event_generator():
+        try:
+            config = load_config()
+            output_dir = config.output_dir
+
+            yield json.dumps({"status": "starting", "message": "Fetching video info..."}) + "\n"
+
+            meta = fetch_video_metadata(
+                req.url,
+                cookie_browser=config.cookie_browser,
+                cookies_txt_path=config.cookies_txt_path,
+                cookie_profile=config.cookie_profile,
             )
-            translated_srt_path = os.path.join(video_output_dir, f"{video_id}_{req.target_lang}.srt")
-            write_srt(segments, translated_srt_path, field="translated")
-            translated_srt_path = os.path.abspath(translated_srt_path)
-            
-            # Update metadata with translation info
-            try:
-                with open(metadata_path, "r", encoding="utf-8") as f:
-                    meta_data = json.load(f)
-                meta_data["target_lang"] = req.target_lang
-                # We don't have translated title here unless we call translate_title separately
-                # But we can store it if we did.
-                with open(metadata_path, "w", encoding="utf-8") as f:
-                    json.dump(meta_data, f, indent=4)
-            except:
-                pass
-            
-        return ProcessResponse(
-            ok=True,
-            video_id=video_id,
-            original_srt_path=original_srt_path,
-            translated_srt_path=translated_srt_path,
-            video_file_path=audio_path 
-        )
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return ProcessResponse(ok=False, error=str(e))
+            video_id = get_video_id(req.url)
+            title = meta.get("title", video_id)
+
+            safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c == ' ' or c == '_']).strip()
+            folder_name = f"{safe_title}_{video_id}"
+            video_output_dir = os.path.join(output_dir, folder_name)
+            os.makedirs(video_output_dir, exist_ok=True)
+
+            metadata_path = os.path.join(video_output_dir, f"{video_id}.json")
+            thumbnail_url = meta.get("thumbnail_url")
+            if video_id != "unknown_id" and (not thumbnail_url or "maxresdefault" in thumbnail_url):
+                thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+
+            with open(metadata_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "video_id": video_id,
+                    "title_original": title,
+                    "thumbnail_url": thumbnail_url,
+                    "url": req.url,
+                    "timestamp": str(datetime.datetime.now())
+                }, f, indent=4)
+
+            yield json.dumps({"status": "downloading", "message": "Downloading audio..."}) + "\n"
+            audio_path, duration = download_audio(
+                req.url, video_output_dir,
+                cookie_browser=config.cookie_browser,
+                cookies_txt_path=config.cookies_txt_path,
+                cookie_profile=config.cookie_profile
+            )
+            yield json.dumps({"status": "transcribing", "message": "Transcribing with Whisper AI...", "progress": None}) + "\n"
+            lang_arg = req.source_lang if req.source_lang.lower() not in ["auto", "auto detect"] else None
+
+            # Run transcription in a thread so we can stream progress events
+            import queue as _queue
+            import threading as _threading
+            progress_q = _queue.Queue()
+            result_holder = {}
+
+            def _run_transcribe():
+                try:
+                    def on_progress(p):
+                        progress_q.put(("progress", p))
+                    segs = transcribe_audio(
+                        audio_path,
+                        model_name=req.whisper_model,
+                        language=lang_arg,
+                        device=req.whisper_device,
+                        duration=duration,
+                        progress_callback=on_progress,
+                    )
+                    result_holder["segments"] = segs
+                except Exception as exc:
+                    result_holder["error"] = exc
+                finally:
+                    progress_q.put(("done", None))
+
+            t = _threading.Thread(target=_run_transcribe, daemon=True)
+            t.start()
+            while True:
+                kind, val = progress_q.get()
+                if kind == "progress":
+                    yield json.dumps({"status": "transcribing", "progress": val}) + "\n"
+                elif kind == "done":
+                    break
+            t.join()
+            if "error" in result_holder:
+                raise result_holder["error"]
+            segments = result_holder["segments"]
+
+            yield json.dumps({"status": "transcribing", "progress": 1.0}) + "\n"
+
+            original_srt_path = os.path.join(video_output_dir, f"{video_id}_original.srt")
+            write_srt(segments, original_srt_path, field="text")
+            original_srt_path = os.path.abspath(original_srt_path)
+
+            translated_srt_path = None
+
+            if req.enable_translation and req.gemini_api_key:
+                yield json.dumps({"status": "translating", "message": f"Translating to {req.target_lang}...", "progress": 0.0}) + "\n"
+                trans_q = _queue.Queue()
+                trans_result = {}
+
+                def _run_translate():
+                    try:
+                        def on_trans_progress(batch_idx, total_batches):
+                            p = batch_idx / total_batches if total_batches > 0 else 0.0
+                            trans_q.put(("progress", p))
+                        translate_segments_with_gemini(
+                            segments,
+                            req.target_lang,
+                            req.gemini_api_key,
+                            req.gemini_model,
+                            progress_callback=on_trans_progress,
+                        )
+                    except Exception as exc:
+                        trans_result["error"] = exc
+                    finally:
+                        trans_q.put(("done", None))
+
+                tt = _threading.Thread(target=_run_translate, daemon=True)
+                tt.start()
+                while True:
+                    tkind, tval = trans_q.get()
+                    if tkind == "progress":
+                        yield json.dumps({"status": "translating", "progress": tval}) + "\n"
+                    elif tkind == "done":
+                        break
+                tt.join()
+                if "error" in trans_result:
+                    raise trans_result["error"]
+                yield json.dumps({"status": "translating", "progress": 1.0}) + "\n"
+                translated_srt_path = os.path.join(video_output_dir, f"{video_id}_{req.target_lang}.srt")
+                write_srt(segments, translated_srt_path, field="translated")
+                translated_srt_path = os.path.abspath(translated_srt_path)
+
+                try:
+                    with open(metadata_path, "r", encoding="utf-8") as f:
+                        meta_data = json.load(f)
+                    meta_data["target_lang"] = req.target_lang
+                    with open(metadata_path, "w", encoding="utf-8") as f:
+                        json.dump(meta_data, f, indent=4)
+                except Exception:
+                    pass
+
+            yield json.dumps({
+                "status": "done",
+                "ok": True,
+                "video_id": video_id,
+                "original_srt_path": original_srt_path,
+                "translated_srt_path": translated_srt_path,
+                "video_file_path": audio_path
+            }) + "\n"
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield json.dumps({"status": "error", "ok": False, "error": str(e)}) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 @app.post("/api/test_gemini_key", response_model=TestKeyResponse)
 def api_test_key(req: TestKeyRequest):
@@ -397,6 +464,9 @@ def delete_output(req: DeleteOutputRequest):
 class OpenFolderRequest(BaseModel):
     path: str
 
+class OpenUrlRequest(BaseModel):
+    url: str
+
 @app.post("/api/open_folder")
 def open_folder(req: OpenFolderRequest):
     try:
@@ -412,15 +482,45 @@ def open_folder(req: OpenFolderRequest):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+@app.post("/api/open_url")
+def open_url_endpoint(req: OpenUrlRequest):
+    import webbrowser
+    try:
+        webbrowser.open(req.url)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
 # --- Config Endpoints ---
 
 class ConfigResponse(BaseModel):
     output_dir: str
     download_dir: str
     whisper_model: str
+    whisper_device: str
+    source_lang: str
+    target_lang: str
+    gemini_api_key: Optional[str] = None
+    gemini_model: str
+    enable_translation: bool
+    cookie_browser: str
+    cookie_profile: str
+    cookies_txt_path: str
+    mpv_path: str = ""
 
 class UpdateConfigRequest(BaseModel):
     download_dir: Optional[str] = None
+    whisper_model: Optional[str] = None
+    whisper_device: Optional[str] = None
+    source_lang: Optional[str] = None
+    target_lang: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    gemini_model: Optional[str] = None
+    enable_translation: Optional[bool] = None
+    cookie_browser: Optional[str] = None
+    cookie_profile: Optional[str] = None
+    cookies_txt_path: Optional[str] = None
+    mpv_path: Optional[str] = None
 
 @app.get("/api/config", response_model=ConfigResponse)
 def get_config_endpoint():
@@ -428,14 +528,46 @@ def get_config_endpoint():
     return ConfigResponse(
         output_dir=config.output_dir,
         download_dir=config.download_dir,
-        whisper_model=config.whisper_model
+        whisper_model=config.whisper_model,
+        whisper_device=config.whisper_device,
+        source_lang=config.source_lang,
+        target_lang=config.target_lang,
+        gemini_api_key=config.gemini_api_key,
+        gemini_model=config.gemini_model,
+        enable_translation=config.enable_translation,
+        cookie_browser=config.cookie_browser,
+        cookie_profile=config.cookie_profile,
+        cookies_txt_path=config.cookies_txt_path,
+        mpv_path=config.mpv_path,
     )
 
 @app.post("/api/config")
 def update_config_endpoint(req: UpdateConfigRequest):
     config = load_config()
-    if req.download_dir:
+    if req.download_dir is not None:
         config.download_dir = req.download_dir
+    if req.whisper_model is not None:
+        config.whisper_model = req.whisper_model
+    if req.whisper_device is not None:
+        config.whisper_device = req.whisper_device
+    if req.source_lang is not None:
+        config.source_lang = req.source_lang
+    if req.target_lang is not None:
+        config.target_lang = req.target_lang
+    if req.gemini_api_key is not None:
+        config.gemini_api_key = req.gemini_api_key
+    if req.gemini_model is not None:
+        config.gemini_model = req.gemini_model
+    if req.enable_translation is not None:
+        config.enable_translation = req.enable_translation
+    if req.cookie_browser is not None:
+        config.cookie_browser = req.cookie_browser
+    if req.cookie_profile is not None:
+        config.cookie_profile = req.cookie_profile
+    if req.cookies_txt_path is not None:
+        config.cookies_txt_path = req.cookies_txt_path
+    if req.mpv_path is not None:
+        config.mpv_path = req.mpv_path
     save_config(config)
     return {"ok": True}
 
@@ -462,12 +594,17 @@ def download_media_endpoint(req: DownloadRequest):
         try:
             config = load_config()
             downloads_dir = config.download_dir
-            
+
             from core.audio_downloader import download_media_generator
-            
-            for event in download_media_generator(req.url, downloads_dir, req.type, req.quality, req.format):
+
+            for event in download_media_generator(
+                req.url, downloads_dir, req.type, req.quality, req.format,
+                cookie_browser=config.cookie_browser,
+                cookie_profile=config.cookie_profile,
+                cookies_txt_path=config.cookies_txt_path
+            ):
                 yield json.dumps(event) + "\n"
-                
+
         except Exception as e:
             yield json.dumps({"status": "error", "error": str(e)}) + "\n"
 

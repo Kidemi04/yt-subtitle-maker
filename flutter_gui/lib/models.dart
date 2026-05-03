@@ -16,11 +16,17 @@ class VideoMetadata {
   });
 
   factory VideoMetadata.fromJson(Map<String, dynamic> json) {
+    final videoId = json['video_id'] as String?;
+    final rawThumb = json['thumbnail_url'] as String?;
+    final normalizedThumb = (videoId != null && (rawThumb == null || rawThumb.contains('maxresdefault')))
+        ? 'https://img.youtube.com/vi/$videoId/hqdefault.jpg'
+        : rawThumb;
+
     return VideoMetadata(
       ok: json['ok'] ?? false,
-      videoId: json['video_id'],
+      videoId: videoId,
       titleOriginal: json['title_original'],
-      thumbnailUrl: json['thumbnail_url'],
+      thumbnailUrl: normalizedThumb,
       durationSeconds: json['duration_seconds']?.toDouble(),
       error: json['error'],
     );
@@ -63,6 +69,7 @@ class HistoryItem {
   final String? titleTranslated;
   final String? targetLang;
   final String? subtitlePath;
+  final String? audioPath;
   final String? thumbnailUrl;
   final String lastUsed;
 
@@ -73,6 +80,7 @@ class HistoryItem {
     this.titleTranslated,
     this.targetLang,
     this.subtitlePath,
+    this.audioPath,
     this.thumbnailUrl,
     required this.lastUsed,
   });
@@ -85,20 +93,28 @@ class HistoryItem {
       'title_translated': titleTranslated,
       'target_lang': targetLang,
       'subtitle_path': subtitlePath,
+      'audio_path': audioPath,
       'thumbnail_url': thumbnailUrl,
       'last_used': lastUsed,
     };
   }
 
   factory HistoryItem.fromJson(Map<String, dynamic> json) {
+    final videoId = json['video_id'] as String?;
+    final rawThumb = json['thumbnail_url'] as String?;
+    final normalizedThumb = (videoId != null && (rawThumb == null || rawThumb.contains('maxresdefault')))
+        ? 'https://img.youtube.com/vi/$videoId/hqdefault.jpg'
+        : rawThumb;
+
     return HistoryItem(
       url: json['url'],
-      videoId: json['video_id'],
+      videoId: videoId,
       titleOriginal: json['title_original'],
       titleTranslated: json['title_translated'],
       targetLang: json['target_lang'],
       subtitlePath: json['subtitle_path'],
-      thumbnailUrl: json['thumbnail_url'],
+      audioPath: json['audio_path'],
+      thumbnailUrl: normalizedThumb,
       lastUsed: json['last_used'],
     );
   }

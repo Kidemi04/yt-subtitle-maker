@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api_service.dart';
+import '../mpv_launcher.dart';
 import 'home_screen.dart';
 
 class InitScreen extends ConsumerStatefulWidget {
@@ -19,11 +20,11 @@ class _InitScreenState extends ConsumerState<InitScreen> {
   String _selectedModel = "turbo";
 
   final Map<String, String> _modelDescriptions = {
-    "tiny": "Very Fast. Low Accuracy. (Requires ~1GB RAM)",
-    "base": "Fast. Decent Accuracy. (Requires ~1GB RAM)",
-    "small": "Balanced. Good Accuracy. (Requires ~2GB RAM)",
-    "medium": "Accurate. Slower. (Requires ~5GB RAM)",
-    "turbo": "Most Accurate. Fast. (Requires ~6GB+ VRAM/RAM)",
+    "tiny": "Very Fast · Low Accuracy (~1 GB RAM)",
+    "base": "Fast · Decent Accuracy (~1 GB RAM)",
+    "small": "Balanced · Good Accuracy (~2 GB RAM)",
+    "medium": "Accurate · Slower (~5 GB RAM)",
+    "turbo": "Fast + Accurate · Recommended (~6 GB VRAM/RAM)",
   };
 
   @override
@@ -35,8 +36,21 @@ class _InitScreenState extends ConsumerState<InitScreen> {
   Future<void> _checkDependencies() async {
     final api = ref.read(apiServiceProvider);
     
-    setState(() => _status = "Checking system requirements...");
-    final status = await api.checkDependencies();
+    setState(() {
+      _status = "Checking system requirements...";
+      _error = false;
+    });
+
+    // Retry up to 5 times (backend may still be starting)
+    Map<String, dynamic>? status;
+    for (int attempt = 0; attempt < 5; attempt++) {
+      status = await api.checkDependencies();
+      if (status != null) break;
+      if (attempt < 4) {
+        await Future.delayed(const Duration(seconds: 2));
+        setState(() => _status = "Connecting to backend... (${attempt + 2}/5)");
+      }
+    }
     
     if (status == null) {
       setState(() {
@@ -44,6 +58,12 @@ class _InitScreenState extends ConsumerState<InitScreen> {
         _error = true;
       });
       return;
+    }
+
+    // Load mpv path from config so MpvLauncher uses the saved executable
+    final config = await api.getConfig();
+    if (config != null) {
+      MpvLauncher.mpvExecutable = config['mpv_path'] ?? '';
     }
 
     final whisperExists = status['whisper_exists'] ?? false;
@@ -143,41 +163,79 @@ class _InitScreenState extends ConsumerState<InitScreen> {
               ),
               const SizedBox(height: 32),
               
-              if (_needsDownload) ...[
+              if (_needsDownload) ...[                
                 // Model Selection
                 if (_error)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(_status, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                    child: Text(_status,
+                        style: const TextStyle(
+                            color: Colors.red, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center),
                   ),
-                  
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade700),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedModel,
-                      isExpanded: true,
-                      items: _modelDescriptions.keys.map((model) {
-                        return DropdownMenuItem(
-                          value: model,
-                          child: Text(model.toUpperCase()),
-                        );
-                      }).toList(),
-                      onChanged: (v) => setState(() => _selectedModel = v!),
-                    ),
-                  ),
+
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Select Whisper Model',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  _modelDescriptions[_selectedModel]!,
-                  style: const TextStyle(fontSize: 12, color: Colors.orange),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
+
+                // Radio list of models
+                ...(_modelDescriptions.keys.map((model) {
+                  final isRecommended = model == 'turbo';
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: _selectedModel == model
+                          ? BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2)
+                          : BorderSide.none,
+                    ),
+                    child: RadioListTile<String>(
+                      value: model,
+                      groupValue: _selectedModel,
+                      onChanged: (v) => setState(() => _selectedModel = v!),
+                      dense: true,
+                      title: Row(
+                        children: [
+                          Text(model.toUpperCase(),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13)),
+                          if (isRecommended) ...[                            
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Recommended',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      subtitle: Text(
+                        _modelDescriptions[model]!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  );
+                })).toList(),
+
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 45,

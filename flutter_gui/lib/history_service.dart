@@ -101,6 +101,13 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
         }
       }
 
+      // Find audio file path
+      String? audioPath;
+      final audioFile = fileList.firstWhere((f) => f['type'] == 'audio', orElse: () => null);
+      if (audioFile != null) {
+        audioPath = audioFile['path'];
+      }
+
       // Check if exists
       final existingIndex = state.indexWhere((h) => h.videoId == vid);
       if (existingIndex != -1) {
@@ -114,6 +121,7 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
             titleTranslated: existing.titleTranslated,
             targetLang: existing.targetLang ?? targetLang,
             subtitlePath: existing.subtitlePath ?? subtitlePath,
+            audioPath: existing.audioPath ?? audioPath,
             thumbnailUrl: existing.thumbnailUrl ?? "https://img.youtube.com/vi/$vid/hqdefault.jpg",
             lastUsed: existing.lastUsed,
           );
@@ -130,6 +138,7 @@ class HistoryNotifier extends StateNotifier<List<HistoryItem>> {
           titleTranslated: null,
           targetLang: targetLang,
           subtitlePath: subtitlePath,
+          audioPath: audioPath,
           thumbnailUrl: "https://img.youtube.com/vi/$vid/hqdefault.jpg",
           lastUsed: DateTime.now().toIso8601String(),
         ));

@@ -1,11 +1,50 @@
 import os
+import sys
+import shutil
 from pathlib import Path
 from typing import Tuple
 from yt_dlp import YoutubeDL
 import queue
 import threading
 
-def download_audio(youtube_url: str, out_dir: str) -> Tuple[str, float]:
+
+def _patch_shutil_copy_for_locked_files():
+    """Monkey-patch shutil.copy to use Windows CopyFileW API as fallback.
+    Chrome 127+ locks its cookie DB; Python's open() fails but Windows
+    CopyFileW can still copy locked files."""
+    if sys.platform != 'win32':
+        return
+
+    _original_copyfile = shutil.copyfile
+
+    def _patched_copyfile(src, dst, *args, **kwargs):
+        try:
+            return _original_copyfile(src, dst, *args, **kwargs)
+        except PermissionError:
+            import ctypes
+            # CopyFileW(src, dst, bFailIfExists=False)
+            result = ctypes.windll.kernel32.CopyFileW(str(src), str(dst), False)
+            if result == 0:
+                raise  # CopyFileW also failed, re-raise original error
+            return dst
+
+    shutil.copyfile = _patched_copyfile
+
+_patch_shutil_copy_for_locked_files()
+
+
+def _build_cookie_opts(cookie_browser: str = "", cookies_txt_path: str = "", cookie_profile: str = "") -> dict:
+    """Build yt-dlp cookie options based on priority: browser > cookies.txt file."""
+    if cookie_browser:
+        # yt-dlp tuple: (browser, profile, keyring, container)
+        profile = cookie_profile.strip() or None
+        return {'cookiesfrombrowser': (cookie_browser, profile, None, None)}
+    if cookies_txt_path and os.path.isfile(cookies_txt_path):
+        return {'cookiefile': cookies_txt_path}
+    return {}
+
+
+def download_audio(youtube_url: str, out_dir: str, cookie_browser: str = "", cookies_txt_path: str = "", cookie_profile: str = "") -> Tuple[str, float]:
     """
     Download audio-only from the given YouTube URL using yt-dlp.
     Return (absolute_path_to_audio_file, duration_in_seconds).
@@ -18,35 +57,41 @@ def download_audio(youtube_url: str, out_dir: str) -> Tuple[str, float]:
     output_template = str(out_path / "%(id)s.%(ext)s")
 
     ydl_opts = {
-        'format': 'ba[ext=m4a]/bestaudio', # prefer m4a, fallback to best
+        'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
         'outtmpl': output_template,
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
     }
+    ydl_opts.update(_build_cookie_opts(cookie_browser, cookies_txt_path, cookie_profile))
 
-    try:
-        with YoutubeDL(ydl_opts) as ydl:
-            # extract_info with download=True returns info dict
+    def _do_download(opts):
+        with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(youtube_url, download=True)
-            
             if not info:
                 raise Exception("Download failed: No info returned.")
-            
-            # Get filename
-            # yt-dlp might change extension if we didn't force it?
-            # info['requested_downloads'] might have the file path
             if 'requested_downloads' in info:
                 filename = info['requested_downloads'][0]['filepath']
             else:
-                # Fallback, prepare_filename might work
                 filename = ydl.prepare_filename(info)
-            
             duration = info.get('duration', 0.0)
-            
             return str(Path(filename).absolute()), float(duration)
 
+    try:
+        return _do_download(ydl_opts)
     except Exception as e:
+        # If cookies were configured (browser or file) and the download failed,
+        # retry without cookies. Authenticated requests can trigger n-challenge
+        # JS decryption (fails without Deno/Node) — retrying without cookies
+        # often succeeds for public videos.
+        has_cookies = bool(cookie_browser or (cookies_txt_path and os.path.isfile(cookies_txt_path)))
+        if has_cookies:
+            fallback_opts = {k: v for k, v in ydl_opts.items()
+                             if k not in ('cookiesfrombrowser', 'cookiefile')}
+            try:
+                return _do_download(fallback_opts)
+            except Exception as e2:
+                raise Exception(f"Download failed: {str(e2)}")
         raise Exception(f"Download failed: {str(e)}")
 
 def download_media(youtube_url: str, out_dir: str, media_type: str = 'video') -> Tuple[str, str, float]:
@@ -101,7 +146,7 @@ def download_media(youtube_url: str, out_dir: str, media_type: str = 'video') ->
     except Exception as e:
         raise Exception(f"Download failed: {str(e)}")
 
-def download_media_generator(youtube_url: str, out_dir: str, media_type: str = 'video', quality: str = 'best', format: str = 'mp4'):
+def download_media_generator(youtube_url: str, out_dir: str, media_type: str = 'video', quality: str = 'best', format: str = 'mp4', cookie_browser: str = "", cookies_txt_path: str = "", cookie_profile: str = ""):
     """
     Download media from YouTube and yield progress updates.
     Yields dicts:
@@ -141,6 +186,7 @@ def download_media_generator(youtube_url: str, out_dir: str, media_type: str = '
         'progress_hooks': [progress_hook],
         'writethumbnail': True, # Save thumbnail
     }
+    ydl_opts.update(_build_cookie_opts(cookie_browser, cookies_txt_path, cookie_profile))
 
     if media_type == 'audio':
         # Audio format selection

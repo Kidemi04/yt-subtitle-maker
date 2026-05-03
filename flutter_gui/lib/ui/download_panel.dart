@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api_service.dart';
@@ -154,79 +155,79 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
                   
                   // Options Row
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Type
-                      SegmentedButton<String>(
-                        segments: const [
-                          ButtonSegment(value: 'video', label: Text('Video'), icon: Icon(Icons.videocam)),
-                          ButtonSegment(value: 'audio', label: Text('Audio'), icon: Icon(Icons.audiotrack)),
-                        ],
-                        selected: {_selectedType},
-                        onSelectionChanged: isDownloading ? null : (Set<String> newSelection) {
-                          setState(() {
-                            _selectedType = newSelection.first;
-                            // Reset format defaults based on type
-                            if (_selectedType == 'video') {
-                              _selectedFormat = 'mp4';
-                            } else {
-                              _selectedFormat = 'mp3';
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(width: 16),
-                      
-                      // Quality (Video only)
-                      if (_selectedType == 'video') ...[
-                        DropdownButton<String>(
-                          value: _selectedQuality,
-                          items: const [
-                            DropdownMenuItem(value: 'best', child: Text("Best Quality")),
-                            DropdownMenuItem(value: '1080p', child: Text("1080p")),
-                            DropdownMenuItem(value: '720p', child: Text("720p")),
-                            DropdownMenuItem(value: '480p', child: Text("480p")),
-                          ],
-                          onChanged: isDownloading ? null : (v) => setState(() => _selectedQuality = v!),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                      
-                      // Format
-                      DropdownButton<String>(
-                        value: _selectedFormat,
-                        items: _selectedType == 'video' 
-                          ? const [
-                              DropdownMenuItem(value: 'mp4', child: Text("MP4")),
-                              DropdownMenuItem(value: 'mkv', child: Text("MKV")),
-                            ]
-                          : const [
-                              DropdownMenuItem(value: 'mp3', child: Text("MP3")),
-                              DropdownMenuItem(value: 'm4a', child: Text("M4A")),
+                      // Left: type + quality + format
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment(value: 'video', label: Text('Video'), icon: Icon(Icons.videocam)),
+                              ButtonSegment(value: 'audio', label: Text('Audio'), icon: Icon(Icons.audiotrack)),
                             ],
-                        onChanged: isDownloading ? null : (v) => setState(() => _selectedFormat = v!),
+                            selected: {_selectedType},
+                            onSelectionChanged: isDownloading ? null : (Set<String> newSelection) {
+                              setState(() {
+                                _selectedType = newSelection.first;
+                                _selectedFormat = _selectedType == 'video' ? 'mp4' : 'mp3';
+                              });
+                            },
+                          ),
+                          if (_selectedType == 'video')
+                            SizedBox(
+                              width: 130,
+                              child: DropdownButtonFormField<String>(
+                                value: _selectedQuality,
+                                isDense: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Quality',
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'best', child: Text('Best')),
+                                  DropdownMenuItem(value: '1080p', child: Text('1080p')),
+                                  DropdownMenuItem(value: '720p', child: Text('720p')),
+                                  DropdownMenuItem(value: '480p', child: Text('480p')),
+                                ],
+                                onChanged: isDownloading ? null : (v) => setState(() => _selectedQuality = v!),
+                              ),
+                            ),
+                          SizedBox(
+                            width: 110,
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedFormat,
+                              isDense: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Format',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              ),
+                              items: _selectedType == 'video'
+                                  ? const [
+                                      DropdownMenuItem(value: 'mp4', child: Text('MP4')),
+                                      DropdownMenuItem(value: 'mkv', child: Text('MKV')),
+                                    ]
+                                  : const [
+                                      DropdownMenuItem(value: 'mp3', child: Text('MP3')),
+                                      DropdownMenuItem(value: 'm4a', child: Text('M4A')),
+                                    ],
+                              onChanged: isDownloading ? null : (v) => setState(() => _selectedFormat = v!),
+                            ),
+                          ),
+                        ],
                       ),
-                      
-                      const Spacer(),
+                      // Right: download button
                       FilledButton.icon(
                         onPressed: isDownloading ? null : _startDownload,
                         icon: const Icon(Icons.download),
-                        label: const Text("Download"),
+                        label: const Text('Download'),
                       ),
                     ],
                   ),
-                  
-                  if (isDownloading) ...[
-                    const SizedBox(height: 24),
-                    LinearProgressIndicator(value: _progress),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_statusMessage, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text("$_speed  ETA: $_eta"),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -281,17 +282,17 @@ class _DownloadPanelState extends ConsumerState<DownloadPanel> {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          leading: thumbnail != null 
+                          leading: thumbnail != null
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
-                                child: Image.network("file:///$thumbnail", width: 80, height: 45, fit: BoxFit.cover,
+                                child: Image.file(
+                                  File(thumbnail),
+                                  width: 80,
+                                  height: 45,
+                                  fit: BoxFit.cover,
                                   errorBuilder: (c, e, s) => const Icon(Icons.broken_image),
                                 ),
-                              ) // Note: file:/// might not work directly in network image on all platforms, but on Windows desktop it usually works if we use FileImage. 
-                              // Actually Image.network doesn't support file scheme. We should use Image.file.
-                              // But we need to pass a File object.
-                              // Let's try to use a custom widget or just Image.file if we can import dart:io.
-                              // Since we are in pure dart/flutter, we can use Image.file.
+                              )
                             : Icon(
                                 filename.endsWith('.mp4') ? Icons.movie : Icons.music_note,
                                 color: Theme.of(context).colorScheme.primary,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,7 +29,7 @@ class ApiService {
     }
   }
 
-  Future<ProcessResponse> processVideo({
+  Stream<Map<String, dynamic>> processVideo({
     required String url,
     required String sourceLang,
     required String targetLang,
@@ -37,7 +38,7 @@ class ApiService {
     required String geminiModel,
     String? geminiApiKey,
     required bool enableTranslation,
-  }) async {
+  }) async* {
     try {
       final body = {
         'url': url,
@@ -50,19 +51,29 @@ class ApiService {
         'enable_translation': enableTranslation,
       };
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/process'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
+      final request = http.Request('POST', Uri.parse('$baseUrl/api/process'));
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode(body);
+
+      final response = await http.Client().send(request);
 
       if (response.statusCode == 200) {
-        return ProcessResponse.fromJson(jsonDecode(response.body));
+        await for (final line in response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+          if (line.isNotEmpty) {
+            try {
+              yield jsonDecode(line) as Map<String, dynamic>;
+            } catch (e) {
+              yield {'status': 'error', 'error': 'Parse error: $e'};
+            }
+          }
+        }
       } else {
-        return ProcessResponse(ok: false, error: 'HTTP Error: ${response.statusCode}');
+        yield {'status': 'error', 'error': 'HTTP \${response.statusCode}'};
       }
     } catch (e) {
-      return ProcessResponse(ok: false, error: 'Connection failed: $e');
+      yield {'status': 'error', 'error': 'Connection failed: $e'};
     }
   }
 
@@ -116,7 +127,9 @@ class ApiService {
 
   Future<Map<String, dynamic>?> checkDependencies() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/dependencies/status'));
+      final response = await http
+          .get(Uri.parse('$baseUrl/api/dependencies/status'))
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
@@ -244,6 +257,23 @@ class ApiService {
     return false;
   }
 
+  Future<bool> openUrl(String url) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/open_url'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'url': url}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      print("Error opening url: $e");
+    }
+    return false;
+  }
+
   Future<Map<String, dynamic>?> getConfig() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/api/config'));
@@ -256,12 +286,39 @@ class ApiService {
     return null;
   }
 
-  Future<bool> updateConfig({String? downloadDir}) async {
+  Future<bool> updateConfig({
+    String? downloadDir,
+    String? whisperModel,
+    String? whisperDevice,
+    String? sourceLang,
+    String? targetLang,
+    String? geminiApiKey,
+    String? geminiModel,
+    bool? enableTranslation,
+    String? cookieBrowser,
+    String? cookieProfile,
+    String? cookiesTxtPath,
+    String? mpvPath,
+  }) async {
     try {
+      final body = <String, dynamic>{};
+      if (downloadDir != null) body['download_dir'] = downloadDir;
+      if (whisperModel != null) body['whisper_model'] = whisperModel;
+      if (whisperDevice != null) body['whisper_device'] = whisperDevice;
+      if (sourceLang != null) body['source_lang'] = sourceLang;
+      if (targetLang != null) body['target_lang'] = targetLang;
+      if (geminiApiKey != null) body['gemini_api_key'] = geminiApiKey;
+      if (geminiModel != null) body['gemini_model'] = geminiModel;
+      if (enableTranslation != null) body['enable_translation'] = enableTranslation;
+      if (cookieBrowser != null) body['cookie_browser'] = cookieBrowser;
+      if (cookieProfile != null) body['cookie_profile'] = cookieProfile;
+      if (cookiesTxtPath != null) body['cookies_txt_path'] = cookiesTxtPath;
+      if (mpvPath != null) body['mpv_path'] = mpvPath;
+
       final response = await http.post(
         Uri.parse('$baseUrl/api/config'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'download_dir': downloadDir}),
+        body: jsonEncode(body),
       );
       return response.statusCode == 200;
     } catch (e) {

@@ -8,7 +8,10 @@ import platform
 def run_command(command, cwd=None, env=None):
     print(f"Running: {command}")
     try:
-        subprocess.check_call(command, shell=True, cwd=cwd, env=env)
+        if isinstance(command, list):
+            subprocess.check_call(command, cwd=cwd, env=env)
+        else:
+            subprocess.check_call(command, shell=True, cwd=cwd, env=env)
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {e}")
         sys.exit(1)
@@ -86,7 +89,7 @@ def main():
         for exc in excludes:
             pyinstaller_cmd.extend(["--exclude-module", exc])
 
-    run_command(" ".join(pyinstaller_cmd), cwd=base_dir)
+    run_command(pyinstaller_cmd, cwd=base_dir)
 
     # 4. Assemble
     print("\n--- Assembling Release ---")

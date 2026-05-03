@@ -1,6 +1,7 @@
 PySide6
 openai-whisper
 yt-dlp
+yt-dlp-ChromeCookieUnlock @ git+https://github.com/seproDev/yt-dlp-ChromeCookieUnlock.git
 google-generativeai
 torch
 numpy

@@ -19,6 +19,9 @@ class AppConfig:
     gemini_model: str = "gemini-2.5-flash-lite"
     enable_translation: bool = False
     download_dir: str = "downloads"
+    cookie_browser: str = ""   # chrome / firefox / edge / opera / brave / ""
+    cookie_profile: str = ""   # Chrome/Firefox profile name e.g. "Profile 1", "Default"
+    cookies_txt_path: str = "" # absolute path to cookies.txt file
     history: list = None  # List[Dict]
 
     def __post_init__(self):

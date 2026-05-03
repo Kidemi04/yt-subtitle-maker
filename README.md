@@ -56,6 +56,21 @@ flutter run -d windows
 ```
 *(Or use `-d macos` on Mac).*
 
+### Alternative: Tauri + Svelte prototype (experimental)
+
+There is an experimental Tauri + Svelte frontend scaffold in `frontend-tauri/` which can be used as a lightweight alternative to the Flutter GUI and is easier to package and deploy for demos.
+
+To run the prototype (dev):
+
+```powershell
+cd frontend-tauri
+npm install
+npm run dev    # start Vite dev server
+npx tauri dev   # run the Tauri app (requires Rust toolchain)
+```
+
+The prototype talks to the backend at `http://127.0.0.1:8000` (ensure the backend is running).
+
 ## Legacy Mode
 
 You can still run the old PySide6 GUI if preferred:
