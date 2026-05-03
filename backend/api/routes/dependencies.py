@@ -1,0 +1,82 @@
+"""Dependency check + install endpoints (Whisper model download, ffmpeg/mpv probe)."""
+from __future__ import annotations
+
+import json
+import queue
+import threading
+from typing import Any
+
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from core.dependency_manager import (
+    MODELS_URLS,
+    check_ffmpeg,
+    check_mpv,
+    check_whisper_model,
+    download_whisper_model_generator,
+)
+
+router = APIRouter(prefix="/api/dependencies", tags=["dependencies"])
+
+
+class InstallRequest(BaseModel):
+    model: str
+
+
+@router.get("")
+def get_dependencies() -> dict[str, Any]:
+    """Return install state of every known Whisper model + ffmpeg/mpv presence."""
+    return {
+        "models": {name: check_whisper_model(name) for name in MODELS_URLS},
+        "ffmpegAvailable": check_ffmpeg(),
+        "mpvAvailable": check_mpv(),
+    }
+
+
+@router.post("/install")
+def install_model(req: InstallRequest):
+    """Stream NDJSON progress events while downloading a Whisper model.
+
+    Event shape per line:
+      {"status": "downloading", "downloaded": int, "total": int, "speed": float, "percent": float}
+      {"status": "done", "model": str, "path": str}
+      {"status": "error", "error": str, "recoverable": false}
+    """
+    if req.model not in MODELS_URLS:
+        return {
+            "ok": False,
+            "error": f"Unknown model: {req.model!r}. Known: {list(MODELS_URLS.keys())}",
+        }
+
+    q: queue.Queue = queue.Queue()
+    SENTINEL = object()
+
+    def runner() -> None:
+        try:
+            for downloaded, total, speed in download_whisper_model_generator(req.model):
+                percent = (downloaded / total * 100.0) if total > 0 else 0.0
+                q.put({
+                    "status": "downloading",
+                    "downloaded": downloaded,
+                    "total": total,
+                    "speed": speed,
+                    "percent": percent,
+                })
+            q.put({"status": "done", "model": req.model})
+        except Exception as e:
+            q.put({"status": "error", "error": str(e), "recoverable": False})
+        finally:
+            q.put(SENTINEL)
+
+    threading.Thread(target=runner, daemon=True).start()
+
+    def gen():
+        while True:
+            evt = q.get()
+            if evt is SENTINEL:
+                break
+            yield json.dumps(evt) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
