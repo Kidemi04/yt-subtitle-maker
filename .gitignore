@@ -1,41 +1,40 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual Environment
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 venv/
 env/
-.env
 
-# IDEs
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Node / Bun (frontend, future)
+node_modules/
+.next/
+.expo/
+.expo-shared/
+
+# Tauri (future)
+src-tauri/target/
+
+# Editor
 .vscode/
 .idea/
+*.iml
 
-# Project Output
+# OS
+.DS_Store
+Thumbs.db
+
+# App data
 output/
-*.srt
-*.mp3
-*.m4a
-*.wav
-
-# Config
-.yt_subtitle_tool/
-config.json
-
-# Logs
-*.log
-
-# Models
-models/
-
-# Downloads
 downloads/
-
-# Release
-release/
-
-# Video Files
-*.mp4
-*.mkv
-*.avi
+models/
+*.log
+.env
