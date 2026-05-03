@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from core.pipeline import _select_stt_provider
 from core.config import AppConfig
 

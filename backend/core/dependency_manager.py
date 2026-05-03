@@ -1,8 +1,8 @@
 import os
-import sys
-import requests
 import shutil
-from typing import Callable, Optional
+import sys
+
+import requests
 
 # Constants for Whisper models
 # Sourced from openai-whisper source code
@@ -39,11 +39,8 @@ def check_whisper_model(model_name: str) -> bool:
     cache_dir = get_whisper_cache_dir()
     file_path = os.path.join(cache_dir, filename)
     
-    if not os.path.exists(file_path):
-        return False
-        
     # Optional: Check file size if we wanted to be robust, but existence is usually enough
-    return True
+    return os.path.exists(file_path)
 
 def check_ffmpeg() -> bool:
     """Checks if ffmpeg is available in PATH."""

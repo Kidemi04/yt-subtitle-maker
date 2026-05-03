@@ -1,8 +1,6 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from core.translator.openai_compat import OpenAICompatTranslator
 from core.translator.base import TranslationProvider
-from core.stt.base import TranscriptionSegment
 
 
 def test_satisfies_protocol():

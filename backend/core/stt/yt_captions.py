@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import re
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import yt_dlp
 
-from core.stt.base import TranscriptionProvider, TranscriptionResult, TranscriptionSegment
+from core.stt.base import TranscriptionResult, TranscriptionSegment
 
 
 class YtCaptionsProvider:

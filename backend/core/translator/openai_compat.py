@@ -10,7 +10,7 @@ Single implementation that talks to any /v1/chat/completions endpoint:
 from __future__ import annotations
 
 import json
-from typing import Callable
+from collections.abc import Callable
 
 from openai import OpenAI
 
@@ -90,7 +90,7 @@ class OpenAICompatTranslator:
             raise RuntimeError(
                 f"Translator returned {len(translations)} for {len(batch)} segments"
             )
-        for seg, t in zip(batch, translations):
+        for seg, t in zip(batch, translations, strict=True):
             seg.translated = t
 
     def translate_title(self, title: str, target_lang: str) -> str:

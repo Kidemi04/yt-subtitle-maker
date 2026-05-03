@@ -8,7 +8,7 @@ import threading
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from api.routes.metadata import fetch_video_metadata, _video_id_from_url
+from api.routes.metadata import _video_id_from_url, fetch_video_metadata
 from api.schemas import ProcessRequest
 from core.config import load_config
 from core.pipeline import run_pipeline

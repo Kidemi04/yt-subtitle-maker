@@ -7,8 +7,8 @@ Emits NDJSON-friendly dict events via `on_event` callback for streaming endpoint
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
 
 from core.config import AppConfig
 from core.downloader.youtube import download_audio, safe_folder_name

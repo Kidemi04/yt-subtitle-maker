@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from core.config import AppConfig, load_config, save_config
 

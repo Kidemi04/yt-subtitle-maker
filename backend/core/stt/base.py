@@ -6,8 +6,9 @@ zero coupling to the engine.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from dataclasses import dataclass, field  # noqa: F401
+from typing import Protocol, runtime_checkable
 
 
 @dataclass

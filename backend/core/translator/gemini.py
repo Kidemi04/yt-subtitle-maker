@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Callable
+from collections.abc import Callable
 
 from google import genai
 
@@ -80,7 +80,7 @@ class GeminiTranslator:
             raise RuntimeError(
                 f"Gemini returned {len(translations)} translations for {len(batch)} segments"
             )
-        for seg, t in zip(batch, translations):
+        for seg, t in zip(batch, translations, strict=True):
             seg.translated = t
 
     def translate_title(self, title: str, target_lang: str) -> str:

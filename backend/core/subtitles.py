@@ -1,4 +1,4 @@
-from typing import List, Dict
+
 
 def format_timestamp(seconds: float) -> str:
     """Convert 12.345 -> '00:00:12,345' in SRT format."""
@@ -9,7 +9,7 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 def write_srt(
-    segments: List[Dict],
+    segments: list[dict],
     srt_path: str,
     field: str = "text",
 ) -> None:

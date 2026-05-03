@@ -1,5 +1,4 @@
 from core.translator.base import TranslationProvider
-from core.stt.base import TranscriptionSegment
 
 
 def test_protocol_runtime_check():

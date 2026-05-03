@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body
 
-from core.config import AppConfig, load_config, save_config
+from core.config import load_config, save_config
 
 router = APIRouter(prefix="/api", tags=["config"])
 
@@ -55,7 +55,7 @@ def get_config() -> dict:
 
 
 @router.post("/config")
-def update_config(payload: dict[str, Any] = Body(...)) -> dict:
+def update_config(payload: dict[str, Any] = Body(...)) -> dict:  # noqa: B008
     cfg = load_config()
     for camel_key, value in payload.items():
         snake_key = _CAMEL_TO_SNAKE.get(camel_key)

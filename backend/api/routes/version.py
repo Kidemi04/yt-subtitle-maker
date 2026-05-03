@@ -7,8 +7,8 @@ import torch
 from fastapi import APIRouter
 
 from api.schemas import BackendCapabilities
-from core.stt import list_providers as list_stt
 from core.config import load_config
+from core.stt import list_providers as list_stt
 
 router = APIRouter(prefix="/api", tags=["version"])
 

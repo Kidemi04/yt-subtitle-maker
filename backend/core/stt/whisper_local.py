@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import os
-from typing import Callable
+from collections.abc import Callable
 
 import torch
 import whisper
 
-from core.stt.base import TranscriptionProvider, TranscriptionResult, TranscriptionSegment
+from core.stt.base import TranscriptionResult, TranscriptionSegment
 
 VALID_DEVICES = {"auto", "cpu", "gpu", "cuda"}
 
