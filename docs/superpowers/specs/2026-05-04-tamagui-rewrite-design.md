@@ -352,6 +352,7 @@ Header: `▾ Configure` clickable to expand/collapse with smooth height animatio
   - **Default: NOT "Auto"** — pick from `Settings > Default source language` or fall back to "English". This is part of the regression-prevention against bad language detection.
 
 - **Translation toggle** + **Target Language** dropdown (when on)
+  - When translation is on, a small `Using: Gemini` chip appears, clickable to override the translator for this run only (opens a popover with the same 3 options as Settings → Translation, pre-filled from current Settings defaults). Useful for "this video I want to use my local Gemma instead of cloud Gemini".
 
 - **"Just download, no subtitles" toggle** — replaces the legacy Downloader tab; when on, hides Settings irrelevant to transcription and the Generate button label changes to "Download only".
 
@@ -503,11 +504,50 @@ Sectioned form, each section is a `{component.glass-card}`.
 - **Default source language** dropdown — explicitly NOT "Auto" by default; **must be set**. Helper text: "Setting a default language prevents Whisper from misdetecting on intros/music."
 - **Try YouTube auto-captions first** toggle (master switch for "Auto" mode)
 
-#### Translation (Gemini)
-- **API key** input (masked with `[👁]` reveal) + `[Test]` button + status indicator
-- **Default model** dropdown (gemini-2.5-flash-lite / -flash / etc.)
-- **Default target language** dropdown
+#### Translation
+The user picks a translation provider; the form below adapts to which one is selected.
+
+- **Provider** segmented control (3 options):
+  - ● **Gemini** (cloud, Google) — fast, accurate, needs API key + internet
+  - ○ **Local AI (LM Studio / Ollama)** — runs on your own machine, private, free, slower
+  - ○ **OpenAI-compatible** (real OpenAI, Groq, Together, etc.) — flexible, needs API key + internet
+
+- **Default target language** dropdown (provider-agnostic)
 - **Auto-translate title** toggle (replaces the manual button from Flutter version)
+
+##### When `Gemini` selected
+- **API key** input (masked with `[👁]` reveal) + `[Test]` button + status indicator
+- **Model** dropdown: `gemini-2.5-flash-lite` (default) / `gemini-2.5-flash` / `gemini-2.0-flash` / etc.
+
+##### When `Local AI` selected
+- **Base URL** input — default `http://127.0.0.1:1234/v1` (LM Studio default)
+  - Helper text: "LM Studio's default port is 1234. Ollama uses 11434 — change to `http://127.0.0.1:11434/v1` if you use Ollama."
+- **Model name** input — user types the model identifier (e.g. `gemma-3-27b-it`, `qwen2.5-72b-instruct`, `llama-3.3-70b-instruct`)
+  - Beside the field: `[Refresh]` button — calls `/api/translator/list-models` which queries the LM Studio endpoint's `/v1/models` and populates a dropdown of currently-loaded models. If the local server is unreachable, show error.
+- **API key** input — optional, accepts `lm-studio` or any string for LM Studio (left blank works too)
+- **`[Test connection]`** button — sends a tiny "translate hello to chinese" request and shows result + latency
+- **Status indicator** — 🟢 working / 🟡 untested / 🔴 unreachable
+
+###### Setup help (collapsible callout, expanded by default if status is 🟡 or 🔴)
+
+> **First time using LM Studio?**
+> 1. Download LM Studio from [lmstudio.ai](https://lmstudio.ai) and install
+> 2. In LM Studio, go to **My Models** → search and download a translation-capable model. Recommended:
+>    - `gemma-3-27b-it` (Google, balanced) — needs ~16 GB VRAM
+>    - `qwen2.5-7b-instruct` (Alibaba, lightweight) — needs ~6 GB VRAM
+>    - `llama-3.3-70b-instruct` (Meta, top quality) — needs ~40 GB VRAM
+> 3. Click **Local Server** in LM Studio, load your model, click **Start Server**
+> 4. Come back here, click **Test connection**, you should see 🟢
+>
+> Larger models = better translation but more memory needed. If you can't load a 27B model, drop to 7B.
+
+##### When `OpenAI-compatible` selected
+- **Base URL** input — default `https://api.openai.com/v1`. Common alternatives:
+  - Groq: `https://api.groq.com/openai/v1`
+  - Together: `https://api.together.xyz/v1`
+  - Anthropic (via OpenAI-compat proxy): user enters proxy URL
+- **API key** input (masked) + `[Test]`
+- **Model name** input — e.g. `gpt-4o-mini`, `gpt-4o`, `llama-3.3-70b-versatile` (Groq), etc.
 
 #### Advanced (collapsible)
 - **MPV executable path** (optional, defaults to PATH lookup)
@@ -631,6 +671,8 @@ export interface VideoMetadata {
   error?: string;
 }
 
+export type TranslatorProvider = 'gemini' | 'local_openai' | 'openai';
+
 export interface ProcessRequest {
   url: string;
   sttSource: 'auto' | 'yt_captions' | 'whisper';
@@ -641,9 +683,15 @@ export interface ProcessRequest {
   sourceLang: string;        // BCP-47, never 'auto' from UI
   enableTranslation: boolean;
   targetLang?: string;
-  geminiModel?: string;
-  geminiApiKey?: string;
-  downloadOnly?: boolean;    // skip transcription
+
+  // Translator selection (default: 'gemini')
+  translatorProvider?: TranslatorProvider;
+  // Provider-specific overrides (fall back to AppConfig when omitted)
+  translatorBaseUrl?: string;   // e.g. 'http://127.0.0.1:1234/v1' for LM Studio
+  translatorModel?: string;     // e.g. 'gemini-2.5-flash-lite' or 'gemma-3-27b-it'
+  translatorApiKey?: string;    // optional for local_openai
+
+  downloadOnly?: boolean;       // skip transcription
 }
 
 export type ProcessEvent =
@@ -698,10 +746,22 @@ export interface AppConfig {
   defaultSourceLang: string;
   defaultTargetLang: string;
   ytCaptionsFirst: boolean;
-  geminiApiKey: string;
-  geminiModel: string;
+
+  // Translation
   enableTranslation: boolean;
   autoTranslateTitle: boolean;
+  translatorProvider: TranslatorProvider;     // default 'gemini'
+  // Gemini-specific:
+  geminiApiKey: string;
+  geminiModel: string;
+  // Local OpenAI / LM Studio specific:
+  localOpenaiBaseUrl: string;     // default 'http://127.0.0.1:1234/v1'
+  localOpenaiModel: string;        // user enters their loaded model (e.g. 'gemma-3-27b-it')
+  localOpenaiApiKey: string;       // optional, mostly placeholder for LM Studio
+  // OpenAI-compatible (real OpenAI, Together, Groq, etc.):
+  openaiBaseUrl: string;           // default 'https://api.openai.com/v1'
+  openaiApiKey: string;
+  openaiModel: string;             // e.g. 'gpt-4o-mini'
   mpvPath: string;
   whisperCacheDir: string;
   ffmpegResample16k: boolean;
@@ -728,7 +788,8 @@ All endpoints prefixed with `{config.backendUrl}` (default `http://127.0.0.1:800
 | POST | `/api/process` | Run pipeline (download → STT → translate) | **Yes (NDJSON)** |
 | POST | `/api/process/cancel` | Cancel an in-flight job | No |
 | POST | `/api/translate-title` | Translate just the title | No |
-| POST | `/api/test-gemini-key` | Verify Gemini API key | No |
+| POST | `/api/translator/test` | Verify any translator (Gemini, LM Studio, OpenAI) | No |
+| POST | `/api/translator/list-models` | List available models from a local OpenAI endpoint (LM Studio) | No |
 | POST | `/api/test-cookies` | Try a small download to verify cookies | No |
 | POST | `/api/download` | Download video/audio without subtitles | **Yes (NDJSON)** |
 | GET | `/api/library` | List all stored media + SRT files | No |
@@ -793,36 +854,87 @@ export class ApiClient {
 
 ## 7. STT Engine Reference (used in tooltips and Settings)
 
-This text is what users see on hover of each ⓘ icon in the STT engine picker.
+This is the text shown to users on hover of each ⓘ icon. **Written for non-technical users** — jargon is explained inline.
+
+### Quick glossary (referenced by all engines)
+
+- **VRAM** = the dedicated memory on your graphics card (GPU). Whisper loads the model into VRAM; if you don't have enough, it falls back to RAM and runs much slower.
+- **VAD** (Voice Activity Detection) = automatic skip of silent or non-speech parts of the audio. Without it, Whisper sometimes invents text in silent sections (the famous "thanks for watching" hallucination).
+- **Quantization** = compressing the model so it uses less memory. Slight quality loss, big memory savings.
+- **Word-level timestamps** = knowing exactly when each individual word starts/ends, instead of just full sentences.
+- **Speaker diarization** = labeling who's speaking ("Person 1", "Person 2") in multi-person audio.
+
+### Whisper model size reference (rule of thumb)
+
+These numbers apply to the **base** `openai-whisper` engine. Other engines may use significantly less or slightly more — see the per-engine notes.
+
+| Model | Disk | VRAM/RAM needed (FP16) | Relative speed | Quality |
+|---|---|---|---|---|
+| tiny | 39 MB | ~1 GB | very fast | low |
+| base | 74 MB | ~1 GB | fast | OK |
+| small | 244 MB | ~2 GB | medium | good |
+| medium | 769 MB | ~5 GB | slow | high |
+| **turbo** | 809 MB | ~6 GB | fast | high ⭐ |
+| large-v3 | 1.5 GB | ~10 GB | slow | highest |
+
+> **Don't have a GPU?** All engines fall back to CPU. Whisper runs ~10× slower on CPU than on a recent GPU, but it works. `faster-whisper` is the most CPU-friendly option.
+
+---
 
 ### `openai-whisper`
-The original OpenAI Python implementation. Stable but slow — uses PyTorch directly with no inference optimization. Good for verifying baseline behavior; not recommended for daily use.
-- **Speed**: 1× (baseline)
-- **Memory**: high
-- **VAD**: ❌ (silence segments may produce hallucinations)
-- **Best for**: reproducing reference Whisper output exactly
+The **original Python version** released by OpenAI. Stable, well-documented, but **not optimized for speed** — it runs the model as-is without any tricks to make it faster. Like a reference car: works correctly, just not built for performance.
+
+- **Speed**: 1× (this is the baseline — every other engine is measured against this)
+- **VRAM**: standard, no compression. Turbo needs ~6 GB.
+- **Silent-section handling (VAD)**: ❌ none built in — can hallucinate phrases in quiet parts
+- **Best for**: comparing against other engines, reproducing reference behavior exactly
+- **Avoid if**: you care about speed or have noticed hallucinations on long videos
 
 ### `faster-whisper` ⭐ Recommended
-Drop-in replacement using the CTranslate2 C++ inference engine. Same model weights as openai-whisper, so transcription quality is identical, but ~4× faster, ~50% less memory, and includes built-in Silero VAD.
-- **Speed**: 4× (CPU and GPU)
-- **Memory**: low
-- **VAD**: ✅ (silero — fixes hallucination loops on silent sections)
-- **Best for**: 99% of users — the right default
+**Same Whisper model, much faster.** Uses a special C++ inference engine called CTranslate2 under the hood. Output text is **identical** to openai-whisper (same model weights), but ~4× faster and uses about half the memory. Has **built-in VAD** — automatically skips silent sections, which fixes the "hallucination on silence" problem.
+
+- **Speed**: 4× (works on both CPU and GPU)
+- **VRAM**: ~50% less than openai-whisper. Turbo runs in ~3 GB instead of ~6 GB.
+- **Silent-section handling (VAD)**: ✅ built-in (Silero VAD)
+- **Optional**: int8 quantization (further halves memory, tiny quality drop)
+- **Best for**: ~99% of users — the right default
+- **Avoid if**: you specifically need to match openai-whisper output exactly for testing
 
 ### `WhisperX`
-Built on top of faster-whisper, adds wav2vec2 forced alignment for word-level timestamps. Slightly slower due to the alignment step but produces the most accurate timestamps.
-- **Speed**: ~3.5×
-- **Memory**: medium
-- **VAD**: ✅
-- **Word-level timestamps**: ✅ (forced alignment via wav2vec2)
-- **Best for**: precise subtitle timing, multi-speaker content (also has speaker diarization)
+Built **on top of faster-whisper** (so it's already fast), and adds two extras:
+
+1. **Word-level timestamps** — knows exactly when each word starts/ends. Useful for karaoke-style or precisely synced subtitles. Works by running a second AI model called `wav2vec2` to align Whisper's text against the audio waveform.
+2. **Speaker diarization** — labels who's speaking ("Speaker 1: ..." / "Speaker 2: ...") in multi-person audio. Great for podcasts and interviews.
+
+The trade-off: the second `wav2vec2` model needs roughly **+1 GB of VRAM** on top of whatever Whisper is using.
+
+- **Speed**: ~3.5× (slightly slower than faster-whisper because of the alignment step)
+- **VRAM**: faster-whisper's needs + ~1 GB for wav2vec2. Turbo total ≈ 4 GB.
+- **Silent-section handling (VAD)**: ✅
+- **Word-level timestamps**: ✅
+- **Speaker diarization**: ✅ (optional)
+- **Best for**: precise subtitle timing, podcasts, interviews
+- **Avoid if**: you don't care about per-word timing — faster-whisper is simpler and faster
 
 ### `insanely-fast-whisper`
-Hugging Face Transformers implementation with Flash Attention 2. Massively fast on modern GPUs only (CPU sees no benefit).
-- **Speed**: up to 30× on A100; same as openai-whisper on CPU
-- **Memory**: high VRAM
-- **VAD**: ❌
-- **Best for**: GPU users with large batch jobs
+A version that's **only fast if you have a modern NVIDIA GPU** (RTX 30/40-series, A100, etc.). It uses a technique called Flash Attention 2 to make the GPU's matrix math more efficient — up to **30× faster** on the right hardware. On CPU it has no benefit and just runs like the slow original.
+
+- **Speed**: up to 30× on a strong GPU; 1× (no improvement) on CPU
+- **VRAM**: **higher than other engines** because Flash Attention trades memory for speed. Turbo needs ~10 GB VRAM.
+- **Silent-section handling (VAD)**: ❌ not included
+- **Best for**: power users with a strong NVIDIA GPU running long videos in batches
+- **Avoid if**: you're on CPU, integrated graphics, or AMD/Apple Silicon — pick faster-whisper instead
+
+---
+
+### Side-by-side cheat sheet (for the tooltip dropdown)
+
+| Engine | Speed | VRAM (turbo) | Has VAD? | Word timestamps | Recommended? |
+|---|---|---|---|---|---|
+| openai-whisper | 1× | ~6 GB | ❌ | no | reference only |
+| **faster-whisper** | **4×** | **~3 GB** | ✅ | optional | ⭐ default |
+| WhisperX | ~3.5× | ~4 GB | ✅ | ✅ + diarization | for precise timing |
+| insanely-fast-whisper | up to 30× (GPU only) | ~10 GB | ❌ | no | for strong GPUs |
 
 ---
 
@@ -843,9 +955,10 @@ backend/core/
 │   ├── insanely_fast.py       # insanely-fast-whisper wrapper (V1.1)
 │   └── yt_captions.py         # yt-dlp --write-auto-sub
 ├── translator/
-│   ├── __init__.py
+│   ├── __init__.py            # Provider registry (gemini / local_openai / openai)
 │   ├── base.py                # TranslationProvider Protocol
-│   └── gemini.py
+│   ├── gemini.py              # Google Gemini API
+│   └── openai_compat.py       # OpenAI-compatible: serves LM Studio, Ollama, OpenAI, Groq, Together — same shape
 ├── downloader/
 │   ├── __init__.py
 │   ├── youtube.py             # yt-dlp wrapper (refactored from audio_downloader.py)
@@ -900,6 +1013,14 @@ All four engine implementations + `yt_captions` satisfy this Protocol.
 class TranslationProvider(Protocol):
     name: str
 
+    def is_available(self) -> bool:
+        """Quick reachability check — for local_openai, pings the base_url."""
+        ...
+
+    def list_models(self) -> list[str]:
+        """Return available models. For Gemini, hardcoded list. For local_openai, GET /v1/models."""
+        ...
+
     def translate_segments(
         self,
         segments: list[TranscriptionSegment],
@@ -911,6 +1032,51 @@ class TranslationProvider(Protocol):
 
     def translate_title(self, title: str, target_lang: str) -> str: ...
 ```
+
+#### `core/translator/openai_compat.py` (covers LM Studio, Ollama, OpenAI, Groq, Together)
+
+```python
+from openai import OpenAI
+
+class OpenAICompatTranslator:
+    """
+    Works with any OpenAI-compatible /v1/chat/completions endpoint.
+    Handles LM Studio (port 1234), Ollama (port 11434 with /v1 suffix),
+    OpenAI proper, Groq, Together AI, etc.
+    """
+    name = "openai_compat"
+
+    def __init__(self, base_url: str, model: str, api_key: str = "not-needed"):
+        # api_key can be empty/dummy for local servers
+        self.client = OpenAI(base_url=base_url, api_key=api_key or "lm-studio")
+        self.model = model
+
+    def is_available(self) -> bool:
+        try:
+            self.client.models.list()
+            return True
+        except Exception:
+            return False
+
+    def list_models(self) -> list[str]:
+        return [m.id for m in self.client.models.list().data]
+
+    def translate_segments(self, segments, target_lang, progress=None):
+        # Batch segments into chunks to fit context window
+        # Send chunked prompt: "Translate these subtitle lines to {target_lang}, one per line, preserve order"
+        # Parse response, attach to each segment.translated
+        ...
+
+    def translate_title(self, title: str, target_lang: str) -> str:
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": f"Translate this to {target_lang}, output only the translation: {title}"}],
+            temperature=0.3,
+        )
+        return resp.choices[0].message.content.strip()
+```
+
+This single file handles all 3 user-facing options (`local_openai`, `openai`) — they only differ in `base_url` and `api_key`. Gemini gets its own file because it's a different SDK.
 
 #### `core/pipeline.py`
 
@@ -948,11 +1114,42 @@ def run_pipeline(
 
     if request.enableTranslation:
         on_event({"status": "translating", "progress": None})
-        translator = GeminiTranslator(config.geminiApiKey, request.geminiModel)
+        translator = _make_translator(request, config)
         translator.translate_segments(
             result.segments, request.targetLang,
             progress=lambda p: on_event({"status": "translating", "progress": p})
         )
+
+# ... and the helper:
+
+def _make_translator(request, config) -> TranslationProvider:
+    """Pick translator based on request override or config default."""
+    provider = request.translatorProvider or config.translatorProvider  # 'gemini' | 'local_openai' | 'openai'
+
+    if provider == "gemini":
+        from core.translator.gemini import GeminiTranslator
+        return GeminiTranslator(
+            api_key=request.translatorApiKey or config.geminiApiKey,
+            model=request.translatorModel or config.geminiModel,
+        )
+
+    if provider == "local_openai":
+        from core.translator.openai_compat import OpenAICompatTranslator
+        return OpenAICompatTranslator(
+            base_url=request.translatorBaseUrl or config.localOpenaiBaseUrl,
+            model=request.translatorModel or config.localOpenaiModel,
+            api_key=request.translatorApiKey or config.localOpenaiApiKey or "lm-studio",
+        )
+
+    if provider == "openai":
+        from core.translator.openai_compat import OpenAICompatTranslator
+        return OpenAICompatTranslator(
+            base_url=request.translatorBaseUrl or config.openaiBaseUrl,
+            model=request.translatorModel or config.openaiModel,
+            api_key=request.translatorApiKey or config.openaiApiKey,
+        )
+
+    raise ValueError(f"Unknown translator provider: {provider}")
 
     # Write SRTs, return paths
     on_event({"status": "done", ...})
@@ -1153,9 +1350,14 @@ These are non-negotiable — they protect against painting V2 into a corner:
 - **`video_id`**: 11-char YouTube video identifier (e.g., `dQw4w9WgXcQ`)
 - **STT**: Speech-to-Text. Used interchangeably with "transcription" in this doc.
 - **VAD**: Voice Activity Detection. Skips silent segments to prevent Whisper hallucinations.
+- **VRAM**: Memory on a graphics card. Whisper / wav2vec2 / Gemma all load into VRAM if available.
+- **Quantization**: Compressing AI model weights to use less memory at small quality cost.
 - **NDJSON**: Newline-Delimited JSON. The streaming format for `/api/process`.
 - **Glass card**: Surface with `backdrop-filter: blur()` and translucent background.
 - **Capability flag**: Boolean in `/api/version` response telling frontend whether a feature is available.
+- **LM Studio**: A free desktop app ([lmstudio.ai](https://lmstudio.ai)) that runs LLMs locally on your machine and exposes them via an OpenAI-compatible HTTP API on port 1234. Used in this app as the **Local AI** translator option.
+- **Ollama**: Similar to LM Studio (open-source, command-line). Runs on port 11434, also OpenAI-compatible. Same code path as LM Studio in this app.
+- **OpenAI-compatible API**: Any HTTP API that mimics OpenAI's `/v1/chat/completions` endpoint shape. LM Studio, Ollama, Groq, Together, Anthropic-via-proxy all expose this — letting one client library cover them all.
 
 ---
 
