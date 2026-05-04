@@ -1,22 +1,298 @@
-import { Text, YStack } from "tamagui";
-import { GlassCard } from "@yt-subtitle-maker/ui";
+import * as React from "react";
+import { Stack, Text, XStack, YStack } from "tamagui";
+import {
+  PlayCircle,
+  RotateCcw,
+  MoreHorizontal,
+  History as HistoryIconLucide,
+} from "@tamagui/lucide-icons";
+import {
+  GlassCard,
+  HeroCard,
+  IconButton,
+  FilterChip,
+  BadgePill,
+  ButtonPrimary,
+  Dropdown,
+} from "@yt-subtitle-maker/ui";
+import { useRouter } from "expo-router";
+import { apiClient } from "../src/state/client";
+import type { HistoryItem } from "@yt-subtitle-maker/api-client";
+
+type TimeFilter = "all" | "today" | "week" | "month";
+type SortOrder = "recent" | "oldest" | "title";
+
+const TIME_FILTERS: { label: string; value: TimeFilter }[] = [
+  { label: "All time", value: "all" },
+  { label: "Today", value: "today" },
+  { label: "This week", value: "week" },
+  { label: "This month", value: "month" },
+];
+
+const SORT_OPTIONS = [
+  { label: "Recent first", value: "recent" },
+  { label: "Oldest first", value: "oldest" },
+  { label: "Title A–Z", value: "title" },
+];
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return iso;
+  const delta = Date.now() - then;
+  const minutes = Math.floor(delta / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function formatElapsed(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function withinTime(item: HistoryItem, range: TimeFilter): boolean {
+  if (range === "all") return true;
+  const then = new Date(item.createdAt).getTime();
+  if (Number.isNaN(then)) return false;
+  const ageMs = Date.now() - then;
+  if (range === "today") return ageMs < 24 * 60 * 60 * 1000;
+  if (range === "week") return ageMs < 7 * 24 * 60 * 60 * 1000;
+  if (range === "month") return ageMs < 30 * 24 * 60 * 60 * 1000;
+  return true;
+}
 
 export default function History() {
+  const router = useRouter();
+  const [items, setItems] = React.useState<HistoryItem[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | undefined>();
+  const [time, setTime] = React.useState<TimeFilter>("all");
+  const [sort, setSort] = React.useState<SortOrder>("recent");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiClient
+      .fetchHistory()
+      .then((res) => {
+        if (!cancelled) setItems(res.items);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = items
+    .filter((it) => withinTime(it, time))
+    .slice()
+    .sort((a, b) => {
+      if (sort === "title") {
+        return (a.titleTranslated ?? a.titleOriginal).localeCompare(
+          b.titleTranslated ?? b.titleOriginal,
+        );
+      }
+      const ta = new Date(a.createdAt).getTime();
+      const tb = new Date(b.createdAt).getTime();
+      return sort === "recent" ? tb - ta : ta - tb;
+    });
+
   return (
     <YStack gap="$lg">
-      <Text
-        fontFamily="$display"
-        fontSize={32}
-        letterSpacing={-0.8}
-        color="$textPrimary"
-      >
-        Past sessions
-      </Text>
-      <GlassCard variant="mid">
-        <Text fontFamily="$body" fontSize={13} color="$textSecondary">
-          History list lands in Phase 9.
+      <YStack gap="$xs">
+        <Text
+          fontFamily="$display"
+          fontSize={32}
+          letterSpacing={-0.8}
+          color="$textPrimary"
+        >
+          Past sessions
         </Text>
+        <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+          {items.length} session{items.length === 1 ? "" : "s"} · click to
+          reload settings into Generate.
+        </Text>
+      </YStack>
+
+      <GlassCard variant="low">
+        <XStack gap="$sm" alignItems="center" flexWrap="wrap">
+          <XStack gap="$xs">
+            {TIME_FILTERS.map((f) => (
+              <FilterChip
+                key={f.value}
+                active={time === f.value}
+                onPress={() => setTime(f.value)}
+              >
+                {f.label}
+              </FilterChip>
+            ))}
+          </XStack>
+          <Stack flex={1} />
+          <Dropdown
+            value={sort}
+            onValueChange={(v) => setSort(v as SortOrder)}
+            options={SORT_OPTIONS}
+            width={180}
+            aria-label="Sort"
+          />
+        </XStack>
       </GlassCard>
+
+      {error ? (
+        <GlassCard variant="mid">
+          <Text fontFamily="$body" fontSize={13} color="$error">
+            Couldn't load history: {error}
+          </Text>
+        </GlassCard>
+      ) : null}
+
+      {!loading && filtered.length === 0 ? (
+        <HeroCard variant="mid">
+          <YStack alignItems="center" gap="$md" paddingVertical="$lg">
+            <Stack
+              width={120}
+              height={120}
+              borderRadius="$xl"
+              alignItems="center"
+              justifyContent="center"
+              opacity={0.5}
+              backgroundColor="$surfaceGlass"
+            >
+              <HistoryIconLucide size={48} color="#6e6e73" />
+            </Stack>
+            <Text
+              fontFamily="$display"
+              fontSize={28}
+              letterSpacing={-0.5}
+              color="$textPrimary"
+            >
+              No history yet
+            </Text>
+            <Text fontFamily="$body" fontSize={14} color="$textSecondary">
+              Once you finish a transcription it'll show up here.
+            </Text>
+            <ButtonPrimary onPress={() => router.push("/")}>
+              Open Generate
+            </ButtonPrimary>
+          </YStack>
+        </HeroCard>
+      ) : null}
+
+      {filtered.length > 0 ? (
+        <YStack gap="$xs">
+          {filtered.map((item) => (
+            <HistoryRow key={item.videoId + item.createdAt} item={item} />
+          ))}
+        </YStack>
+      ) : null}
     </YStack>
+  );
+}
+
+function HistoryRow({ item }: { item: HistoryItem }) {
+  const router = useRouter();
+  const onReload = () => {
+    // Phase 12: hydrate generate store from this item before navigating.
+    router.push("/");
+  };
+  return (
+    <XStack
+      gap="$md"
+      alignItems="center"
+      padding="$md"
+      paddingHorizontal="$lg"
+      borderRadius="$lg"
+      backgroundColor="$surfaceGlassMid"
+      borderColor="$borderSubtle"
+      borderWidth={1}
+      hoverStyle={{ y: -1, borderColor: "$borderStrong" }}
+      animation="quick"
+      cursor="pointer"
+      onPress={onReload}
+    >
+      <Stack
+        width={80}
+        height={48}
+        borderRadius="$sm"
+        backgroundColor="$bgElevated"
+        flexShrink={0}
+        style={{
+          backgroundImage: item.thumbnailUrl
+            ? `url(${item.thumbnailUrl})`
+            : "linear-gradient(135deg, #1a1a1d 0%, #0a0a0c 100%)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      />
+
+      <YStack flex={1} gap={2} minWidth={0}>
+        <Text
+          fontFamily="$body"
+          fontSize={14}
+          fontWeight="600"
+          color="$textPrimary"
+          numberOfLines={1}
+        >
+          {item.titleTranslated ?? item.titleOriginal}
+        </Text>
+        {item.titleTranslated ? (
+          <Text
+            fontFamily="$body"
+            fontSize={13}
+            color="$textSecondary"
+            numberOfLines={1}
+          >
+            {item.titleOriginal}
+          </Text>
+        ) : null}
+        <XStack gap="$xs" marginTop={4} flexWrap="wrap">
+          {item.targetLang ? (
+            <BadgePill tone="accent">{item.targetLang}</BadgePill>
+          ) : null}
+          <BadgePill tone="neutral">{item.sttEngineUsed}</BadgePill>
+          <Text fontFamily="$body" fontSize={11} color="$textMuted">
+            {formatRelative(item.createdAt)}
+          </Text>
+        </XStack>
+      </YStack>
+
+      <Text
+        fontFamily="$mono"
+        fontSize={12}
+        color="$textMuted"
+        style={{ fontFeatureSettings: "'tnum'" }}
+      >
+        {formatElapsed(item.processingDurationMs)}
+      </Text>
+
+      <XStack gap="$xs">
+        <IconButton
+          icon={<PlayCircle size={14} color="#a1a1a6" />}
+          aria-label="Play"
+          size={32}
+        />
+        <IconButton
+          icon={<RotateCcw size={14} color="#a1a1a6" />}
+          aria-label="Reload in Generate"
+          size={32}
+          onPress={onReload}
+        />
+        <IconButton
+          icon={<MoreHorizontal size={14} color="#a1a1a6" />}
+          aria-label="More"
+          size={32}
+        />
+      </XStack>
+    </XStack>
   );
 }
