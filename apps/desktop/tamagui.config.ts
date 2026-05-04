@@ -31,6 +31,11 @@ import {
   createTokens,
 } from "tamagui";
 
+// Glass recipes + animation primitives live in @yt-subtitle-maker/ui so the
+// component package can consume them without a cross-workspace import back
+// into apps/desktop. We re-export them here for backwards compatibility.
+export { glassRecipes, EASING, DURATION } from "@yt-subtitle-maker/ui";
+
 // ─── Color tokens (15) ──────────────────────────────────────────────────────
 const color = {
   bgBase: "#0a0a0c",
@@ -240,7 +245,8 @@ const fonts = {
 // string of the form `<easing> <duration>`. We name the keys after their
 // duration (quick/normal/slow/slowest) and bake the standard easing into
 // each. Components that need a different easing (decelerate, accelerate,
-// spring) compose a custom transition inline using the `EASING` map.
+// spring) compose a custom transition inline using the `EASING` map
+// re-exported above from @yt-subtitle-maker/ui.
 
 const animations = createAnimations({
   quick: "cubic-bezier(0.4, 0, 0.2, 1) 150ms",
@@ -248,20 +254,6 @@ const animations = createAnimations({
   slow: "cubic-bezier(0.4, 0, 0.2, 1) 400ms",
   slowest: "cubic-bezier(0.4, 0, 0.2, 1) 600ms",
 });
-
-export const EASING = {
-  standard: "cubic-bezier(0.4, 0, 0.2, 1)",
-  decelerate: "cubic-bezier(0, 0, 0.2, 1)",
-  accelerate: "cubic-bezier(0.4, 0, 1, 1)",
-  spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-} as const;
-
-export const DURATION = {
-  quick: 150,
-  normal: 250,
-  slow: 400,
-  slowest: 600,
-} as const;
 
 // ─── Themes ────────────────────────────────────────────────────────────────
 //
@@ -314,31 +306,6 @@ const dark = {
 const themes = {
   dark,
 };
-
-// ─── Glass elevation recipes (NOT tokens — see header comment) ──────────────
-//
-// Each recipe is consumed directly by the future `<GlassCard>` component.
-// `bg` and `border` are also available as Tamagui tokens so simple use cases
-// can skip the recipe and just style with `$surfaceGlassMid` + `$borderSubtle`.
-
-export const glassRecipes = {
-  glassLow: {
-    bg: "rgba(255,255,255,0.04)",
-    border: "rgba(255,255,255,0.06)",
-    backdropFilter: "blur(24px) saturate(180%)",
-  },
-  glassMid: {
-    bg: "rgba(255,255,255,0.06)",
-    border: "rgba(255,255,255,0.08)",
-    backdropFilter: "blur(40px) saturate(180%)",
-  },
-  glassHigh: {
-    bg: "rgba(255,255,255,0.08)",
-    border: "rgba(255,255,255,0.12)",
-    backdropFilter: "blur(60px) saturate(200%)",
-    boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
-  },
-} as const;
 
 // ─── Tamagui config ─────────────────────────────────────────────────────────
 export const config = createTamagui({

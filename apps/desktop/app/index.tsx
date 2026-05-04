@@ -1,108 +1,224 @@
-import { Stack, Text, XStack, YStack } from "tamagui";
+import * as React from "react";
+import { ScrollView, Stack, Text, XStack, YStack } from "tamagui";
+import { Settings, X } from "@tamagui/lucide-icons";
+import {
+  ButtonGhost,
+  ButtonPrimary,
+  ButtonSecondary,
+  GlassCard,
+  HeroCard,
+  IconButton,
+} from "@yt-subtitle-maker/ui";
 
 /**
- * Phase 2 — token verification surface.
+ * Phase 3 — foundation-component verification surface.
  *
- * Every visual property here is sourced from tamagui.config.ts tokens
- * (no hardcoded hex). The screenshot for this screen proves the token
- * system + font loading both took effect:
- *   - bg "$bgBase" → almost-black warm dark
- *   - Fraunces serif heading
- *   - Inter sans-serif body / chip
- *   - JetBrains Mono timestamp
- *   - "$accent" / "$accentSoft" / "$accentDim" sunset-orange chip
- *   - glass-mid surface + "$borderStrong" outline
+ * Visually exercises every component shipped from @yt-subtitle-maker/ui in
+ * Phase 3. The accent-orange "blob" sits behind the cards so the glass
+ * `backdropFilter: blur(...)` becomes visible — if the blob looks crisp
+ * through a card, the blur isn't being applied.
  */
+
+function CaptionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      fontFamily="$body"
+      fontSize={11}
+      fontWeight="600"
+      letterSpacing={1.5}
+      textTransform="uppercase"
+      color="$textMuted"
+    >
+      {children}
+    </Text>
+  );
+}
+
 export default function Index() {
   return (
-    <YStack
-      flex={1}
-      bg="$bgBase"
-      padding="$xl"
-      gap="$lg"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Text
-        fontFamily="$display"
-        fontSize={56}
-        lineHeight={59}
-        letterSpacing={-1.5}
-        color="$textPrimary"
-      >
-        yt-subtitle-maker
-      </Text>
-
-      <Text
-        fontFamily="$body"
-        fontSize={14}
-        lineHeight={22}
-        color="$textSecondary"
-      >
-        Phase 2 — design tokens online
-      </Text>
-
-      <XStack gap="$sm">
-        {/* Accent chip — proves $accent / $accentSoft / $accentDim resolve */}
-        <Stack
-          bg="$accentSoft"
-          borderColor="$accentDim"
-          borderWidth={1}
-          borderRadius="$pill"
-          paddingHorizontal="$md"
-          paddingVertical="$xs"
-        >
-          <Text
-            fontFamily="$body"
-            fontSize={12}
-            fontWeight="600"
-            color="$accent"
-          >
-            accent #fb923c
-          </Text>
-        </Stack>
-
-        {/* Mono chip — proves JetBrains Mono loaded with tabular figures */}
-        <Stack
-          bg="$surfaceGlass"
-          borderColor="$borderSubtle"
-          borderWidth={1}
-          borderRadius="$pill"
-          paddingHorizontal="$md"
-          paddingVertical="$xs"
-        >
-          <Text
-            fontFamily="$mono"
-            fontSize={11}
-            color="$textMuted"
-            // tabular figures so digits sit on a fixed grid — the visual
-            // payoff of using a mono font for timestamps.
-            style={{ fontFeatureSettings: "'tnum'" }}
-          >
-            12:34:56.789
-          </Text>
-        </Stack>
-      </XStack>
-
-      {/* Glass-mid card — exercises a surface, border, radius and bodyMd */}
+    <Stack flex={1} bg="$bgBase" position="relative" overflow="hidden">
+      {/* Accent blobs — give the glass cards something to blur. */}
       <Stack
-        bg="$surfaceGlassMid"
-        borderColor="$borderStrong"
-        borderWidth={1}
-        borderRadius="$lg"
-        padding="$lg"
-        maxWidth={480}
+        position="absolute"
+        top={180}
+        left={140}
+        width={320}
+        height={320}
+        borderRadius="$pill"
+        backgroundColor="$accent"
+        opacity={0.22}
+        pointerEvents="none"
+        style={{ filter: "blur(40px)" }}
+      />
+      <Stack
+        position="absolute"
+        bottom={120}
+        right={180}
+        width={260}
+        height={260}
+        borderRadius="$pill"
+        backgroundColor="$accent"
+        opacity={0.16}
+        pointerEvents="none"
+        style={{ filter: "blur(50px)" }}
+      />
+
+      <ScrollView
+        flex={1}
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: "center",
+          paddingVertical: 64,
+          paddingHorizontal: 24,
+        }}
       >
-        <Text
-          fontFamily="$body"
-          fontSize={13}
-          lineHeight={20}
-          color="$textSecondary"
-        >
-          Spacing $xxs–$section / radius $xs–$pill / colors 15 / typography 13
-          styles / 4 durations + 4 easings.
-        </Text>
-      </Stack>
-    </YStack>
+        <YStack width="100%" maxWidth={720} gap="$xl">
+          <YStack gap="$xs">
+            <Text
+              fontFamily="$display"
+              fontSize={40}
+              lineHeight={44}
+              letterSpacing={-1}
+              color="$textPrimary"
+            >
+              Phase 3 — foundation
+            </Text>
+            <Text
+              fontFamily="$body"
+              fontSize={14}
+              lineHeight={22}
+              color="$textSecondary"
+            >
+              Six components from @yt-subtitle-maker/ui composed against the
+              token system shipped in Phase 2.
+            </Text>
+          </YStack>
+
+          {/* GlassCard — mid variant (default surface) */}
+          <YStack gap="$sm">
+            <CaptionLabel>GlassCard / mid</CaptionLabel>
+            <GlassCard>
+              <YStack gap="$xs">
+                <Text
+                  fontFamily="$body"
+                  fontSize={15}
+                  fontWeight="600"
+                  color="$textPrimary"
+                >
+                  Default surface
+                </Text>
+                <Text
+                  fontFamily="$body"
+                  fontSize={13}
+                  lineHeight={20}
+                  color="$textSecondary"
+                >
+                  glassMid recipe: rgba(255,255,255,0.06) bg, blur(40px)
+                  saturate(180%). Radius $lg, padding $lg.
+                </Text>
+              </YStack>
+            </GlassCard>
+          </YStack>
+
+          {/* HeroCard — XL radius/padding for splash + URL hero */}
+          <YStack gap="$sm">
+            <CaptionLabel>HeroCard</CaptionLabel>
+            <HeroCard>
+              <YStack gap="$md">
+                <Text
+                  fontFamily="$display"
+                  fontSize={28}
+                  lineHeight={34}
+                  letterSpacing={-0.5}
+                  color="$textPrimary"
+                >
+                  Make any video readable
+                </Text>
+                <Stack
+                  height={56}
+                  borderRadius="$md"
+                  backgroundColor="$surfaceGlass"
+                  borderWidth={1}
+                  borderColor="$borderSubtle"
+                  paddingHorizontal="$md"
+                  justifyContent="center"
+                >
+                  <Text
+                    fontFamily="$body"
+                    fontSize={14}
+                    color="$textMuted"
+                  >
+                    Paste a YouTube URL…
+                  </Text>
+                </Stack>
+              </YStack>
+            </HeroCard>
+          </YStack>
+
+          {/* Buttons — primary + secondary + ghost */}
+          <YStack gap="$sm">
+            <CaptionLabel>Buttons</CaptionLabel>
+            <GlassCard variant="low">
+              <YStack gap="$md">
+                <ButtonPrimary onPress={() => {}}>
+                  Generate Subtitles
+                </ButtonPrimary>
+                <XStack gap="$sm">
+                  <ButtonSecondary onPress={() => {}} flex={1}>
+                    Cancel
+                  </ButtonSecondary>
+                  <ButtonGhost onPress={() => {}} flex={1}>
+                    Discard
+                  </ButtonGhost>
+                </XStack>
+              </YStack>
+            </GlassCard>
+          </YStack>
+
+          {/* IconButtons */}
+          <YStack gap="$sm">
+            <CaptionLabel>IconButton</CaptionLabel>
+            <GlassCard variant="low">
+              <XStack gap="$md" alignItems="center">
+                <IconButton
+                  icon={<X size={16} color="#a1a1a6" />}
+                  onPress={() => {}}
+                  aria-label="Close"
+                />
+                <IconButton
+                  icon={<Settings size={16} color="#a1a1a6" />}
+                  size={32}
+                  onPress={() => {}}
+                  aria-label="Open settings"
+                />
+                <Text
+                  fontFamily="$body"
+                  fontSize={13}
+                  color="$textSecondary"
+                >
+                  36px (default) and 32px circles, glassLow surface.
+                </Text>
+              </XStack>
+            </GlassCard>
+          </YStack>
+
+          {/* GlassCard — high variant (modal/sheet surface) */}
+          <YStack gap="$sm">
+            <CaptionLabel>GlassCard / high</CaptionLabel>
+            <GlassCard variant="high">
+              <Text
+                fontFamily="$body"
+                fontSize={13}
+                lineHeight={20}
+                color="$textSecondary"
+              >
+                glassHigh recipe: heavier blur(60px) saturate(200%) plus a
+                drop shadow for modals and action sheets.
+              </Text>
+            </GlassCard>
+          </YStack>
+        </YStack>
+      </ScrollView>
+    </Stack>
   );
 }
