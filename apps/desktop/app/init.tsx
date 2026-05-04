@@ -1,19 +1,28 @@
 import * as React from "react";
-import { Stack, Text, XStack, YStack } from "tamagui";
+import { Stack, XStack, YStack } from "tamagui";
 import { Sparkles, Check } from "@tamagui/lucide-icons";
 import {
-  HeroCard,
   RadioCard,
   ButtonPrimary,
   ButtonGhost,
   ProgressBar,
   BadgeAccent,
   StatusDot,
+  DisplayMd,
+  TitleMd,
+  TitleSm,
+  BodyMd,
+  BodySm,
+  Caption,
+  Timestamp,
   glassRecipes,
 } from "@yt-subtitle-maker/ui";
 import { useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
-import type { WhisperModel } from "@yt-subtitle-maker/api-client";
+import {
+  anyModelInstalled,
+  type WhisperModel,
+} from "@yt-subtitle-maker/api-client";
 
 type InitState = "connecting" | "checking" | "picking" | "downloading" | "ready";
 
@@ -94,7 +103,7 @@ export default function Init() {
       try {
         const dep = await apiClient.fetchDependencies();
         if (cancelled) return;
-        if (dep.whisperModelInstalled) {
+        if (anyModelInstalled(dep)) {
           setState("ready");
           setTimeout(() => {
             if (!cancelled) router.replace("/");
@@ -120,13 +129,23 @@ export default function Init() {
     setProgressMessage("Starting…");
     try {
       for await (const ev of apiClient.installDependency(picked)) {
-        if (ev.status === "downloading" && typeof ev.percent === "number") {
-          setProgress(ev.percent / 100);
+        if (ev.status === "downloading") {
+          if (typeof ev.percent === "number") setProgress(ev.percent / 100);
+          if (typeof ev.downloaded === "number" && typeof ev.total === "number") {
+            const mb = (ev.downloaded / 1024 / 1024).toFixed(1);
+            const tot = (ev.total / 1024 / 1024).toFixed(0);
+            const mbps =
+              typeof ev.speed === "number"
+                ? ` · ${(ev.speed / 1024 / 1024).toFixed(1)} MB/s`
+                : "";
+            setProgressMessage(`${mb} / ${tot} MB${mbps}`);
+          }
         }
-        if (ev.message) setProgressMessage(ev.message);
-        if (ev.status === "complete") {
+        if (ev.status === "done") {
+          setProgress(1);
+          setProgressMessage("Done");
           setState("ready");
-          setTimeout(() => router.replace("/"), 800);
+          setTimeout(() => router.replace("/"), 600);
           return;
         }
         if (ev.status === "error") {
@@ -183,21 +202,8 @@ export default function Init() {
         <YStack gap="$lg">
           <YStack gap="$xs">
             <BadgeAccent>setup · one time</BadgeAccent>
-            <Text
-              fontFamily="$display"
-              fontSize={28}
-              lineHeight={34}
-              letterSpacing={-0.5}
-              color="$textPrimary"
-            >
-              Setting up your studio
-            </Text>
-            <Text
-              fontFamily="$body"
-              fontSize={14}
-              lineHeight={22}
-              color="$textSecondary"
-            >
+            <DisplayMd>Setting up your studio</DisplayMd>
+            <BodyMd color="$textSecondary">
               {state === "connecting"
                 ? "Reaching the local backend…"
                 : state === "checking"
@@ -207,7 +213,7 @@ export default function Init() {
                 : state === "downloading"
                 ? "Downloading the model. Hang tight."
                 : "Ready. Heading to the Generate flow."}
-            </Text>
+            </BodyMd>
           </YStack>
 
           {error ? (
@@ -218,20 +224,18 @@ export default function Init() {
               borderColor="rgba(255,90,95,0.25)"
               borderWidth={1}
             >
-              <Text fontFamily="$body" fontSize={13} color="$error">
-                {error}
-              </Text>
+              <BodySm color="$error">{error}</BodySm>
             </Stack>
           ) : null}
 
           {state === "connecting" || state === "checking" ? (
             <XStack alignItems="center" gap="$sm">
               <StatusDot status="warning" size={8} />
-              <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+              <BodySm color="$textSecondary">
                 {state === "connecting"
                   ? "127.0.0.1:8000"
                   : "Reading dependency state…"}
-              </Text>
+              </BodySm>
             </XStack>
           ) : null}
 
@@ -245,32 +249,13 @@ export default function Init() {
                 >
                   <YStack gap={2} flex={1}>
                     <XStack alignItems="center" gap="$xs">
-                      <Text
-                        fontFamily="$body"
-                        fontSize={14}
-                        fontWeight="600"
-                        color="$textPrimary"
-                      >
-                        {m.label}
-                      </Text>
-                      <Text
-                        fontFamily="$mono"
-                        fontSize={11}
-                        color="$textMuted"
-                      >
-                        {m.size}
-                      </Text>
+                      <TitleSm>{m.label}</TitleSm>
+                      <Timestamp>{m.size}</Timestamp>
                       {m.recommended ? (
                         <BadgeAccent>⭐ default</BadgeAccent>
                       ) : null}
                     </XStack>
-                    <Text
-                      fontFamily="$body"
-                      fontSize={12}
-                      color="$textSecondary"
-                    >
-                      {m.blurb}
-                    </Text>
+                    <Caption color="$textSecondary">{m.blurb}</Caption>
                   </YStack>
                 </RadioCard>
               ))}
@@ -281,17 +266,12 @@ export default function Init() {
             <YStack gap="$sm">
               <ProgressBar value={progress ?? 0} />
               <XStack justifyContent="space-between" alignItems="center">
-                <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+                <BodySm color="$textSecondary">
                   {progressMessage ?? "Downloading…"}
-                </Text>
-                <Text
-                  fontFamily="$mono"
-                  fontSize={12}
-                  color="$textMuted"
-                  style={{ fontFeatureSettings: "'tnum'" }}
-                >
+                </BodySm>
+                <Timestamp fontSize={12}>
                   {Math.round((progress ?? 0) * 100)}%
-                </Text>
+                </Timestamp>
               </XStack>
             </YStack>
           ) : null}
@@ -306,11 +286,9 @@ export default function Init() {
                 alignItems="center"
                 justifyContent="center"
               >
-                <Check size={16} color="#5db872" />
+                <Check size={16} color="$success" />
               </Stack>
-              <Text fontFamily="$body" fontSize={14} color="$textPrimary">
-                Ready · opening Generate.
-              </Text>
+              <BodyMd>Ready · opening Generate.</BodyMd>
             </XStack>
           ) : null}
 
@@ -318,39 +296,32 @@ export default function Init() {
             <YStack gap="$xs">
               <ButtonPrimary onPress={onDownload}>
                 <XStack alignItems="center" gap="$xs">
-                  <Sparkles size={16} color="#f5f5f7" />
-                  <Text
-                    fontFamily="$body"
-                    fontSize={15}
-                    fontWeight="600"
-                    color="$textPrimary"
-                  >
-                    Download {picked}
-                  </Text>
+                  <Sparkles size={16} color="$textPrimary" />
+                  <TitleMd>Download {picked}</TitleMd>
                 </XStack>
               </ButtonPrimary>
-              <ButtonGhost onPress={() => router.replace("/")}>
-                <Text
-                  fontFamily="$body"
-                  fontSize={13}
-                  fontWeight="500"
-                  color="$textSecondary"
-                >
+              <ButtonGhost
+                onPress={() => {
+                  // Skip persists across reloads so _layout's init gate
+                  // doesn't loop the user back here. Clears automatically
+                  // once any Whisper model is installed.
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem("yt_init_skipped", "1");
+                  }
+                  router.replace("/");
+                }}
+              >
+                <BodySm fontWeight="500" color="$textSecondary">
                   Skip — I'll only use YouTube captions
-                </Text>
+                </BodySm>
               </ButtonGhost>
             </YStack>
           ) : null}
 
-          <Text
-            fontFamily="$body"
-            fontSize={11}
-            color="$textMuted"
-            textAlign="center"
-          >
+          <Caption textAlign="center">
             Models live in the Whisper cache directory; change it in
             Settings → Advanced.
-          </Text>
+          </Caption>
         </YStack>
       </Stack>
     </Stack>

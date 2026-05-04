@@ -1,12 +1,9 @@
 import * as React from "react";
-import { Stack, Text, XStack, YStack, ScrollView } from "tamagui";
+import { Stack, Text, XStack, YStack } from "tamagui";
 import {
   Eye,
   EyeOff,
   RefreshCcw,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
 } from "@tamagui/lucide-icons";
 import {
   GlassCard,
@@ -21,6 +18,11 @@ import {
   StatusDot,
   BadgePill,
   BadgeAccent,
+  DisplaySm,
+  TitleSm,
+  BodyMd,
+  BodySm,
+  Caption,
 } from "@yt-subtitle-maker/ui";
 import { apiClient } from "../src/state/client";
 import {
@@ -82,69 +84,34 @@ const LANGS = [
   { label: "Tiếng Việt", value: "vi" },
 ];
 
-function CaptionUpper({ children }: { children: React.ReactNode }) {
-  return (
-    <Text
-      fontFamily="$body"
-      fontSize={11}
-      fontWeight="600"
-      letterSpacing={1.5}
-      textTransform="uppercase"
-      color="$textMuted"
-    >
-      {children}
-    </Text>
-  );
-}
-
-function SectionTitle({
-  children,
+/** Section header — DisplaySm title plus optional BodySm subtitle. */
+function Section({
+  title,
   subtitle,
 }: {
-  children: React.ReactNode;
+  title: string;
   subtitle?: string;
 }) {
   return (
     <YStack gap={2}>
-      <Text
-        fontFamily="$display"
-        fontSize={22}
-        letterSpacing={-0.3}
-        color="$textPrimary"
-      >
-        {children}
-      </Text>
-      {subtitle ? (
-        <Text fontFamily="$body" fontSize={13} color="$textSecondary">
-          {subtitle}
-        </Text>
-      ) : null}
+      <DisplaySm>{title}</DisplaySm>
+      {subtitle ? <BodySm color="$textSecondary">{subtitle}</BodySm> : null}
     </YStack>
   );
 }
 
-function FieldLabel({
-  children,
+/** Field label — TitleSm primary line + optional Caption helper. */
+function Field({
+  label,
   helper,
 }: {
-  children: React.ReactNode;
+  label: string;
   helper?: string;
 }) {
   return (
     <YStack gap={2} marginBottom="$xxs">
-      <Text
-        fontFamily="$body"
-        fontSize={13}
-        fontWeight="500"
-        color="$textPrimary"
-      >
-        {children}
-      </Text>
-      {helper ? (
-        <Text fontFamily="$body" fontSize={12} color="$textMuted">
-          {helper}
-        </Text>
-      ) : null}
+      <TitleSm>{label}</TitleSm>
+      {helper ? <Caption>{helper}</Caption> : null}
     </YStack>
   );
 }
@@ -160,6 +127,9 @@ export default function Settings() {
   const [translatorStatus, setTranslatorStatus] = React.useState<ConnState>("untested");
   const [cookieStatus, setCookieStatus] = React.useState<ConnState>("untested");
   const [cookieError, setCookieError] = React.useState<string | undefined>();
+  const [installedEngines, setInstalledEngines] = React.useState<
+    string[] | undefined
+  >(undefined);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -172,10 +142,25 @@ export default function Settings() {
       })
       .catch((err) => !cancelled && setError(err.message))
       .finally(() => !cancelled && setLoading(false));
+    apiClient
+      .fetchVersion()
+      .then((v) => {
+        if (cancelled) return;
+        setInstalledEngines(v.installedSttEngines ?? []);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const sttEngineOptions = React.useMemo(() => {
+    const installed = installedEngines;
+    if (!installed) return STT_ENGINES; // not loaded yet — show all to avoid flash
+    return STT_ENGINES.filter(
+      (opt) => opt.value === "auto" || installed.includes(opt.value),
+    );
+  }, [installedEngines]);
 
   const dirty =
     !!draft && !!config && JSON.stringify(draft) !== JSON.stringify(config);
@@ -265,11 +250,11 @@ export default function Settings() {
   if (loading || !draft) {
     return (
       <YStack gap="$lg">
-        <SectionTitle>Settings</SectionTitle>
+        <Section title="Settings" />
         <GlassCard variant="mid">
-          <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+          <BodySm color="$textSecondary">
             {error ? `Failed to load config: ${error}` : "Loading config…"}
-          </Text>
+          </BodySm>
         </GlassCard>
       </YStack>
     );
@@ -277,18 +262,20 @@ export default function Settings() {
 
   return (
     <YStack gap="$lg" paddingBottom={120}>
-      <SectionTitle subtitle="Backend, cookies, STT engine, translation, and advanced.">
-        Settings
-      </SectionTitle>
+      <Section
+        title="Settings"
+        subtitle="Backend, cookies, STT engine, translation, and advanced."
+      />
 
       {/* GENERAL */}
       <GlassCard variant="mid">
         <YStack gap="$md">
-          <SectionTitle>General</SectionTitle>
+          <Section title="General" />
           <YStack gap="$xs">
-            <FieldLabel helper="Default 127.0.0.1:8000. Change for V2 ngrok tunneling.">
-              Backend URL
-            </FieldLabel>
+            <Field
+              label="Backend URL"
+              helper="Default 127.0.0.1:8000. Change for V2 ngrok tunneling."
+            />
             <XStack gap="$sm" alignItems="center">
               <TextInput
                 flex={1}
@@ -300,7 +287,7 @@ export default function Settings() {
             </XStack>
           </YStack>
           <YStack gap="$xs">
-            <FieldLabel>Download folder</FieldLabel>
+            <Field label="Download folder" />
             <TextInput
               value={draft.downloadDir}
               onChangeText={(v: string) => update("downloadDir", v)}
@@ -313,11 +300,12 @@ export default function Settings() {
       {/* COOKIES */}
       <GlassCard variant="mid">
         <YStack gap="$md">
-          <SectionTitle subtitle="Some YouTube videos require browser cookies. Firefox is the most reliable extractor.">
-            Cookies (YouTube)
-          </SectionTitle>
+          <Section
+            title="Cookies (YouTube)"
+            subtitle="Some YouTube videos require browser cookies. Firefox is the most reliable extractor."
+          />
           <YStack gap="$xs">
-            <FieldLabel>Cookie source</FieldLabel>
+            <Field label="Cookie source" />
             <Dropdown
               value={draft.cookieBrowser}
               onValueChange={(v) =>
@@ -329,9 +317,10 @@ export default function Settings() {
           </YStack>
           {draft.cookieBrowser ? (
             <YStack gap="$xs">
-              <FieldLabel helper="Optional — leave blank for default profile.">
-                Browser profile
-              </FieldLabel>
+              <Field
+                label="Browser profile"
+                helper="Optional — leave blank for default profile."
+              />
               <TextInput
                 value={draft.cookieProfile}
                 onChangeText={(v: string) => update("cookieProfile", v)}
@@ -339,9 +328,10 @@ export default function Settings() {
             </YStack>
           ) : null}
           <YStack gap="$xs">
-            <FieldLabel helper="Optional fallback — overrides browser cookies.">
-              cookies.txt path
-            </FieldLabel>
+            <Field
+              label="cookies.txt path"
+              helper="Optional fallback — overrides browser cookies."
+            />
             <TextInput
               value={draft.cookiesTxtPath}
               onChangeText={(v: string) => update("cookiesTxtPath", v)}
@@ -370,13 +360,13 @@ export default function Settings() {
           >
             <XStack gap="$sm" alignItems="center" flex={1}>
               <StatusDot status={cookieStatus} size={8} />
-              <Text fontFamily="$body" fontSize={13} color="$textPrimary">
+              <BodySm>
                 {cookieStatus === "ok"
                   ? "Cookies working"
                   : cookieStatus === "error"
                   ? `Failed: ${cookieError ?? "unknown"}`
                   : "Untested — click Test to verify."}
-              </Text>
+              </BodySm>
             </XStack>
             <ButtonSecondary onPress={testCookies}>Test</ButtonSecondary>
           </XStack>
@@ -390,11 +380,11 @@ export default function Settings() {
               borderColor="rgba(232,165,90,0.30)"
               borderWidth={1}
             >
-              <Text fontFamily="$body" fontSize={12} color="$warning">
+              <Caption color="$warning">
                 ⚠ Chromium-based browsers (Chrome 127+) encrypt cookies with
                 App-Bound Encryption. Extraction may fail. Use Firefox or
                 cookies.txt fallback.
-              </Text>
+              </Caption>
             </Stack>
           ) : null}
         </YStack>
@@ -403,21 +393,22 @@ export default function Settings() {
       {/* STT */}
       <GlassCard variant="mid">
         <YStack gap="$md">
-          <SectionTitle subtitle="Defaults are overridable per-job in Generate.">
-            STT Engine
-          </SectionTitle>
+          <Section
+            title="STT Engine"
+            subtitle="Defaults are overridable per-job in Generate."
+          />
           <XStack gap="$md" flexWrap="wrap">
             <YStack flex={1} minWidth={220} gap="$xs">
-              <FieldLabel>Default engine</FieldLabel>
+              <Field label="Default engine" />
               <Dropdown
                 value={draft.defaultSttEngine}
                 onValueChange={(v) => update("defaultSttEngine", v)}
-                options={STT_ENGINES}
+                options={sttEngineOptions}
                 width="100%"
               />
             </YStack>
             <YStack flex={1} minWidth={220} gap="$xs">
-              <FieldLabel>Default model</FieldLabel>
+              <Field label="Default model" />
               <Dropdown
                 value={draft.defaultWhisperModel}
                 onValueChange={(v) => update("defaultWhisperModel", v)}
@@ -428,7 +419,7 @@ export default function Settings() {
           </XStack>
           <XStack gap="$md" flexWrap="wrap">
             <YStack flex={1} minWidth={220} gap="$xs">
-              <FieldLabel>Default device</FieldLabel>
+              <Field label="Default device" />
               <Dropdown
                 value={draft.defaultWhisperDevice}
                 onValueChange={(v) => update("defaultWhisperDevice", v)}
@@ -437,9 +428,10 @@ export default function Settings() {
               />
             </YStack>
             <YStack flex={1} minWidth={220} gap="$xs">
-              <FieldLabel helper="Setting a default prevents Whisper misdetection on intros / music.">
-                Default source language
-              </FieldLabel>
+              <Field
+                label="Default source language"
+                helper="Setting a default prevents Whisper misdetection on intros / music."
+              />
               <Dropdown
                 value={draft.defaultSourceLang}
                 onValueChange={(v) => update("defaultSourceLang", v)}
@@ -449,9 +441,10 @@ export default function Settings() {
             </YStack>
           </XStack>
           <XStack alignItems="center" justifyContent="space-between">
-            <FieldLabel helper="Master switch for Auto mode. When off, Whisper always runs.">
-              Try YouTube auto-captions first
-            </FieldLabel>
+            <Field
+              label="Try YouTube auto-captions first"
+              helper="Master switch for Auto mode. When off, Whisper always runs."
+            />
             <Toggle
               value={draft.ytCaptionsFirst}
               onValueChange={(v) => update("ytCaptionsFirst", v)}
@@ -464,9 +457,9 @@ export default function Settings() {
       {/* TRANSLATION */}
       <GlassCard variant="mid">
         <YStack gap="$md">
-          <SectionTitle>Translation</SectionTitle>
+          <Section title="Translation" />
           <YStack gap="$xs">
-            <FieldLabel>Provider</FieldLabel>
+            <Field label="Provider" />
             <SegmentedControl
               value={draft.translatorProvider}
               onValueChange={(v) =>
@@ -482,7 +475,7 @@ export default function Settings() {
 
           <XStack gap="$md" flexWrap="wrap">
             <YStack flex={1} minWidth={220} gap="$xs">
-              <FieldLabel>Default target language</FieldLabel>
+              <Field label="Default target language" />
               <Dropdown
                 value={draft.defaultTargetLang}
                 onValueChange={(v) => update("defaultTargetLang", v)}
@@ -490,23 +483,13 @@ export default function Settings() {
                 width="100%"
               />
             </YStack>
-            <YStack flex={1} minWidth={220} gap="$xs">
-              <XStack alignItems="center" justifyContent="space-between" flex={1}>
-                <FieldLabel>Auto-translate title</FieldLabel>
-                <Toggle
-                  value={draft.autoTranslateTitle}
-                  onValueChange={(v) => update("autoTranslateTitle", v)}
-                  aria-label="Auto-translate title"
-                />
-              </XStack>
-            </YStack>
           </XStack>
 
           {/* Provider-specific */}
           {draft.translatorProvider === "gemini" ? (
             <YStack gap="$sm">
               <YStack gap="$xs">
-                <FieldLabel>Gemini API key</FieldLabel>
+                <Field label="Gemini API key" />
                 <XStack gap="$sm" alignItems="center">
                   <XStack flex={1} alignItems="center" position="relative">
                     <TextInput
@@ -520,9 +503,9 @@ export default function Settings() {
                       <IconButton
                         icon={
                           showApiKey ? (
-                            <EyeOff size={14} color="#a1a1a6" />
+                            <EyeOff size={14} color="$textSecondary" />
                           ) : (
-                            <Eye size={14} color="#a1a1a6" />
+                            <Eye size={14} color="$textSecondary" />
                           )
                         }
                         aria-label="Toggle API key visibility"
@@ -536,7 +519,7 @@ export default function Settings() {
                 </XStack>
               </YStack>
               <YStack gap="$xs">
-                <FieldLabel>Gemini model</FieldLabel>
+                <Field label="Gemini model" />
                 <TextInput
                   value={draft.geminiModel}
                   onChangeText={(v: string) => update("geminiModel", v)}
@@ -549,9 +532,10 @@ export default function Settings() {
           {draft.translatorProvider === "local_openai" ? (
             <YStack gap="$sm">
               <YStack gap="$xs">
-                <FieldLabel helper="LM Studio default 1234. Ollama is :11434.">
-                  Base URL
-                </FieldLabel>
+                <Field
+                  label="Base URL"
+                  helper="LM Studio default 1234. Ollama is :11434."
+                />
                 <TextInput
                   value={draft.localOpenaiBaseUrl}
                   onChangeText={(v: string) => update("localOpenaiBaseUrl", v)}
@@ -559,7 +543,7 @@ export default function Settings() {
                 />
               </YStack>
               <YStack gap="$xs">
-                <FieldLabel>Model name</FieldLabel>
+                <Field label="Model name" />
                 <XStack gap="$sm" alignItems="center">
                   <TextInput
                     flex={1}
@@ -583,14 +567,15 @@ export default function Settings() {
                       }
                     }}
                   >
-                    <RefreshCcw size={14} color="#a1a1a6" />
+                    <RefreshCcw size={14} color="$textSecondary" />
                   </ButtonSecondary>
                 </XStack>
               </YStack>
               <YStack gap="$xs">
-                <FieldLabel helper="Most local servers don't need one. Leave blank or 'lm-studio'.">
-                  API key (optional)
-                </FieldLabel>
+                <Field
+                  label="API key (optional)"
+                  helper="Most local servers don't need one. Leave blank or 'lm-studio'."
+                />
                 <TextInput
                   value={draft.localOpenaiApiKey}
                   onChangeText={(v: string) => update("localOpenaiApiKey", v)}
@@ -602,13 +587,13 @@ export default function Settings() {
                   Test connection
                 </ButtonSecondary>
                 <StatusDot status={translatorStatus} size={8} />
-                <Text fontFamily="$body" fontSize={12} color="$textMuted">
+                <Caption>
                   {translatorStatus === "ok"
                     ? "Working"
                     : translatorStatus === "error"
                     ? "Unreachable"
                     : "Untested"}
-                </Text>
+                </Caption>
               </XStack>
               {translatorStatus !== "ok" ? (
                 <Stack
@@ -618,17 +603,12 @@ export default function Settings() {
                   borderWidth={1}
                   borderColor="$borderSubtle"
                 >
-                  <Text
-                    fontFamily="$body"
-                    fontSize={12}
-                    lineHeight={18}
-                    color="$textSecondary"
-                  >
+                  <Caption color="$textSecondary">
                     First time using LM Studio? Download from{" "}
                     <Text color="$accent">lmstudio.ai</Text>, install a
                     translation-capable model (gemma-3-27b-it works on RTX
                     4060 Ti+), then click Local Server → Start.
-                  </Text>
+                  </Caption>
                 </Stack>
               ) : null}
             </YStack>
@@ -637,16 +617,17 @@ export default function Settings() {
           {draft.translatorProvider === "openai" ? (
             <YStack gap="$sm">
               <YStack gap="$xs">
-                <FieldLabel helper="OpenAI api.openai.com/v1, Groq api.groq.com/openai/v1, Together api.together.xyz/v1, etc.">
-                  Base URL
-                </FieldLabel>
+                <Field
+                  label="Base URL"
+                  helper="OpenAI api.openai.com/v1, Groq api.groq.com/openai/v1, Together api.together.xyz/v1, etc."
+                />
                 <TextInput
                   value={draft.openaiBaseUrl}
                   onChangeText={(v: string) => update("openaiBaseUrl", v)}
                 />
               </YStack>
               <YStack gap="$xs">
-                <FieldLabel>API key</FieldLabel>
+                <Field label="API key" />
                 <XStack gap="$sm" alignItems="center">
                   <TextInput
                     flex={1}
@@ -659,7 +640,7 @@ export default function Settings() {
                 </XStack>
               </YStack>
               <YStack gap="$xs">
-                <FieldLabel>Model</FieldLabel>
+                <Field label="Model" />
                 <TextInput
                   value={draft.openaiModel}
                   onChangeText={(v: string) => update("openaiModel", v)}
@@ -674,9 +655,9 @@ export default function Settings() {
       {/* ADVANCED */}
       <GlassCard variant="mid">
         <YStack gap="$md">
-          <SectionTitle>Advanced</SectionTitle>
+          <Section title="Advanced" />
           <YStack gap="$xs">
-            <FieldLabel>MPV executable path</FieldLabel>
+            <Field label="MPV executable path" />
             <TextInput
               value={draft.mpvPath}
               onChangeText={(v: string) => update("mpvPath", v)}
@@ -684,21 +665,21 @@ export default function Settings() {
             />
           </YStack>
           <YStack gap="$xs">
-            <FieldLabel>Whisper cache directory</FieldLabel>
+            <Field label="Whisper cache directory" />
             <TextInput
               value={draft.whisperCacheDir}
               onChangeText={(v: string) => update("whisperCacheDir", v)}
             />
           </YStack>
           <YStack gap="$xs">
-            <FieldLabel>Output folder</FieldLabel>
+            <Field label="Output folder" />
             <TextInput
               value={draft.outputDir}
               onChangeText={(v: string) => update("outputDir", v)}
             />
           </YStack>
           <YStack gap="$xs">
-            <FieldLabel>Logs verbosity</FieldLabel>
+            <Field label="Logs verbosity" />
             <Dropdown
               value={draft.logsVerbosity}
               onValueChange={(v) =>
@@ -709,9 +690,10 @@ export default function Settings() {
             />
           </YStack>
           <XStack alignItems="center" justifyContent="space-between">
-            <FieldLabel helper="Pre-resamples to 16 kHz mono before Whisper for timestamp accuracy.">
-              FFmpeg 16 kHz pre-resample
-            </FieldLabel>
+            <Field
+              label="FFmpeg 16 kHz pre-resample"
+              helper="Pre-resamples to 16 kHz mono before Whisper for timestamp accuracy."
+            />
             <Toggle
               value={draft.ffmpegResample16k}
               onValueChange={(v) => update("ffmpegResample16k", v)}
@@ -732,27 +714,31 @@ export default function Settings() {
                 }
               }}
             >
-              <Text fontFamily="$body" fontSize={13} fontWeight="500" color="$error">
+              <BodySm fontWeight="500" color="$error">
                 Reset to defaults
-              </Text>
+              </BodySm>
             </ButtonGhost>
           </XStack>
         </YStack>
       </GlassCard>
 
       {/* Sticky footer (position: sticky lives in inline style — Tamagui's
-          position prop doesn't accept it on web targets). */}
+          position prop doesn't accept it on web targets). The left-aligned
+          status sentence anchors the bar so it doesn't read as floating. */}
       <XStack
         marginTop="$lg"
         padding="$md"
         backgroundColor="$bgElevated"
         borderTopWidth={1}
         borderTopColor="$borderSubtle"
-        justifyContent="flex-end"
         alignItems="center"
         gap="$sm"
         style={{ position: "sticky", bottom: 0, zIndex: 50 }}
       >
+        <Caption color="$textMuted">
+          Click Save settings to apply changes.
+        </Caption>
+        <Stack flex={1} />
         {dirty ? (
           <BadgeAccent>unsaved changes</BadgeAccent>
         ) : (

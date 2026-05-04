@@ -39,11 +39,18 @@ import {
   StatusDot,
   IconButton,
   Dropdown,
+  DisplaySm,
+  TitleLg,
+  TitleMd,
+  Caption,
+  CaptionUpper,
+  Timestamp,
   glassRecipes,
 } from "@yt-subtitle-maker/ui";
 import { config } from "../tamagui.config";
 import { useLogs, type LogLevel } from "../src/state/logs";
 import { apiClient } from "../src/state/client";
+import { anyModelInstalled } from "@yt-subtitle-maker/api-client";
 
 type NavRoute = "/" | "/library" | "/history" | "/settings" | "/about";
 
@@ -68,6 +75,15 @@ const ROUTE_TITLES: Record<string, string> = {
   "/init": "First-run setup",
 };
 
+const ROUTE_SUBTITLES: Record<string, string> = {
+  "/": "Drop a YouTube link",
+  "/library": "Browse what you've made",
+  "/history": "Past sessions",
+  "/settings": "Backend, cookies, engines, translation",
+  "/about": "yt·subtitle v2.0 alpha",
+  "/init": "One-time setup",
+};
+
 function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -89,25 +105,14 @@ function Sidebar() {
         WebkitBackdropFilter: glassRecipes.glassMid.backdropFilter,
       }}
     >
-      <YStack paddingHorizontal="$md" paddingBottom="$lg">
-        <Text
-          fontFamily="$display"
-          fontSize={20}
-          color="$textPrimary"
-          letterSpacing={-0.4}
-        >
+      <YStack paddingHorizontal="$md" paddingBottom="$lg" gap={4}>
+        {/* Wordmark — Fraunces with relaxed tracking; the locked -0.5 from
+            the display scale makes the lowercase characters touch at this
+            size, so we override to 0.2 for breathing room. */}
+        <DisplaySm fontSize={20} lineHeight={26} letterSpacing={0.2}>
           yt·subtitle
-        </Text>
-        <Text
-          fontFamily="$body"
-          fontSize={11}
-          fontWeight="600"
-          letterSpacing={1.5}
-          textTransform="uppercase"
-          color="$textMuted"
-        >
-          v2.0 · alpha
-        </Text>
+        </DisplaySm>
+        <CaptionUpper>v2.0 · alpha</CaptionUpper>
       </YStack>
 
       <YStack flex={1} gap={2}>
@@ -118,7 +123,7 @@ function Sidebar() {
             <SidebarItem
               key={item.href}
               icon={
-                <Icon size={16} color={active ? "#fb923c" : "#a1a1a6"} />
+                <Icon size={16} color={active ? "$accent" : "$textSecondary"} />
               }
               label={item.label}
               active={active}
@@ -137,9 +142,7 @@ function Sidebar() {
         borderTopColor="$borderSubtle"
       >
         <StatusDot status="ok" size={8} />
-        <Text fontFamily="$body" fontSize={12} color="$textMuted">
-          Backend · 127.0.0.1:8000
-        </Text>
+        <Caption>Backend · 127.0.0.1:8000</Caption>
       </XStack>
     </YStack>
   );
@@ -148,6 +151,7 @@ function Sidebar() {
 function Topbar() {
   const pathname = usePathname();
   const title = ROUTE_TITLES[pathname] ?? "";
+  const subtitle = ROUTE_SUBTITLES[pathname];
   const toggleDrawer = useLogs((s) => s.toggleDrawer);
 
   return (
@@ -163,22 +167,18 @@ function Topbar() {
         WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
       }}
     >
-      <Text
-        fontFamily="$display"
-        fontSize={22}
-        letterSpacing={-0.3}
-        color="$textPrimary"
-      >
-        {title}
-      </Text>
-      <XStack gap="$xs" alignItems="center">
+      <YStack gap={2}>
+        <TitleLg fontSize={20}>{title}</TitleLg>
+        {subtitle ? <Caption>{subtitle}</Caption> : null}
+      </YStack>
+      <XStack gap="$sm" alignItems="center">
         <IconButton
-          icon={<Bell size={16} color="#a1a1a6" />}
+          icon={<Bell size={16} color="$textSecondary" />}
           aria-label="Notifications"
           size={32}
         />
         <IconButton
-          icon={<Terminal size={16} color="#a1a1a6" />}
+          icon={<Terminal size={16} color="$textSecondary" />}
           aria-label="Toggle logs (⌘L)"
           size={32}
           onPress={toggleDrawer}
@@ -262,14 +262,7 @@ function LogsDrawer() {
         borderBottomWidth={1}
         borderBottomColor="$borderSubtle"
       >
-        <Text
-          fontFamily="$body"
-          fontSize={15}
-          fontWeight="600"
-          color="$textPrimary"
-        >
-          Logs
-        </Text>
+        <TitleMd>Logs</TitleMd>
         <XStack gap="$xs" alignItems="center">
           <Dropdown
             value={filter}
@@ -279,13 +272,13 @@ function LogsDrawer() {
             aria-label="Log level filter"
           />
           <IconButton
-            icon={<Trash2 size={14} color="#a1a1a6" />}
+            icon={<Trash2 size={14} color="$textSecondary" />}
             aria-label="Clear logs"
             size={32}
             onPress={clear}
           />
           <IconButton
-            icon={<XIcon size={14} color="#a1a1a6" />}
+            icon={<XIcon size={14} color="$textSecondary" />}
             aria-label="Close logs"
             size={32}
             onPress={close}
@@ -295,9 +288,9 @@ function LogsDrawer() {
       <ScrollView flex={1}>
         <YStack paddingHorizontal="$md" paddingVertical="$sm">
           {visible.length === 0 ? (
-            <Text fontFamily="$mono" fontSize={12} color="$textMuted">
+            <Caption fontFamily="$mono">
               {filter === "all" ? "No log entries." : `No ${filter} entries.`}
-            </Text>
+            </Caption>
           ) : (
             visible.map((e) => (
               <XStack
@@ -308,18 +301,9 @@ function LogsDrawer() {
                 backgroundColor={logRowTint(e.level) as never}
                 gap="$sm"
               >
-                <Text
-                  fontFamily="$mono"
-                  fontSize={11}
-                  fontWeight="500"
-                  color="$textMuted"
-                  style={{
-                    fontFeatureSettings: "'tnum'",
-                    minWidth: 60,
-                  }}
-                >
+                <Timestamp style={{ minWidth: 60 }}>
                   {formatLogTime(e.ts)}
-                </Text>
+                </Timestamp>
                 <Text
                   fontFamily="$mono"
                   fontSize={12}
@@ -350,12 +334,10 @@ function LogsDrawer() {
         borderTopWidth={1}
         borderTopColor="$borderSubtle"
       >
-        <Text fontFamily="$body" fontSize={11} color="$textMuted">
+        <Caption fontSize={11}>
           {visible.length} entr{visible.length === 1 ? "y" : "ies"}
-        </Text>
-        <Text fontFamily="$body" fontSize={11} color="$textMuted">
-          ⌘L to close
-        </Text>
+        </Caption>
+        <Caption fontSize={11}>⌘L to close</Caption>
       </XStack>
     </YStack>
   );
@@ -392,6 +374,9 @@ export default function RootLayout() {
 
   // Init gate — check dependencies once on first mount, redirect to /init
   // if Whisper isn't installed and the user isn't already there.
+  // Honors the "yt_init_skipped" localStorage flag set by Init's Skip
+  // button: if a model later becomes available, clear the flag so the
+  // gate's behavior matches reality.
   useEffect(() => {
     if (pathname === "/init") return;
     let cancelled = false;
@@ -399,7 +384,15 @@ export default function RootLayout() {
       .fetchDependencies()
       .then((dep) => {
         if (cancelled) return;
-        if (!dep.whisperModelInstalled) router.replace("/init");
+        const installed = anyModelInstalled(dep);
+        if (typeof window !== "undefined") {
+          if (installed) {
+            window.localStorage.removeItem("yt_init_skipped");
+          } else if (window.localStorage.getItem("yt_init_skipped") === "1") {
+            return;
+          }
+        }
+        if (!installed) router.replace("/init");
       })
       .catch(() => undefined);
     return () => {

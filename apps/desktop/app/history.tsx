@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Stack, Text, XStack, YStack } from "tamagui";
+import { Stack, XStack, YStack } from "tamagui";
 import {
   PlayCircle,
   RotateCcw,
@@ -14,6 +14,12 @@ import {
   BadgePill,
   ButtonPrimary,
   Dropdown,
+  DisplayMd,
+  TitleSm,
+  BodyMd,
+  BodySm,
+  Caption,
+  Timestamp,
 } from "@yt-subtitle-maker/ui";
 import { useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
@@ -110,18 +116,11 @@ export default function History() {
   return (
     <YStack gap="$lg">
       <YStack gap="$xs">
-        <Text
-          fontFamily="$display"
-          fontSize={32}
-          letterSpacing={-0.8}
-          color="$textPrimary"
-        >
-          Past sessions
-        </Text>
-        <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+        <DisplayMd>Past sessions</DisplayMd>
+        <BodySm color="$textSecondary">
           {items.length} session{items.length === 1 ? "" : "s"} · click to
           reload settings into Generate.
-        </Text>
+        </BodySm>
       </YStack>
 
       <GlassCard variant="low">
@@ -150,9 +149,7 @@ export default function History() {
 
       {error ? (
         <GlassCard variant="mid">
-          <Text fontFamily="$body" fontSize={13} color="$error">
-            Couldn't load history: {error}
-          </Text>
+          <BodySm color="$error">Couldn't load history: {error}</BodySm>
         </GlassCard>
       ) : null}
 
@@ -165,22 +162,26 @@ export default function History() {
               borderRadius="$xl"
               alignItems="center"
               justifyContent="center"
-              opacity={0.5}
               backgroundColor="$surfaceGlass"
+              borderWidth={1}
+              borderColor="$borderSubtle"
+              position="relative"
             >
-              <HistoryIconLucide size={48} color="#6e6e73" />
+              <Stack
+                position="absolute"
+                width={32}
+                height={32}
+                borderRadius="$pill"
+                backgroundColor="$accentSoft"
+                opacity={0.6}
+                style={{ filter: "blur(12px)" }}
+              />
+              <HistoryIconLucide size={48} color="$textMuted" />
             </Stack>
-            <Text
-              fontFamily="$display"
-              fontSize={28}
-              letterSpacing={-0.5}
-              color="$textPrimary"
-            >
-              No history yet
-            </Text>
-            <Text fontFamily="$body" fontSize={14} color="$textSecondary">
+            <DisplayMd textAlign="center">No history yet</DisplayMd>
+            <BodyMd color="$textSecondary" textAlign="center">
               Once you finish a transcription it'll show up here.
-            </Text>
+            </BodyMd>
             <ButtonPrimary onPress={() => router.push("/")}>
               Open Generate
             </ButtonPrimary>
@@ -236,59 +237,39 @@ function HistoryRow({ item }: { item: HistoryItem }) {
       />
 
       <YStack flex={1} gap={2} minWidth={0}>
-        <Text
-          fontFamily="$body"
-          fontSize={14}
-          fontWeight="600"
-          color="$textPrimary"
-          numberOfLines={1}
-        >
+        <TitleSm numberOfLines={1}>
           {item.titleTranslated ?? item.titleOriginal}
-        </Text>
+        </TitleSm>
         {item.titleTranslated ? (
-          <Text
-            fontFamily="$body"
-            fontSize={13}
-            color="$textSecondary"
-            numberOfLines={1}
-          >
+          <BodySm color="$textSecondary" numberOfLines={1}>
             {item.titleOriginal}
-          </Text>
+          </BodySm>
         ) : null}
-        <XStack gap="$xs" marginTop={4} flexWrap="wrap">
+        <XStack gap="$xs" marginTop={4} flexWrap="wrap" alignItems="center">
           {item.targetLang ? (
             <BadgePill tone="accent">{item.targetLang}</BadgePill>
           ) : null}
           <BadgePill tone="neutral">{item.sttEngineUsed}</BadgePill>
-          <Text fontFamily="$body" fontSize={11} color="$textMuted">
-            {formatRelative(item.createdAt)}
-          </Text>
+          <Caption fontSize={11}>{formatRelative(item.createdAt)}</Caption>
         </XStack>
       </YStack>
 
-      <Text
-        fontFamily="$mono"
-        fontSize={12}
-        color="$textMuted"
-        style={{ fontFeatureSettings: "'tnum'" }}
-      >
-        {formatElapsed(item.processingDurationMs)}
-      </Text>
+      <Timestamp fontSize={12}>{formatElapsed(item.processingDurationMs)}</Timestamp>
 
       <XStack gap="$xs">
         <IconButton
-          icon={<PlayCircle size={14} color="#a1a1a6" />}
+          icon={<PlayCircle size={14} color="$textSecondary" />}
           aria-label="Play"
           size={32}
         />
         <IconButton
-          icon={<RotateCcw size={14} color="#a1a1a6" />}
+          icon={<RotateCcw size={14} color="$textSecondary" />}
           aria-label="Reload in Generate"
           size={32}
           onPress={onReload}
         />
         <IconButton
-          icon={<MoreHorizontal size={14} color="#a1a1a6" />}
+          icon={<MoreHorizontal size={14} color="$textSecondary" />}
           aria-label="More"
           size={32}
         />
