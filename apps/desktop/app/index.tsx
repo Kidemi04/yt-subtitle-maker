@@ -1,25 +1,23 @@
 import * as React from "react";
 import { ScrollView, Stack, Text, XStack, YStack } from "tamagui";
 import {
-  Dropdown,
-  FilterChip,
+  BadgeAccent,
+  BadgePill,
   GlassCard,
-  RadioCard,
-  SegmentedControl,
-  TextInput,
-  Toggle,
+  ProgressBar,
+  StatusDot,
+  StepPill,
 } from "@yt-subtitle-maker/ui";
 
 /**
- * Phase 4 — form-component verification surface.
+ * Phase 5 — status / badge component verification surface.
  *
  * Visually exercises every component shipped from @yt-subtitle-maker/ui in
- * Phase 4 (TextInput, Dropdown, Toggle, RadioCard, FilterChip,
- * SegmentedControl). The accent-orange "blob" sits behind the cards so the
- * glass `backdropFilter: blur(...)` becomes visible — if the blob looks
- * crisp through a card, the blur isn't being applied. Layout is two-column
- * so the full Phase 4 surface fits inside a 1440×900 capture without
- * scrolling.
+ * Phase 5 (BadgePill, BadgeAccent, ProgressBar, StepPill, StatusDot). The
+ * accent-orange "blob" sits behind the cards so the glass `backdropFilter:
+ * blur(...)` is visible — if the blob looks crisp through a card, the blur
+ * isn't being applied. Layout is two-column so the full Phase 5 surface fits
+ * inside a 1440×900 capture without scrolling.
  */
 
 function CaptionLabel({ children }: { children: React.ReactNode }) {
@@ -37,37 +35,15 @@ function CaptionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-const LANGUAGE_OPTIONS = [
-  { label: "Auto-detect", value: "auto" },
-  { label: "English", value: "en" },
-  { label: "Spanish", value: "es" },
-  { label: "Japanese", value: "ja" },
-];
-
-type FilterValue = "all" | "video" | "audio" | "srt";
-type SegmentedValue = "gemini" | "local" | "openai";
-
-const SEGMENTED_OPTIONS: ReadonlyArray<{
-  label: string;
-  value: SegmentedValue;
-}> = [
-  { label: "Gemini", value: "gemini" },
-  { label: "Local AI", value: "local" },
-  { label: "OpenAI-compat", value: "openai" },
-];
+function SmallLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+      {children}
+    </Text>
+  );
+}
 
 export default function Index() {
-  const [language, setLanguage] = React.useState<string | undefined>(
-    undefined
-  );
-  const [notifications, setNotifications] = React.useState(false);
-  const [autoStart, setAutoStart] = React.useState(true);
-  const [selectedModel, setSelectedModel] = React.useState<
-    "gemini-2-flash" | "gemini-2-pro"
-  >("gemini-2-flash");
-  const [filter, setFilter] = React.useState<FilterValue>("all");
-  const [provider, setProvider] = React.useState<SegmentedValue>("gemini");
-
   return (
     <Stack flex={1} bg="$bgBase" position="relative" overflow="hidden">
       {/* Accent blobs — give the glass cards something to blur. */}
@@ -114,7 +90,7 @@ export default function Index() {
               letterSpacing={-0.8}
               color="$textPrimary"
             >
-              Phase 4 — forms
+              Phase 5 — status & badges
             </Text>
             <Text
               fontFamily="$body"
@@ -122,83 +98,52 @@ export default function Index() {
               lineHeight={20}
               color="$textSecondary"
             >
-              Six form components from @yt-subtitle-maker/ui composed against
-              the token system shipped in Phase 2.
+              Five status/badge components from @yt-subtitle-maker/ui composed
+              against the token system shipped in Phase 2.
             </Text>
           </YStack>
 
           <XStack gap="$lg" flexWrap="wrap">
             {/* LEFT COLUMN */}
             <YStack flex={1} minWidth={520} gap="$md">
-              {/* TextInput */}
+              {/* BadgePill — one per tone */}
               <YStack gap="$xs">
-                <CaptionLabel>TextInput</CaptionLabel>
+                <CaptionLabel>BadgePill — tones</CaptionLabel>
                 <GlassCard variant="low">
-                  <YStack gap="$sm">
-                    <TextInput placeholder="Paste a YouTube URL…" />
-                    <TextInput
-                      placeholder="Filename prefix"
-                      defaultValue="lecture-2026-05-04"
-                      autoFocus
-                    />
-                  </YStack>
+                  <XStack gap="$xs" flexWrap="wrap" alignItems="center">
+                    <BadgePill tone="neutral">Neutral</BadgePill>
+                    <BadgePill tone="accent">Accent</BadgePill>
+                    <BadgePill tone="success">Success</BadgePill>
+                    <BadgePill tone="warning">Warning</BadgePill>
+                    <BadgePill tone="error">Error</BadgePill>
+                  </XStack>
                 </GlassCard>
               </YStack>
 
-              {/* Dropdown */}
+              {/* BadgeAccent */}
               <YStack gap="$xs">
-                <CaptionLabel>Dropdown</CaptionLabel>
+                <CaptionLabel>BadgeAccent</CaptionLabel>
                 <GlassCard variant="low">
-                  <Dropdown
-                    value={language}
-                    onValueChange={setLanguage}
-                    options={LANGUAGE_OPTIONS}
-                    placeholder="Source language"
-                    aria-label="Source language"
-                    width={280}
-                  />
+                  <XStack gap="$sm" alignItems="center">
+                    <BadgeAccent>RECOMMENDED</BadgeAccent>
+                    <SmallLabel>Inter 11 / 600 · letterSpacing 1.5</SmallLabel>
+                  </XStack>
                 </GlassCard>
               </YStack>
 
-              {/* Toggle */}
+              {/* ProgressBar */}
               <YStack gap="$xs">
-                <CaptionLabel>Toggle</CaptionLabel>
+                <CaptionLabel>ProgressBar</CaptionLabel>
                 <GlassCard variant="low">
-                  <YStack gap="$sm">
-                    <XStack
-                      alignItems="center"
-                      justifyContent="space-between"
-                    >
-                      <Text
-                        fontFamily="$body"
-                        fontSize={14}
-                        color="$textPrimary"
-                      >
-                        Show notifications
-                      </Text>
-                      <Toggle
-                        value={notifications}
-                        onValueChange={setNotifications}
-                        aria-label="Show notifications"
-                      />
-                    </XStack>
-                    <XStack
-                      alignItems="center"
-                      justifyContent="space-between"
-                    >
-                      <Text
-                        fontFamily="$body"
-                        fontSize={14}
-                        color="$textPrimary"
-                      >
-                        Auto-start jobs
-                      </Text>
-                      <Toggle
-                        value={autoStart}
-                        onValueChange={setAutoStart}
-                        aria-label="Auto-start jobs"
-                      />
-                    </XStack>
+                  <YStack gap="$md">
+                    <YStack gap="$xs">
+                      <SmallLabel>Determinate · value 0.6</SmallLabel>
+                      <ProgressBar value={0.6} />
+                    </YStack>
+                    <YStack gap="$xs">
+                      <SmallLabel>Indeterminate · barber-pole</SmallLabel>
+                      <ProgressBar indeterminate />
+                    </YStack>
                   </YStack>
                 </GlassCard>
               </YStack>
@@ -206,101 +151,41 @@ export default function Index() {
 
             {/* RIGHT COLUMN */}
             <YStack flex={1} minWidth={520} gap="$md">
-              {/* RadioCard */}
+              {/* StepPill */}
               <YStack gap="$xs">
-                <CaptionLabel>RadioCard</CaptionLabel>
+                <CaptionLabel>StepPill — process flow</CaptionLabel>
                 <GlassCard variant="low">
-                  <YStack gap="$sm">
-                    <RadioCard
-                      selected={selectedModel === "gemini-2-flash"}
-                      onPress={() => setSelectedModel("gemini-2-flash")}
-                    >
-                      <YStack gap={2}>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={14}
-                          fontWeight="600"
-                          color="$textPrimary"
-                        >
-                          Gemini 2.0 Flash
-                        </Text>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={12}
-                          color="$textSecondary"
-                        >
-                          Fast + cheap. 1M context.
-                        </Text>
-                      </YStack>
-                    </RadioCard>
-                    <RadioCard
-                      selected={selectedModel === "gemini-2-pro"}
-                      onPress={() => setSelectedModel("gemini-2-pro")}
-                    >
-                      <YStack gap={2}>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={14}
-                          fontWeight="600"
-                          color="$textPrimary"
-                        >
-                          Gemini 2.0 Pro
-                        </Text>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={12}
-                          color="$textSecondary"
-                        >
-                          Higher quality, slower.
-                        </Text>
-                      </YStack>
-                    </RadioCard>
-                  </YStack>
-                </GlassCard>
-              </YStack>
-
-              {/* FilterChip */}
-              <YStack gap="$xs">
-                <CaptionLabel>FilterChip</CaptionLabel>
-                <GlassCard variant="low">
-                  <XStack gap="$xs" flexWrap="wrap">
-                    <FilterChip
-                      active={filter === "all"}
-                      onPress={() => setFilter("all")}
-                    >
-                      All
-                    </FilterChip>
-                    <FilterChip
-                      active={filter === "video"}
-                      onPress={() => setFilter("video")}
-                    >
-                      Video
-                    </FilterChip>
-                    <FilterChip
-                      active={filter === "audio"}
-                      onPress={() => setFilter("audio")}
-                    >
-                      Audio
-                    </FilterChip>
-                    <FilterChip
-                      active={filter === "srt"}
-                      onPress={() => setFilter("srt")}
-                    >
-                      SRT
-                    </FilterChip>
+                  <XStack gap="$xs" flexWrap="wrap" alignItems="center">
+                    <StepPill status="done">Download</StepPill>
+                    <StepPill status="active">Transcribe</StepPill>
+                    <StepPill status="pending">Translate</StepPill>
+                    <StepPill status="pending">Done</StepPill>
                   </XStack>
                 </GlassCard>
               </YStack>
 
-              {/* SegmentedControl */}
+              {/* StatusDot */}
               <YStack gap="$xs">
-                <CaptionLabel>SegmentedControl</CaptionLabel>
+                <CaptionLabel>StatusDot</CaptionLabel>
                 <GlassCard variant="low">
-                  <SegmentedControl<SegmentedValue>
-                    options={SEGMENTED_OPTIONS}
-                    value={provider}
-                    onValueChange={setProvider}
-                  />
+                  <YStack gap="$sm">
+                    <XStack alignItems="center" gap="$sm">
+                      <StatusDot status="ok" />
+                      <SmallLabel>OK · pulsing (default)</SmallLabel>
+                    </XStack>
+                    <XStack alignItems="center" gap="$sm">
+                      <StatusDot status="warning" />
+                      <SmallLabel>Warning</SmallLabel>
+                    </XStack>
+                    <XStack alignItems="center" gap="$sm">
+                      <StatusDot status="error" />
+                      <SmallLabel>Error</SmallLabel>
+                    </XStack>
+                    <XStack alignItems="center" gap="$sm">
+                      <StatusDot status="untested" />
+                      <SmallLabel>Untested · no pulse</SmallLabel>
+                    </XStack>
+                  </YStack>
                 </GlassCard>
               </YStack>
             </YStack>

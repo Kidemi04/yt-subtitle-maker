@@ -9,8 +9,10 @@
  *   - Form controls  : TextInput, Dropdown, Toggle, RadioCard, FilterChip,
  *                      SegmentedControl
  *
- * Phase 5+ will add: ProgressBar, StepPill, BadgePill, BadgeAccent,
- * SidebarItem, StatusDot, ActionSheet, Modal, Toast.
+ * Phase 5 adds:
+ *   - Status / badges: BadgePill, BadgeAccent, ProgressBar, StepPill, StatusDot
+ *
+ * Phase 6+ will add: SidebarItem, ActionSheet, Modal, Toast, Tooltip.
  *
  * Tokens (`glassRecipes`, `EASING`, `DURATION`) live here so apps/desktop's
  * tamagui.config can re-export them without a circular workspace dep.
@@ -55,3 +57,18 @@ export type {
   SegmentedControlOption,
   SegmentedControlProps,
 } from "./components/SegmentedControl";
+
+export { BadgePill } from "./components/BadgePill";
+export type { BadgePillProps, BadgePillTone } from "./components/BadgePill";
+
+export { BadgeAccent } from "./components/BadgeAccent";
+export type { BadgeAccentProps } from "./components/BadgeAccent";
+
+export { ProgressBar } from "./components/ProgressBar";
+export type { ProgressBarProps } from "./components/ProgressBar";
+
+export { StepPill } from "./components/StepPill";
+export type { StepPillProps, StepPillStatus } from "./components/StepPill";
+
+export { StatusDot } from "./components/StatusDot";
+export type { StatusDotProps, StatusDotStatus } from "./components/StatusDot";
