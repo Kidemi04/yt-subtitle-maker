@@ -32,15 +32,30 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@tamagui/config':
+      '@expo-google-fonts/fraunces':
+        specifier: ^0.4.1
+        version: 0.4.1
+      '@expo-google-fonts/inter':
+        specifier: ^0.4.2
+        version: 0.4.2
+      '@expo-google-fonts/jetbrains-mono':
+        specifier: ^0.4.1
+        version: 0.4.1
+      '@tamagui/animations-css':
         specifier: 1.115.5
-        version: 1.115.5(react-dom@18.2.0(react@18.2.0))(react-native-reanimated@4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
+        version: 1.115.5(react@18.2.0)
+      '@tamagui/shorthands':
+        specifier: 1.115.5
+        version: 1.115.5
       expo:
         specifier: 51.0.39
         version: 51.0.39(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
       expo-constants:
         specifier: 16.0.2
         version: 16.0.2(expo@51.0.39(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))
+      expo-font:
+        specifier: ^12.0.10
+        version: 12.0.10(expo@51.0.39(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))
       expo-linking:
         specifier: 6.3.1
         version: 6.3.1(expo@51.0.39(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))
@@ -825,11 +840,14 @@ packages:
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
 
-  '@emotion/is-prop-valid@0.8.8':
-    resolution: {integrity: sha512-u5WtneEAr5IDG2Wv65yhunPSMLIpuKsbuOktRojfrEiEvRyC85LgPMZI63cr7NUqT8ZIGdSVg8ZKGxIug4lXcA==}
+  '@expo-google-fonts/fraunces@0.4.1':
+    resolution: {integrity: sha512-gYc9P92ObyWvz1rWPOeWSvVKyBFIuA8hgOdhvo4DSiPBaWLbFA6v8uLIEIBwW+0oWTlXbBzjeBReHQI2H7UNjQ==}
 
-  '@emotion/memoize@0.7.4':
-    resolution: {integrity: sha512-Ja/Vfqe3HpuzRsG1oBtWTHk2PGZ7GR+2Vz5iYGelAw8dx32K0y7PjVuxK6z1nMpZOqAFsRUPCkK1YjJ56qJlgw==}
+  '@expo-google-fonts/inter@0.4.2':
+    resolution: {integrity: sha512-syfiImMaDmq7cFi0of+waE2M4uSCyd16zgyWxdPOY7fN2VBmSLKEzkfbZgeOjJq61kSqPBNNtXjggiQiSD6gMQ==}
+
+  '@expo-google-fonts/jetbrains-mono@0.4.1':
+    resolution: {integrity: sha512-CslACrtMOcRwoWXCO7OMEI+9w3fukWSoBtvNz46OqPoogEuuoY0tkDY1O8sFumk8t0pC6Cx0Xr95O0TOQhpkug==}
 
   '@expo/bunyan@4.0.1':
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
@@ -1006,24 +1024,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
-
-  '@motionone/animation@10.18.0':
-    resolution: {integrity: sha512-9z2p5GFGCm0gBsZbi8rVMOAJCtw1WqBTIPw3ozk06gDvZInBPIsQcHgYogEJ4yuHJ+akuW8g1SEIOpTOvYs8hw==}
-
-  '@motionone/dom@10.12.0':
-    resolution: {integrity: sha512-UdPTtLMAktHiqV0atOczNYyDd/d8Cf5fFsd1tua03PqTwwCe/6lwhLSQ8a7TbnQ5SN0gm44N1slBfj+ORIhrqw==}
-
-  '@motionone/easing@10.18.0':
-    resolution: {integrity: sha512-VcjByo7XpdLS4o9T8t99JtgxkdMcNWD3yHU/n6CLEz3bkmKDRZyYQ/wmSf6daum8ZXqfUAgFeCZSpJZIMxaCzg==}
-
-  '@motionone/generators@10.18.0':
-    resolution: {integrity: sha512-+qfkC2DtkDj4tHPu+AFKVfR/C30O1vYdvsGYaR13W/1cczPrrcjdvYCj0VLFuRMN+lP1xvpNZHCRNM4fBzn1jg==}
-
-  '@motionone/types@10.17.1':
-    resolution: {integrity: sha512-KaC4kgiODDz8hswCrS0btrVrzyU2CSQKO7Ps90ibBVSQmjkrt2teqta6/sOG59v7+dPnKMAg13jyqtMKV2yJ7A==}
-
-  '@motionone/utils@10.18.0':
-    resolution: {integrity: sha512-3XVF7sgyTSI2KWvTf6uLlBJ5iAgRgmvp3bpuOiQJvInd4nZ19ET8lX5unn30SlmRH7hXbBbH+Gxd0m0klJ3Xtw==}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -1327,11 +1327,6 @@ packages:
     peerDependencies:
       react: 18.2.0
 
-  '@tamagui/animations-moti@1.115.5':
-    resolution: {integrity: sha512-ODm1BjRp9O0dVB2yJYSubHGIBo0PbiX2Sk+zcvaOkkw3u4fauQhERejpIcZk6dAis86Ic6I6O3Eiha/Gl1o2qA==}
-    peerDependencies:
-      react: 18.2.0
-
   '@tamagui/animations-react-native@1.115.5':
     resolution: {integrity: sha512-xMDcSf7xsZw1CHtpf7OTQTNtqua1vGNii+4+CDGZSRLWpYb5FpQDjb3OkXxt1/cNPrFP5qbhRsCCRwrmEhpxUA==}
     peerDependencies:
@@ -1377,16 +1372,10 @@ packages:
     peerDependencies:
       react: 18.2.0
 
-  '@tamagui/colors@1.115.5':
-    resolution: {integrity: sha512-Fm8G/D2hRTpp60puhGw2RoCntqztrP/MGkktGJyiDzjJM2u8uQ2dr7wXLRn0K0qVW89dobqz77V78YUBFtJBpA==}
-
   '@tamagui/compose-refs@1.115.5':
     resolution: {integrity: sha512-FubEt9sqiExndKDZVl0IY9ctIKdbDB5t1xr6i+CddYOYYoKsGfnh5b6O2XTL5HzO9T8sOi1qUtX1UAPVZqoN2A==}
     peerDependencies:
       react: 18.2.0
-
-  '@tamagui/config@1.115.5':
-    resolution: {integrity: sha512-/yx1YCG24cQ8fFy0pt/H3pK/Jr7q+ERvxwM1JWMCbGrNGqbcbBBfUmpmNwdY5VXx3/fRd4mCm5SsarxnaiV9Kw==}
 
   '@tamagui/constants@1.115.5':
     resolution: {integrity: sha512-cQPSXoW7PTyfyi1uMnxIcSelWp81uSG4ou+23Opn7EKq6MnFpfTvVrt67t4VIY5Btfy6y5dIxGmB8Gc7AIIX2Q==}
@@ -1400,9 +1389,6 @@ packages:
     resolution: {integrity: sha512-evY23UExuZanAs4glu8q7wjjJBQp62dOE15/z6DVU77YQhreUUi5XUlIH+W3ftzui+HXFGqex1zAWObB8PhMPQ==}
     peerDependencies:
       react: 18.2.0
-
-  '@tamagui/create-theme@1.115.5':
-    resolution: {integrity: sha512-Yo+iLJ3u5zGOuD/BM7qaGD9gkmLL5UNzaq0WWZeeKllG91xs3TRLIlUZODtRUpqL77fOs3qTpLGDXBiUeWdK4Q==}
 
   '@tamagui/cubic-bezier-animator@1.115.5':
     resolution: {integrity: sha512-Mg0e4Q1Sg72bOOITDNS1qR6g0UKK2g2LaxmFmehpSXIBsGpP4AEIq/GY47RyQ0zn/fNr3tvcO6RAMjTocNKlBg==}
@@ -1439,12 +1425,6 @@ packages:
     resolution: {integrity: sha512-BGVPp6HN6blZ44ZSHm0EuQeAhaTur+9UbheD00gqo7sKCKUJ9oU423HrDzTHA6iZuQ4JBK8AGO5pd5jM059hZw==}
     peerDependencies:
       react: 18.2.0
-
-  '@tamagui/font-inter@1.115.5':
-    resolution: {integrity: sha512-mz6Okd9BUN5aQa2Xgno6hXlC7J4OCEfDRcgXtRu6B5M29NNT8p1leb22xTzuYvDrTAkRiXH054wscevnVVv/Qg==}
-
-  '@tamagui/font-silkscreen@1.115.5':
-    resolution: {integrity: sha512-lMfuUuZdk3JtMHfMDURfMMvQVzBzOBBJ/WPq4n1kriwsJw9w6PmI1C1ViF82O+chmG1o2zZ7zFaCPqH5XBx6kQ==}
 
   '@tamagui/font-size@1.115.5':
     resolution: {integrity: sha512-J0Dci+bbBr9M4lGo1ZeeTOoBSW5DleNXgsYeHDdmYbOCUDP8gg1rCPLdm1HyGTvVAwSKJDtKhs1CyRvjM2nuNA==}
@@ -1630,16 +1610,10 @@ packages:
     peerDependencies:
       react: 18.2.0
 
-  '@tamagui/theme-builder@1.115.5':
-    resolution: {integrity: sha512-fnVRRE23iROTx4+ISSpoS+1txq591RqTuWNCA/VQYEHMF4MS4q5rRq6KkIrwW1/GyHhRKrsH68ybK/XCbHYbpg==}
-
   '@tamagui/theme@1.115.5':
     resolution: {integrity: sha512-lCU8ccpPvHHA0JwJCf2ruCAWjf3HXaHzrs9LdUR7npjASoL0JvXzfA4kGJbI/Uf57i6SsAL+X01aDCO7oTb1aw==}
     peerDependencies:
       react: 18.2.0
-
-  '@tamagui/themes@1.115.5':
-    resolution: {integrity: sha512-eCE8cSuFH3orReUjfvdJbR/jq3XtTwN752X/NVtK6kngdQ3458vIO8WxjKgq9RHhRqBBP7SkM2xu/TkgUG2BhQ==}
 
   '@tamagui/timer@1.115.5':
     resolution: {integrity: sha512-N+RidjXNUyt2bjhPseMioDVTxljTPG9ZMplkaqD9dYd8AK9j2JX//XH2GHQ6PbUoAFAPGPFIO+rphTBSCQVVOg==}
@@ -2234,9 +2208,6 @@ packages:
   color-string@1.9.1:
     resolution: {integrity: sha512-shrVawQFojnZv6xM40anx4CkoDP+fZsw/ZerEMsW/pyzsRbElpsL/DBVW7q3ExxwusdNXI3lXpuhEZkzs8p5Eg==}
 
-  color2k@2.0.3:
-    resolution: {integrity: sha512-zW190nQTIoXcGCaU08DvVNFTmQhUpnJfVuAKfWqUQkflXKpaDdpaYoM0iluLS9lgJNHyBF58KKA2FBEwkD7wog==}
-
   color@4.2.3:
     resolution: {integrity: sha512-1rXeuUUiGGrykh+CeBdu5Ie7OJwinCgQY0bc7GCRxy5xVHy+moaqkpL/jqQq0MtQOeYcrqEz4abc5f0KtU7W4A==}
     engines: {node: '>=12.5.0'}
@@ -2741,15 +2712,6 @@ packages:
     resolution: {integrity: sha512-f0cRzm6dkyVYV3nPoooP8XlccPQukegwhAnpoLcXy+X+A8KfpGOoXwDr9FLZd3wzgLaBGQBE3lY93Zm/i1JvIQ==}
     engines: {node: '>= 6'}
 
-  framer-motion@6.5.1:
-    resolution: {integrity: sha512-o1BGqqposwi7cgDrtg0dNONhkmPsUFDaLcKXigzuTFC5x58mE8iyTazxSudFzmT6MEyJKfjjU8ItoMe3W+3fiw==}
-    peerDependencies:
-      react: 18.2.0
-      react-dom: 18.2.0
-
-  framesync@6.0.1:
-    resolution: {integrity: sha512-fUY88kXvGiIItgNC7wcTOl0SNRCVXMKSWW2Yzfmn7EKNc+MpCzcz9DhdHcdjbrtN3c6R4H5dTY2jiCpPdysEjA==}
-
   freeport-async@2.0.0:
     resolution: {integrity: sha512-K7od3Uw45AJg00XUmy15+Hae2hOcgKcmN3/EF6Y7i01O0gaqiRx8sUSpsb9+BRNL8RPBrhzPsVfy8q9ADlJuWQ==}
     engines: {node: '>=8'}
@@ -2935,9 +2897,6 @@ packages:
   hermes-profile-transformer@0.0.6:
     resolution: {integrity: sha512-cnN7bQUm65UWOy6cbGcCcZ3rpwW8Q/j4OP5aWRhEry4Z2t2aR1cjrbp0BS+KiBN0smvP1caBgAuxutvyvJILzQ==}
     engines: {node: '>=8'}
-
-  hey-listen@1.0.8:
-    resolution: {integrity: sha512-COpmrF2NOg4TBWUJ5UVyaCU2A88wEMkUPK4hNqyCkqHbxT92BbvfjoSozkAIIm6XhicGlJHhFdullInrdhwU8Q==}
 
   hosted-git-info@3.0.8:
     resolution: {integrity: sha512-aXpmwoOhRBrw6X3j0h5RloK4x1OzsxMPyxqIHyNfSe2pypkVTZFpEiRoSipPEPlMrh0HW/XsjkJ5WgnCirpNUw==}
@@ -3611,11 +3570,6 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  moti@0.29.0:
-    resolution: {integrity: sha512-o/blVE3lm0i/6E5X0RLK59SVWEGxo7pQh8dTm+JykVCYY9bcz0lWyZFCO1s+MMNq+nMsSZBX8lkp4im/AZmhyw==}
-    peerDependencies:
-      react-native-reanimated: '*'
-
   mrmime@1.0.1:
     resolution: {integrity: sha512-hzzEagAgDyoU1Q6yg5uI+AorQgdvMCur3FcKf7NhMKWsaYg+RnbTyHRa/9IlLF9rf455MOCtcqqrQQ83pPP7Uw==}
     engines: {node: '>=10'}
@@ -3908,9 +3862,6 @@ packages:
   pngjs@3.4.0:
     resolution: {integrity: sha512-NCrCHhWmnQklfH4MtJMRjZ2a8c80qXeMlQMv2uVp9ISJMTt562SbGd6n2oq0PaPgKm7Z6pL9E2UlLIhC+SHL3w==}
     engines: {node: '>=4.0.0'}
-
-  popmotion@11.0.3:
-    resolution: {integrity: sha512-Y55FLdj3UxkR7Vl3s7Qr4e9m0onSnP8W7d/xQLsoJM40vs6UKHFdygs6SWryasTZYqugMjm3BepCF4CWXDiHgA==}
 
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
@@ -4510,9 +4461,6 @@ packages:
 
   structured-headers@0.4.1:
     resolution: {integrity: sha512-0MP/Cxx5SzeeZ10p/bZI0S6MpgD+yxAhi1BOQ34jgnMXsCq3j1t6tQnZu+KdlL7dvJTLT3g9xN8tl10TqgFMcg==}
-
-  style-value-types@5.0.0:
-    resolution: {integrity: sha512-08yq36Ikn4kx4YU6RD7jWEv27v4V+PUsOGa4n/as8Et3CuODMJQ00ENeAVXAeydX4Z2j1XHZF1K2sX4mGl18fA==}
 
   styleq@0.1.3:
     resolution: {integrity: sha512-3ZUifmCDCQanjeej1f6kyl/BeP/Vae5EYkQ9iJfUm/QwZvlgnZzyflqAsAWYURdtea8Vkvswu2GrC57h3qffcA==}
@@ -5948,13 +5896,11 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@emotion/is-prop-valid@0.8.8':
-    dependencies:
-      '@emotion/memoize': 0.7.4
-    optional: true
+  '@expo-google-fonts/fraunces@0.4.1': {}
 
-  '@emotion/memoize@0.7.4':
-    optional: true
+  '@expo-google-fonts/inter@0.4.2': {}
+
+  '@expo-google-fonts/jetbrains-mono@0.4.1': {}
 
   '@expo/bunyan@4.0.1':
     dependencies:
@@ -6356,41 +6302,6 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@motionone/animation@10.18.0':
-    dependencies:
-      '@motionone/easing': 10.18.0
-      '@motionone/types': 10.17.1
-      '@motionone/utils': 10.18.0
-      tslib: 2.8.1
-
-  '@motionone/dom@10.12.0':
-    dependencies:
-      '@motionone/animation': 10.18.0
-      '@motionone/generators': 10.18.0
-      '@motionone/types': 10.17.1
-      '@motionone/utils': 10.18.0
-      hey-listen: 1.0.8
-      tslib: 2.8.1
-
-  '@motionone/easing@10.18.0':
-    dependencies:
-      '@motionone/utils': 10.18.0
-      tslib: 2.8.1
-
-  '@motionone/generators@10.18.0':
-    dependencies:
-      '@motionone/types': 10.17.1
-      '@motionone/utils': 10.18.0
-      tslib: 2.8.1
-
-  '@motionone/types@10.17.1': {}
-
-  '@motionone/utils@10.18.0':
-    dependencies:
-      '@motionone/types': 10.17.1
-      hey-listen: 1.0.8
-      tslib: 2.8.1
-
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
       '@nodelib/fs.stat': 2.0.5
@@ -6584,6 +6495,7 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - supports-color
+    optional: true
 
   '@react-native/babel-preset@0.74.87(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))':
     dependencies:
@@ -6671,6 +6583,7 @@ snapshots:
       react-refresh: 0.14.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@react-native/codegen@0.74.87(@babel/preset-env@7.29.3(@babel/core@7.25.2))':
     dependencies:
@@ -6694,6 +6607,7 @@ snapshots:
       nullthrows: 1.1.1
       tinyglobby: 0.2.16
       yargs: 17.7.2
+    optional: true
 
   '@react-native/community-cli-plugin@0.74.87(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))':
     dependencies:
@@ -6767,7 +6681,8 @@ snapshots:
 
   '@react-native/js-polyfills@0.74.87': {}
 
-  '@react-native/js-polyfills@0.85.2': {}
+  '@react-native/js-polyfills@0.85.2':
+    optional: true
 
   '@react-native/metro-babel-transformer@0.74.87(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))':
     dependencies:
@@ -6787,6 +6702,7 @@ snapshots:
       nullthrows: 1.1.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@react-native/metro-config@0.85.2(@babel/core@7.25.2)':
     dependencies:
@@ -6796,9 +6712,8 @@ snapshots:
       metro-runtime: 0.80.12
     transitivePeerDependencies:
       - '@babel/core'
-      - bufferutil
       - supports-color
-      - utf-8-validate
+    optional: true
 
   '@react-native/normalize-color@2.1.0': {}
 
@@ -7026,16 +6941,6 @@ snapshots:
       '@tamagui/web': 1.115.5(react@18.2.0)
       react: 18.2.0
 
-  '@tamagui/animations-moti@1.115.5(react-dom@18.2.0(react@18.2.0))(react-native-reanimated@4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react@18.2.0)':
-    dependencies:
-      '@tamagui/use-presence': 1.115.5(react@18.2.0)
-      '@tamagui/web': 1.115.5(react@18.2.0)
-      moti: 0.29.0(react-dom@18.2.0(react@18.2.0))(react-native-reanimated@4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react@18.2.0)
-      react: 18.2.0
-    transitivePeerDependencies:
-      - react-dom
-      - react-native-reanimated
-
   '@tamagui/animations-react-native@1.115.5(react@18.2.0)':
     dependencies:
       '@tamagui/constants': 1.115.5(react@18.2.0)
@@ -7133,29 +7038,9 @@ snapshots:
       '@tamagui/use-controllable-state': 1.115.5(react@18.2.0)
       react: 18.2.0
 
-  '@tamagui/colors@1.115.5': {}
-
   '@tamagui/compose-refs@1.115.5(react@18.2.0)':
     dependencies:
       react: 18.2.0
-
-  '@tamagui/config@1.115.5(react-dom@18.2.0(react@18.2.0))(react-native-reanimated@4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)':
-    dependencies:
-      '@tamagui/animations-css': 1.115.5(react@18.2.0)
-      '@tamagui/animations-moti': 1.115.5(react-dom@18.2.0(react@18.2.0))(react-native-reanimated@4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react@18.2.0)
-      '@tamagui/animations-react-native': 1.115.5(react@18.2.0)
-      '@tamagui/colors': 1.115.5
-      '@tamagui/font-inter': 1.115.5(react@18.2.0)
-      '@tamagui/font-silkscreen': 1.115.5(react@18.2.0)
-      '@tamagui/react-native-media-driver': 1.115.5(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
-      '@tamagui/shorthands': 1.115.5
-      '@tamagui/themes': 1.115.5(react@18.2.0)
-      '@tamagui/web': 1.115.5(react@18.2.0)
-    transitivePeerDependencies:
-      - react
-      - react-dom
-      - react-native
-      - react-native-reanimated
 
   '@tamagui/constants@1.115.5(react@18.2.0)':
     dependencies:
@@ -7173,12 +7058,6 @@ snapshots:
   '@tamagui/create-context@1.115.5(react@18.2.0)':
     dependencies:
       react: 18.2.0
-
-  '@tamagui/create-theme@1.115.5(react@18.2.0)':
-    dependencies:
-      '@tamagui/web': 1.115.5(react@18.2.0)
-    transitivePeerDependencies:
-      - react
 
   '@tamagui/cubic-bezier-animator@1.115.5': {}
 
@@ -7245,18 +7124,6 @@ snapshots:
       '@tamagui/compose-refs': 1.115.5(react@18.2.0)
       '@tamagui/web': 1.115.5(react@18.2.0)
       react: 18.2.0
-
-  '@tamagui/font-inter@1.115.5(react@18.2.0)':
-    dependencies:
-      '@tamagui/core': 1.115.5(react@18.2.0)
-    transitivePeerDependencies:
-      - react
-
-  '@tamagui/font-silkscreen@1.115.5(react@18.2.0)':
-    dependencies:
-      '@tamagui/core': 1.115.5(react@18.2.0)
-    transitivePeerDependencies:
-      - react
 
   '@tamagui/font-size@1.115.5(react@18.2.0)':
     dependencies:
@@ -7635,27 +7502,11 @@ snapshots:
       '@tamagui/web': 1.115.5(react@18.2.0)
       react: 18.2.0
 
-  '@tamagui/theme-builder@1.115.5(react@18.2.0)':
-    dependencies:
-      '@tamagui/create-theme': 1.115.5(react@18.2.0)
-      color2k: 2.0.3
-    transitivePeerDependencies:
-      - react
-
   '@tamagui/theme@1.115.5(react@18.2.0)':
     dependencies:
       '@tamagui/constants': 1.115.5(react@18.2.0)
       '@tamagui/web': 1.115.5(react@18.2.0)
       react: 18.2.0
-
-  '@tamagui/themes@1.115.5(react@18.2.0)':
-    dependencies:
-      '@tamagui/colors': 1.115.5
-      '@tamagui/create-theme': 1.115.5(react@18.2.0)
-      '@tamagui/theme-builder': 1.115.5(react@18.2.0)
-      '@tamagui/web': 1.115.5(react@18.2.0)
-    transitivePeerDependencies:
-      - react
 
   '@tamagui/timer@1.115.5': {}
 
@@ -8066,6 +7917,7 @@ snapshots:
   babel-plugin-syntax-hermes-parser@0.33.3:
     dependencies:
       hermes-parser: 0.33.3
+    optional: true
 
   babel-plugin-transform-flow-enums@0.0.2(@babel/core@7.25.2):
     dependencies:
@@ -8295,8 +8147,6 @@ snapshots:
     dependencies:
       color-name: 1.1.4
       simple-swizzle: 0.2.4
-
-  color2k@2.0.3: {}
 
   color@4.2.3:
     dependencies:
@@ -8828,6 +8678,7 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
+    optional: true
 
   fetch-retry@4.1.1: {}
 
@@ -8895,23 +8746,6 @@ snapshots:
       es-set-tostringtag: 2.1.0
       hasown: 2.0.3
       mime-types: 2.1.35
-
-  framer-motion@6.5.1(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
-    dependencies:
-      '@motionone/dom': 10.12.0
-      framesync: 6.0.1
-      hey-listen: 1.0.8
-      popmotion: 11.0.3
-      react: 18.2.0
-      react-dom: 18.2.0(react@18.2.0)
-      style-value-types: 5.0.0
-      tslib: 2.8.1
-    optionalDependencies:
-      '@emotion/is-prop-valid': 0.8.8
-
-  framesync@6.0.1:
-    dependencies:
-      tslib: 2.8.1
 
   freeport-async@2.0.0: {}
 
@@ -9090,7 +8924,8 @@ snapshots:
 
   hermes-estree@0.23.1: {}
 
-  hermes-estree@0.33.3: {}
+  hermes-estree@0.33.3:
+    optional: true
 
   hermes-parser@0.19.1:
     dependencies:
@@ -9103,12 +8938,11 @@ snapshots:
   hermes-parser@0.33.3:
     dependencies:
       hermes-estree: 0.33.3
+    optional: true
 
   hermes-profile-transformer@0.0.6:
     dependencies:
       source-map: 0.7.6
-
-  hey-listen@1.0.8: {}
 
   hosted-git-info@3.0.8:
     dependencies:
@@ -9890,14 +9724,6 @@ snapshots:
 
   mkdirp@1.0.4: {}
 
-  moti@0.29.0(react-dom@18.2.0(react@18.2.0))(react-native-reanimated@4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react@18.2.0):
-    dependencies:
-      framer-motion: 6.5.1(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      react-native-reanimated: 4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
-    transitivePeerDependencies:
-      - react
-      - react-dom
-
   mrmime@1.0.1: {}
 
   ms@2.0.0: {}
@@ -10126,7 +9952,8 @@ snapshots:
 
   picomatch@3.0.2: {}
 
-  picomatch@4.0.4: {}
+  picomatch@4.0.4:
+    optional: true
 
   pify@4.0.1: {}
 
@@ -10151,13 +9978,6 @@ snapshots:
       xmlbuilder: 15.1.1
 
   pngjs@3.4.0: {}
-
-  popmotion@11.0.3:
-    dependencies:
-      framesync: 6.0.1
-      hey-listen: 1.0.8
-      style-value-types: 5.0.0
-      tslib: 2.8.1
 
   possible-typed-array-names@1.1.0: {}
 
@@ -10280,6 +10100,7 @@ snapshots:
     dependencies:
       react: 18.2.0
       react-native: 0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0)
+    optional: true
 
   react-native-reanimated@4.3.0(react-native-worklets@0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0):
     dependencies:
@@ -10288,6 +10109,7 @@ snapshots:
       react-native-is-edge-to-edge: 1.3.1(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
       react-native-worklets: 0.8.1(@babel/core@7.25.2)(@react-native/metro-config@0.85.2(@babel/core@7.25.2))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
       semver: 7.7.4
+    optional: true
 
   react-native-safe-area-context@4.10.5(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0):
     dependencies:
@@ -10335,6 +10157,7 @@ snapshots:
       semver: 7.7.4
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0):
     dependencies:
@@ -10865,11 +10688,6 @@ snapshots:
 
   structured-headers@0.4.1: {}
 
-  style-value-types@5.0.0:
-    dependencies:
-      hey-listen: 1.0.8
-      tslib: 2.8.1
-
   styleq@0.1.3: {}
 
   sucrase@3.34.0:
@@ -11029,6 +10847,7 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
+    optional: true
 
   tmpl@1.0.5: {}
 
