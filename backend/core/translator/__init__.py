@@ -26,12 +26,14 @@ def get_translator(name: str, **kwargs: Any) -> TranslationProvider:
             base_url=kwargs.get("base_url") or DEFAULT_LM_STUDIO_URL,
             model=kwargs["model"],
             api_key=kwargs.get("api_key") or "lm-studio",
+            name="local_openai",
         )
     if name == "openai":
         return OpenAICompatTranslator(
             base_url=kwargs.get("base_url") or DEFAULT_OPENAI_URL,
             model=kwargs["model"],
             api_key=kwargs.get("api_key", ""),
+            name="openai",
         )
     raise KeyError(f"unknown translator: {name!r}")
 

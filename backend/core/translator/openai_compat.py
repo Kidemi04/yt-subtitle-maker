@@ -20,14 +20,18 @@ BATCH_SIZE = 30  # smaller than Gemini because local LLMs have shorter contexts
 
 
 class OpenAICompatTranslator:
-    name = "openai_compat"
-
     def __init__(
         self,
         base_url: str,
         model: str,
         api_key: str | None = None,
+        name: str = "openai_compat",
     ):
+        # `name` distinguishes the two registered instances at runtime —
+        # "local_openai" (LM Studio/Ollama) vs "openai" (OpenAI/Groq/Together)
+        # — so callers (e.g. the history sidecar) can record which flavour
+        # was used. Defaults to the generic identifier when not supplied.
+        self.name = name
         # LM Studio / Ollama accept any non-empty string. We pass 'lm-studio' as a
         # safe default so curl-style debugging shows the same auth path.
         self.api_key = api_key or "lm-studio"
