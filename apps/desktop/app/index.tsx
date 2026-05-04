@@ -1,23 +1,37 @@
 import * as React from "react";
 import { ScrollView, Stack, Text, XStack, YStack } from "tamagui";
 import {
-  BadgeAccent,
-  BadgePill,
+  Film,
+  Library as LibraryIcon,
+  History as HistoryIcon,
+  Settings as SettingsIcon,
+  Play,
+  FolderOpen,
+  Trash2,
+  Info,
+} from "@tamagui/lucide-icons";
+import {
+  ActionSheet,
+  ButtonPrimary,
+  ButtonSecondary,
   GlassCard,
-  ProgressBar,
-  StatusDot,
-  StepPill,
+  Modal,
+  SidebarItem,
+  Toast,
+  Tooltip,
 } from "@yt-subtitle-maker/ui";
 
 /**
- * Phase 5 — status / badge component verification surface.
+ * Phase 6 — layout / overlay component verification surface.
  *
  * Visually exercises every component shipped from @yt-subtitle-maker/ui in
- * Phase 5 (BadgePill, BadgeAccent, ProgressBar, StepPill, StatusDot). The
- * accent-orange "blob" sits behind the cards so the glass `backdropFilter:
- * blur(...)` is visible — if the blob looks crisp through a card, the blur
- * isn't being applied. Layout is two-column so the full Phase 5 surface fits
- * inside a 1440×900 capture without scrolling.
+ * Phase 6 (SidebarItem, Modal, ActionSheet, Toast, Tooltip). For the
+ * screenshot we open Modal + ActionSheet by default — both surfaces need to
+ * be visible in the same capture, not gated behind interaction.
+ *
+ * Accent blobs sit behind the content so the glass `backdropFilter:
+ * blur(...)` can be visually verified — a crisp blob through any glass
+ * surface means blur isn't applying.
  */
 
 function CaptionLabel({ children }: { children: React.ReactNode }) {
@@ -44,9 +58,16 @@ function SmallLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function Index() {
+  // Default to OPEN so the Phase 6 screenshot shows the overlay surfaces.
+  const [modalOpen, setModalOpen] = React.useState(true);
+  const [sheetOpen, setSheetOpen] = React.useState(true);
+  const [toastOpen, setToastOpen] = React.useState(true);
+  const [successToastOpen, setSuccessToastOpen] = React.useState(true);
+  const [activeNav, setActiveNav] = React.useState("generate");
+
   return (
     <Stack flex={1} bg="$bgBase" position="relative" overflow="hidden">
-      {/* Accent blobs — give the glass cards something to blur. */}
+      {/* Accent blobs — give the glass surfaces something to blur. */}
       <Stack
         position="absolute"
         top={120}
@@ -90,7 +111,7 @@ export default function Index() {
               letterSpacing={-0.8}
               color="$textPrimary"
             >
-              Phase 5 — status & badges
+              Phase 6 — layout & overlay
             </Text>
             <Text
               fontFamily="$body"
@@ -98,100 +119,205 @@ export default function Index() {
               lineHeight={20}
               color="$textSecondary"
             >
-              Five status/badge components from @yt-subtitle-maker/ui composed
-              against the token system shipped in Phase 2.
+              Five layout/overlay components from @yt-subtitle-maker/ui:
+              SidebarItem, Modal, ActionSheet, Toast, Tooltip.
             </Text>
           </YStack>
 
-          <XStack gap="$lg" flexWrap="wrap">
-            {/* LEFT COLUMN */}
-            <YStack flex={1} minWidth={520} gap="$md">
-              {/* BadgePill — one per tone */}
-              <YStack gap="$xs">
-                <CaptionLabel>BadgePill — tones</CaptionLabel>
-                <GlassCard variant="low">
-                  <XStack gap="$xs" flexWrap="wrap" alignItems="center">
-                    <BadgePill tone="neutral">Neutral</BadgePill>
-                    <BadgePill tone="accent">Accent</BadgePill>
-                    <BadgePill tone="success">Success</BadgePill>
-                    <BadgePill tone="warning">Warning</BadgePill>
-                    <BadgePill tone="error">Error</BadgePill>
-                  </XStack>
-                </GlassCard>
-              </YStack>
-
-              {/* BadgeAccent */}
-              <YStack gap="$xs">
-                <CaptionLabel>BadgeAccent</CaptionLabel>
-                <GlassCard variant="low">
-                  <XStack gap="$sm" alignItems="center">
-                    <BadgeAccent>RECOMMENDED</BadgeAccent>
-                    <SmallLabel>Inter 11 / 600 · letterSpacing 1.5</SmallLabel>
-                  </XStack>
-                </GlassCard>
-              </YStack>
-
-              {/* ProgressBar */}
-              <YStack gap="$xs">
-                <CaptionLabel>ProgressBar</CaptionLabel>
-                <GlassCard variant="low">
-                  <YStack gap="$md">
-                    <YStack gap="$xs">
-                      <SmallLabel>Determinate · value 0.6</SmallLabel>
-                      <ProgressBar value={0.6} />
-                    </YStack>
-                    <YStack gap="$xs">
-                      <SmallLabel>Indeterminate · barber-pole</SmallLabel>
-                      <ProgressBar indeterminate />
-                    </YStack>
-                  </YStack>
-                </GlassCard>
-              </YStack>
+          <XStack gap="$lg" alignItems="flex-start" flexWrap="wrap">
+            {/* LEFT — Sidebar mock */}
+            <YStack gap="$xs">
+              <CaptionLabel>SidebarItem · 240px sidebar</CaptionLabel>
+              <GlassCard variant="mid" width={240} padding="$sm">
+                <YStack gap={4}>
+                  <SidebarItem
+                    icon={
+                      <Film
+                        size={16}
+                        color={activeNav === "generate" ? "#fb923c" : "#a1a1a6"}
+                      />
+                    }
+                    label="Generate"
+                    active={activeNav === "generate"}
+                    onPress={() => setActiveNav("generate")}
+                  />
+                  <SidebarItem
+                    icon={
+                      <LibraryIcon
+                        size={16}
+                        color={activeNav === "library" ? "#fb923c" : "#a1a1a6"}
+                      />
+                    }
+                    label="Library"
+                    active={activeNav === "library"}
+                    onPress={() => setActiveNav("library")}
+                  />
+                  <SidebarItem
+                    icon={
+                      <HistoryIcon
+                        size={16}
+                        color={activeNav === "history" ? "#fb923c" : "#a1a1a6"}
+                      />
+                    }
+                    label="History"
+                    active={activeNav === "history"}
+                    onPress={() => setActiveNav("history")}
+                  />
+                  <SidebarItem
+                    icon={
+                      <SettingsIcon
+                        size={16}
+                        color={activeNav === "settings" ? "#fb923c" : "#a1a1a6"}
+                      />
+                    }
+                    label="Settings"
+                    active={activeNav === "settings"}
+                    onPress={() => setActiveNav("settings")}
+                  />
+                </YStack>
+              </GlassCard>
             </YStack>
 
-            {/* RIGHT COLUMN */}
-            <YStack flex={1} minWidth={520} gap="$md">
-              {/* StepPill */}
+            {/* RIGHT — triggers + tooltip */}
+            <YStack flex={1} minWidth={420} gap="$md">
               <YStack gap="$xs">
-                <CaptionLabel>StepPill — process flow</CaptionLabel>
+                <CaptionLabel>Modal · centered overlay</CaptionLabel>
                 <GlassCard variant="low">
-                  <XStack gap="$xs" flexWrap="wrap" alignItems="center">
-                    <StepPill status="done">Download</StepPill>
-                    <StepPill status="active">Transcribe</StepPill>
-                    <StepPill status="pending">Translate</StepPill>
-                    <StepPill status="pending">Done</StepPill>
+                  <XStack gap="$sm" alignItems="center">
+                    <ButtonPrimary onPress={() => setModalOpen(true)}>
+                      Open modal
+                    </ButtonPrimary>
+                    <SmallLabel>Click to re-open the centered modal</SmallLabel>
                   </XStack>
                 </GlassCard>
               </YStack>
 
-              {/* StatusDot */}
               <YStack gap="$xs">
-                <CaptionLabel>StatusDot</CaptionLabel>
+                <CaptionLabel>ActionSheet · 260px width</CaptionLabel>
                 <GlassCard variant="low">
-                  <YStack gap="$sm">
-                    <XStack alignItems="center" gap="$sm">
-                      <StatusDot status="ok" />
-                      <SmallLabel>OK · pulsing (default)</SmallLabel>
-                    </XStack>
-                    <XStack alignItems="center" gap="$sm">
-                      <StatusDot status="warning" />
-                      <SmallLabel>Warning</SmallLabel>
-                    </XStack>
-                    <XStack alignItems="center" gap="$sm">
-                      <StatusDot status="error" />
-                      <SmallLabel>Error</SmallLabel>
-                    </XStack>
-                    <XStack alignItems="center" gap="$sm">
-                      <StatusDot status="untested" />
-                      <SmallLabel>Untested · no pulse</SmallLabel>
-                    </XStack>
-                  </YStack>
+                  <XStack gap="$sm" alignItems="center">
+                    <ButtonSecondary onPress={() => setSheetOpen(true)}>
+                      Show actions
+                    </ButtonSecondary>
+                    <SmallLabel>3 actions, last is destructive</SmallLabel>
+                  </XStack>
+                </GlassCard>
+              </YStack>
+
+              <YStack gap="$xs">
+                <CaptionLabel>Tooltip · inline ⓘ explainer</CaptionLabel>
+                <GlassCard variant="low">
+                  <XStack gap="$sm" alignItems="center">
+                    <Tooltip content="This is a Whisper engine that runs locally on your machine. Models range from 80MB (tiny) to 3GB (large-v3).">
+                      <XStack
+                        alignItems="center"
+                        gap="$xs"
+                        cursor="help"
+                        paddingHorizontal="$sm"
+                        paddingVertical="$xs"
+                        borderRadius="$sm"
+                        backgroundColor="$surfaceGlass"
+                      >
+                        <Info size={14} color="#a1a1a6" />
+                        <Text
+                          fontFamily="$body"
+                          fontSize={13}
+                          color="$textSecondary"
+                        >
+                          Hover me
+                        </Text>
+                      </XStack>
+                    </Tooltip>
+                    <SmallLabel>Glass-high surface, max-w 320</SmallLabel>
+                  </XStack>
+                </GlassCard>
+              </YStack>
+
+              <YStack gap="$xs">
+                <CaptionLabel>Toast · bottom-center · two tones</CaptionLabel>
+                <GlassCard variant="low">
+                  <SmallLabel>
+                    Two toasts render fixed at the bottom of the viewport
+                    (neutral + success). Both have close buttons.
+                  </SmallLabel>
                 </GlassCard>
               </YStack>
             </YStack>
           </XStack>
         </YStack>
       </ScrollView>
+
+      {/* Modal — open by default for screenshot */}
+      <Modal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title="Library detail"
+        width={520}
+      >
+        <YStack gap="$md">
+          <Text
+            fontFamily="$body"
+            fontSize={14}
+            lineHeight={22}
+            color="$textSecondary"
+          >
+            Sample modal body. The Library Detail Modal (Screen 8) renders
+            video metadata, file rows, processing info, and a footer with
+            Open-folder + Delete actions. Phase 6 ships only the surface — the
+            content composition is Phase 8+.
+          </Text>
+          <XStack gap="$sm" justifyContent="flex-end">
+            <ButtonSecondary onPress={() => setModalOpen(false)}>
+              Close
+            </ButtonSecondary>
+            <ButtonPrimary onPress={() => setModalOpen(false)}>
+              Open folder
+            </ButtonPrimary>
+          </XStack>
+        </YStack>
+      </Modal>
+
+      {/* ActionSheet — open by default for screenshot */}
+      <ActionSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        actions={[
+          {
+            label: "Play",
+            icon: <Play size={14} color="#a1a1a6" />,
+            onPress: () => {},
+          },
+          {
+            label: "Open folder",
+            icon: <FolderOpen size={14} color="#a1a1a6" />,
+            onPress: () => {},
+          },
+          {
+            label: "Delete",
+            icon: <Trash2 size={14} color="#ff5a5f" />,
+            onPress: () => {},
+            destructive: true,
+          },
+        ]}
+      />
+
+      {/* Toasts — both default-open for screenshot. The neutral toast sits
+          at the default 32px from bottom; the success one stacks above it. */}
+      <Toast
+        open={toastOpen}
+        bottom={32}
+        onClose={() => setToastOpen(false)}
+      >
+        Saved settings
+      </Toast>
+      <Toast
+        open={successToastOpen}
+        tone="success"
+        bottom={96}
+        onClose={() => setSuccessToastOpen(false)}
+      >
+        Saved successfully · success tone
+      </Toast>
     </Stack>
   );
 }

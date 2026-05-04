@@ -12,7 +12,8 @@
  * Phase 5 adds:
  *   - Status / badges: BadgePill, BadgeAccent, ProgressBar, StepPill, StatusDot
  *
- * Phase 6+ will add: SidebarItem, ActionSheet, Modal, Toast, Tooltip.
+ * Phase 6 adds:
+ *   - Layout / overlay: SidebarItem, Modal, ActionSheet, Toast, Tooltip
  *
  * Tokens (`glassRecipes`, `EASING`, `DURATION`) live here so apps/desktop's
  * tamagui.config can re-export them without a circular workspace dep.
@@ -72,3 +73,21 @@ export type { StepPillProps, StepPillStatus } from "./components/StepPill";
 
 export { StatusDot } from "./components/StatusDot";
 export type { StatusDotProps, StatusDotStatus } from "./components/StatusDot";
+
+export { SidebarItem } from "./components/SidebarItem";
+export type { SidebarItemProps } from "./components/SidebarItem";
+
+export { Modal } from "./components/Modal";
+export type { ModalProps } from "./components/Modal";
+
+export { ActionSheet } from "./components/ActionSheet";
+export type {
+  ActionSheetAction,
+  ActionSheetProps,
+} from "./components/ActionSheet";
+
+export { Toast } from "./components/Toast";
+export type { ToastProps, ToastTone } from "./components/Toast";
+
+export { Tooltip } from "./components/Tooltip";
+export type { TooltipProps } from "./components/Tooltip";
