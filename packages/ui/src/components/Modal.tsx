@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Dialog, Stack, Text, XStack, YStack } from "tamagui";
+import { Dialog, Stack, Text, Theme, XStack, YStack } from "tamagui";
 import { X } from "@tamagui/lucide-icons";
 import { glassRecipes } from "../tokens";
 import { IconButton } from "./IconButton";
@@ -40,43 +40,50 @@ export function Modal({
   return (
     <Dialog modal open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay
-          key="overlay"
-          animation="quick"
-          opacity={1}
-          enterStyle={{ opacity: 0 }}
-          exitStyle={{ opacity: 0 }}
-          backgroundColor="rgba(10,10,12,0.75)"
-          style={{
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-          }}
-        />
+        {/* Portal renders at document root and (with `themeClassNameOnRoot`)
+            inherits `tui_dark` from <html>. But Tamagui token resolution for
+            descendants without the surrounding Theme React context can fall
+            back to bare browser defaults — which is why $textPrimary text
+            inside a Dialog can render BLACK on the dark backdrop. Wrapping
+            the portal subtree in <Theme name="dark"> restores the context. */}
+        <Theme name="dark">
+          <Dialog.Overlay
+            key="overlay"
+            animation="quick"
+            opacity={1}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+            backgroundColor="rgba(10,10,12,0.75)"
+            style={{
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+            }}
+          />
 
-        <Dialog.Content
-          key="content"
-          unstyled
-          animation="quick"
-          enterStyle={{ opacity: 0, scale: 0.96 }}
-          exitStyle={{ opacity: 0, scale: 0.96 }}
-          width={width}
-          maxWidth="90vw"
-          padding="$lg"
-          borderRadius="$xl"
-          // Spec: "glassMid + extra opacity" — pure glassMid
-          // (rgba(255,255,255,0.06)) is too transparent against the 0.75-alpha
-          // black backdrop. We use the Library Detail Modal's opaque-glass
-          // value (~95% alpha on a slightly brightened bgElevated) so the
-          // modal reads as a distinct surface above the overlay.
-          backgroundColor="rgba(36,36,40,0.96)"
-          borderWidth={1}
-          borderColor="$borderStrong"
-          style={{
-            backdropFilter: glassRecipes.glassHigh.backdropFilter,
-            WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
-            boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
-          }}
-        >
+          <Dialog.Content
+            key="content"
+            unstyled
+            animation="quick"
+            enterStyle={{ opacity: 0, scale: 0.96 }}
+            exitStyle={{ opacity: 0, scale: 0.96 }}
+            width={width}
+            maxWidth="90vw"
+            padding="$lg"
+            borderRadius="$xl"
+            // Spec: "glassMid + extra opacity" — pure glassMid
+            // (rgba(255,255,255,0.06)) is too transparent against the 0.75-alpha
+            // black backdrop. We use the Library Detail Modal's opaque-glass
+            // value (~95% alpha on a slightly brightened bgElevated) so the
+            // modal reads as a distinct surface above the overlay.
+            backgroundColor="rgba(36,36,40,0.96)"
+            borderWidth={1}
+            borderColor="$borderStrong"
+            style={{
+              backdropFilter: glassRecipes.glassHigh.backdropFilter,
+              WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
+              boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
+            }}
+          >
           {/* Tamagui Dialog requires a Dialog.Title for a11y. When no title is
               provided, render a visually-hidden one so screen readers still
               get an accessible label. */}
@@ -129,8 +136,9 @@ export function Modal({
               </Stack>
             </>
           )}
-          <YStack>{children}</YStack>
-        </Dialog.Content>
+            <YStack>{children}</YStack>
+          </Dialog.Content>
+        </Theme>
       </Dialog.Portal>
     </Dialog>
   );

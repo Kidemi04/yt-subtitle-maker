@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Select, XStack, YStack } from "tamagui";
+import { Select, Theme, XStack, YStack } from "tamagui";
 import { ChevronDown, Check } from "@tamagui/lucide-icons";
 import { glassRecipes } from "../tokens";
 
@@ -80,57 +80,63 @@ export function Dropdown({
       </Select.Trigger>
 
       <Select.Content zIndex={2000}>
-        <Select.Viewport
-          unstyled
-          minWidth={200}
-          backgroundColor={glassRecipes.glassMid.bg}
-          borderColor="$borderSubtle"
-          borderWidth={1}
-          borderRadius="$md"
-          paddingVertical="$xs"
-          // Glass blur on the popover surface.
-          style={{
-            backdropFilter: glassRecipes.glassMid.backdropFilter,
-            WebkitBackdropFilter: glassRecipes.glassMid.backdropFilter,
-            boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
-          }}
-        >
-          <Select.Group>
-            <YStack>
-              {options.map((opt, index) => (
-                <Select.Item
-                  key={opt.value}
-                  index={index}
-                  value={opt.value}
-                  paddingVertical="$xs"
-                  paddingHorizontal="$md"
-                  cursor="pointer"
-                  hoverStyle={{ backgroundColor: "$surfaceGlass" }}
-                >
-                  <XStack
-                    flex={1}
-                    alignItems="center"
-                    justifyContent="space-between"
-                    gap="$sm"
+        {/* Tamagui Select.Content portals to document root; without a Theme
+            wrap the dark token cascade can drop and ItemText falls back to
+            black. Re-wrap so $textPrimary etc. resolve correctly inside the
+            popover. */}
+        <Theme name="dark">
+          <Select.Viewport
+            unstyled
+            minWidth={200}
+            backgroundColor={glassRecipes.glassMid.bg}
+            borderColor="$borderSubtle"
+            borderWidth={1}
+            borderRadius="$md"
+            paddingVertical="$xs"
+            // Glass blur on the popover surface.
+            style={{
+              backdropFilter: glassRecipes.glassMid.backdropFilter,
+              WebkitBackdropFilter: glassRecipes.glassMid.backdropFilter,
+              boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
+            }}
+          >
+            <Select.Group>
+              <YStack>
+                {options.map((opt, index) => (
+                  <Select.Item
+                    key={opt.value}
+                    index={index}
+                    value={opt.value}
+                    paddingVertical="$xs"
+                    paddingHorizontal="$md"
+                    cursor="pointer"
+                    hoverStyle={{ backgroundColor: "$surfaceGlass" }}
                   >
-                    <Select.ItemText
-                      fontFamily="$body"
-                      fontSize={14}
-                      color={
-                        opt.value === value ? "$accent" : "$textPrimary"
-                      }
+                    <XStack
+                      flex={1}
+                      alignItems="center"
+                      justifyContent="space-between"
+                      gap="$sm"
                     >
-                      {opt.label}
-                    </Select.ItemText>
-                    <Select.ItemIndicator>
-                      <Check size={14} color="#fb923c" />
-                    </Select.ItemIndicator>
-                  </XStack>
-                </Select.Item>
-              ))}
-            </YStack>
-          </Select.Group>
-        </Select.Viewport>
+                      <Select.ItemText
+                        fontFamily="$body"
+                        fontSize={14}
+                        color={
+                          opt.value === value ? "$accent" : "$textPrimary"
+                        }
+                      >
+                        {opt.label}
+                      </Select.ItemText>
+                      <Select.ItemIndicator>
+                        <Check size={14} color="$accent" />
+                      </Select.ItemIndicator>
+                    </XStack>
+                  </Select.Item>
+                ))}
+              </YStack>
+            </Select.Group>
+          </Select.Viewport>
+        </Theme>
       </Select.Content>
     </Select>
   );

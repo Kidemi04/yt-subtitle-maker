@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Tooltip as TamaguiTooltip, Text } from "tamagui";
+import { Tooltip as TamaguiTooltip, Text, Theme } from "tamagui";
 import { glassRecipes } from "../tokens";
 
 /**
@@ -32,39 +32,44 @@ export function Tooltip({ content, children }: TooltipProps) {
           icon). Letting Tamagui render its own wrapper attaches the ref to a
           real DOM node. */}
       <TamaguiTooltip.Trigger>{children}</TamaguiTooltip.Trigger>
-      <TamaguiTooltip.Content
-        unstyled
-        animation="quick"
-        enterStyle={{ opacity: 0, y: -4 }}
-        exitStyle={{ opacity: 0, y: -4 }}
-        padding="$sm"
-        borderRadius="$sm"
-        backgroundColor={glassRecipes.glassHigh.bg}
-        borderWidth={1}
-        borderColor="$borderStrong"
-        maxWidth={320}
-        zIndex={3000}
-        style={{
-          backdropFilter: glassRecipes.glassHigh.backdropFilter,
-          WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
-          boxShadow: glassRecipes.glassHigh.boxShadow,
-        }}
-      >
-        <TamaguiTooltip.Arrow size={8} backgroundColor="$borderStrong" />
-        {typeof content === "string" ? (
-          <Text
-            fontFamily="$body"
-            fontSize={13}
-            fontWeight="400"
-            lineHeight={20}
-            color="$textSecondary"
-          >
-            {content}
-          </Text>
-        ) : (
-          content
-        )}
-      </TamaguiTooltip.Content>
+      {/* Popover portals out of the React subtree — re-anchor the dark theme
+          context so $textSecondary / $borderStrong / etc. don't fall back to
+          system defaults (otherwise tooltip text renders black). */}
+      <Theme name="dark">
+        <TamaguiTooltip.Content
+          unstyled
+          animation="quick"
+          enterStyle={{ opacity: 0, y: -4 }}
+          exitStyle={{ opacity: 0, y: -4 }}
+          padding="$sm"
+          borderRadius="$sm"
+          backgroundColor={glassRecipes.glassHigh.bg}
+          borderWidth={1}
+          borderColor="$borderStrong"
+          maxWidth={320}
+          zIndex={3000}
+          style={{
+            backdropFilter: glassRecipes.glassHigh.backdropFilter,
+            WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
+            boxShadow: glassRecipes.glassHigh.boxShadow,
+          }}
+        >
+          <TamaguiTooltip.Arrow size={8} backgroundColor="$borderStrong" />
+          {typeof content === "string" ? (
+            <Text
+              fontFamily="$body"
+              fontSize={13}
+              fontWeight="400"
+              lineHeight={20}
+              color="$textSecondary"
+            >
+              {content}
+            </Text>
+          ) : (
+            content
+          )}
+        </TamaguiTooltip.Content>
+      </Theme>
     </TamaguiTooltip>
   );
 }
