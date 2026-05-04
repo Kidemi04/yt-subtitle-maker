@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "yt-subtitle-maker",
+    "slug": "yt-subtitle-maker",
+    "version": "2.0.0-alpha",
+    "scheme": "ytsub",
+    "platforms": ["web", "ios", "android"],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"]
+  }
+}

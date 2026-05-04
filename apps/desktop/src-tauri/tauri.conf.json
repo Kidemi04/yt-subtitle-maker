@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "yt-subtitle-maker",
+  "version": "2.0.0-alpha",
+  "identifier": "com.kelvinfongnee.ytsubtitlemaker",
+  "build": {
+    "beforeDevCommand": "pnpm web",
+    "beforeBuildCommand": "pnpm build",
+    "devUrl": "http://localhost:8081",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "yt-subtitle-maker",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 600,
+        "resizable": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"]
+  }
+}

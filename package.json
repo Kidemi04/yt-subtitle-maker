@@ -1,0 +1,37 @@
+{
+  "name": "yt-subtitle-maker",
+  "version": "2.0.0-alpha",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -F desktop dev",
+    "web": "pnpm -F desktop web",
+    "build": "pnpm -F desktop build"
+  },
+  "devDependencies": {
+    "playwright": "1.59.1"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "18.2.0",
+      "react-dom": "18.2.0",
+      "metro": "0.80.12",
+      "metro-cache": "0.80.12",
+      "metro-cache-key": "0.80.12",
+      "metro-config": "0.80.12",
+      "metro-core": "0.80.12",
+      "metro-runtime": "0.80.12",
+      "metro-source-map": "0.80.12",
+      "metro-resolver": "0.80.12",
+      "metro-transform-worker": "0.80.12",
+      "metro-transform-plugins": "0.80.12",
+      "metro-babel-transformer": "0.80.12",
+      "metro-file-map": "0.80.12",
+      "metro-symbolicate": "0.80.12",
+      "metro-minify-terser": "0.80.12"
+    }
+  }
+}
