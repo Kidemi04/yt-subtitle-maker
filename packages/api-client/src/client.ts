@@ -87,20 +87,6 @@ export class ApiClient {
   }
 
   // ─── Translation helpers ───────────────────────────────────────────────
-  async translateTitle(input: {
-    title: string;
-    targetLang: string;
-    provider?: TranslatorProvider;
-  }): Promise<{ translated: string }> {
-    const res = await fetch(`${this.baseUrl}/api/translate-title`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error(`/api/translate-title ${res.status}`);
-    return res.json();
-  }
-
   async testTranslator(input: {
     provider: TranslatorProvider;
     baseUrl?: string;
@@ -165,6 +151,18 @@ export class ApiClient {
       body: JSON.stringify({ videoId }),
     });
     if (!res.ok) throw new Error(`/api/library/open-folder ${res.status}`);
+  }
+
+  async playMpv(
+    videoId: string,
+  ): Promise<{ ok: boolean; error?: string; media?: string; subtitle?: string | null }> {
+    const res = await fetch(`${this.baseUrl}/api/library/play-mpv`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ videoId }),
+    });
+    if (!res.ok) throw new Error(`/api/library/play-mpv ${res.status}`);
+    return res.json();
   }
 
   // ─── History ──────────────────────────────────────────────────────────
