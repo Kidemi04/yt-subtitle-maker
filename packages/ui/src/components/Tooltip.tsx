@@ -27,7 +27,11 @@ export type TooltipProps = {
 export function Tooltip({ content, children }: TooltipProps) {
   return (
     <TamaguiTooltip>
-      <TamaguiTooltip.Trigger asChild>{children}</TamaguiTooltip.Trigger>
+      {/* No `asChild` — that forwards the ref to children, which crashes when
+          children is a function component without forwardRef (e.g. a lucide
+          icon). Letting Tamagui render its own wrapper attaches the ref to a
+          real DOM node. */}
+      <TamaguiTooltip.Trigger>{children}</TamaguiTooltip.Trigger>
       <TamaguiTooltip.Content
         unstyled
         animation="quick"
