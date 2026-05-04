@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from api.schemas import VideoMetadata
 from core.config import load_config
 from core.downloader.cookies import build_cookie_opts
+from core.downloader.js_runtime import build_js_runtime_opts
 
 router = APIRouter(prefix="/api", tags=["metadata"])
 
@@ -25,8 +26,10 @@ def _video_id_from_url(url: str) -> str:
 
 def fetch_video_metadata(url: str, **cookie_kwargs) -> dict:
     """Lightweight metadata fetch using yt-dlp's flat extractor."""
+    cfg = load_config()
     opts: dict = {"quiet": True, "skip_download": True}
     opts.update(build_cookie_opts(**cookie_kwargs))
+    opts.update(build_js_runtime_opts(cfg.js_runtime_path))
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
     return {

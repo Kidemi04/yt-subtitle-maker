@@ -78,3 +78,7 @@ class BackendCapabilities(BaseModel):
     installedSttEngines: list[str]
     whisperModelsAvailable: list[str]
     version: str
+    # Detected JS runtime spec yt-dlp uses to deobfuscate YouTube format URLs
+    # ("deno:/path", "node:/path"), or null if neither is on PATH and no
+    # override is configured. When null, format extraction is degraded.
+    jsRuntime: str | None = None

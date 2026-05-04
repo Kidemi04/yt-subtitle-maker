@@ -30,11 +30,12 @@ restricted content. Frontend uses this to disambiguate "no cookies sent" from
 from __future__ import annotations
 
 import yt_dlp
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
 from core.config import load_config
 from core.downloader.cookies import build_cookie_opts
+from core.downloader.js_runtime import build_js_runtime_opts
 
 router = APIRouter(prefix="/api", tags=["cookies"])
 
@@ -64,7 +65,9 @@ def _describe_source(opts: dict) -> tuple[bool, str]:
 
 
 @router.post("/test-cookies")
-def test_cookies(req: TestCookiesRequest = TestCookiesRequest()) -> dict:
+def test_cookies(
+    req: TestCookiesRequest = Body(default_factory=TestCookiesRequest),  # noqa: B008
+) -> dict:
     cfg = load_config()
     browser = req.cookieBrowser if req.cookieBrowser is not None else cfg.cookie_browser
     profile = req.cookieProfile if req.cookieProfile is not None else cfg.cookie_profile
@@ -77,6 +80,7 @@ def test_cookies(req: TestCookiesRequest = TestCookiesRequest()) -> dict:
 
     try:
         opts: dict = {"quiet": True, "skip_download": True, **cookie_opts}
+        opts.update(build_js_runtime_opts(cfg.js_runtime_path))
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(_TEST_URL, download=False)
         return {

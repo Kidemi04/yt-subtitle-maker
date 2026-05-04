@@ -8,7 +8,9 @@ from pathlib import Path
 
 import yt_dlp
 
+from core.config import load_config
 from core.downloader.cookies import build_cookie_opts
+from core.downloader.js_runtime import build_js_runtime_opts
 
 # Filesystem-unsafe characters on Windows (the strictest target). We strip these.
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -86,6 +88,7 @@ def download_audio(
         "postprocessor_args": ["-ar", "16000", "-ac", "1"],
     }
     opts.update(build_cookie_opts(cookie_browser, cookie_profile, cookies_txt_path))
+    opts.update(build_js_runtime_opts(load_config().js_runtime_path))
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)

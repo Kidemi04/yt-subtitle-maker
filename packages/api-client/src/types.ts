@@ -154,6 +154,8 @@ export interface AppConfig {
   whisperCacheDir: string;
   ffmpegResample16k: boolean;
   logsVerbosity: "error" | "warning" | "info" | "debug";
+  /** JS runtime override for yt-dlp. Empty = auto-detect node/deno on PATH. */
+  jsRuntimePath: string;
 }
 
 export interface BackendCapabilities {
@@ -162,6 +164,10 @@ export interface BackendCapabilities {
   installedSttEngines: string[];
   whisperModelsAvailable: string[];
   version: string;
+  /** Detected runtime spec ("node:/path", "deno:/path") or null if missing.
+   *  When null, yt-dlp degrades — many YouTube format URLs become
+   *  unavailable and download/playback can fail. */
+  jsRuntime: string | null;
 }
 
 /**

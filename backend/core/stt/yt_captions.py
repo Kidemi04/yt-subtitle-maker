@@ -14,6 +14,8 @@ from pathlib import Path
 
 import yt_dlp
 
+from core.config import load_config
+from core.downloader.js_runtime import build_js_runtime_opts
 from core.stt.base import TranscriptionResult, TranscriptionSegment
 
 
@@ -26,7 +28,9 @@ class YtCaptionsProvider:
         if not url:
             return False
         try:
-            with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True}) as ydl:
+            opts: dict = {"quiet": True, "skip_download": True}
+            opts.update(build_js_runtime_opts(load_config().js_runtime_path))
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 automatic = info.get("automatic_captions", {}) or {}
                 manual = info.get("subtitles", {}) or {}
@@ -48,7 +52,7 @@ class YtCaptionsProvider:
             progress(0.0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            opts = {
+            opts: dict = {
                 "quiet": True,
                 "skip_download": True,
                 "writesubtitles": True,
@@ -57,6 +61,7 @@ class YtCaptionsProvider:
                 "subtitlesformat": "vtt",
                 "outtmpl": str(Path(tmp) / "%(id)s.%(ext)s"),
             }
+            opts.update(build_js_runtime_opts(load_config().js_runtime_path))
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 video_id = info["id"]

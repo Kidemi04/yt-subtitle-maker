@@ -130,6 +130,9 @@ export default function Settings() {
   const [installedEngines, setInstalledEngines] = React.useState<
     string[] | undefined
   >(undefined);
+  const [jsRuntime, setJsRuntime] = React.useState<string | null | undefined>(
+    undefined,
+  );
 
   // Translator model dropdown sources. Gemini's list is fetched once
   // (returns the hardcoded KNOWN_MODELS); LM Studio + OpenAI come from
@@ -157,6 +160,7 @@ export default function Settings() {
       .then((v) => {
         if (cancelled) return;
         setInstalledEngines(v.installedSttEngines ?? []);
+        setJsRuntime(v.jsRuntime ?? null);
       })
       .catch(() => undefined);
     // Gemini list is static (KNOWN_MODELS in the backend) — fetch once on
@@ -783,6 +787,21 @@ export default function Settings() {
               value={draft.mpvPath}
               onChangeText={(v: string) => update("mpvPath", v)}
               placeholder="(falls back to PATH)"
+            />
+          </YStack>
+          <YStack gap="$xs">
+            <Field
+              label="JS runtime for yt-dlp"
+              helper={
+                jsRuntime
+                  ? `Detected: ${jsRuntime}`
+                  : "⚠ No runtime detected — install Node or Deno, or set the path here. Without one, YouTube extraction degrades."
+              }
+            />
+            <TextInput
+              value={draft.jsRuntimePath}
+              onChangeText={(v: string) => update("jsRuntimePath", v)}
+              placeholder="(auto-detect node/deno on PATH)"
             />
           </YStack>
           <YStack gap="$xs">

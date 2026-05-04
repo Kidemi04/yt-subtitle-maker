@@ -41,6 +41,7 @@ _CAMEL_TO_SNAKE = {
     "mpvPath": "mpv_path",
     "whisperCacheDir": "whisper_cache_dir",
     "logsVerbosity": "logs_verbosity",
+    "jsRuntimePath": "js_runtime_path",
 }
 _SNAKE_TO_CAMEL = {v: k for k, v in _CAMEL_TO_SNAKE.items()}
 

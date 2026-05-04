@@ -65,6 +65,11 @@ class AppConfig:
     mpv_path: str = ""
     whisper_cache_dir: str = ""
     logs_verbosity: Literal["error", "warning", "info", "debug"] = "info"
+    # JS runtime override for yt-dlp's YouTube player extraction. Recent
+    # yt-dlp requires Deno or Node to deobfuscate format URLs. Empty string
+    # = auto-detect (PATH lookup). Otherwise: "node" / "deno" / a bare or
+    # "name:path" spec.
+    js_runtime_path: str = ""
 
 
 def load_config() -> AppConfig:
