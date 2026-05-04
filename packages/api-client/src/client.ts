@@ -117,10 +117,23 @@ export class ApiClient {
   }
 
   // ─── Cookies ──────────────────────────────────────────────────────────
-  async testCookies(): Promise<{ ok: boolean; error?: string }> {
+  async testCookies(
+    input?: {
+      cookieBrowser?: string;
+      cookieProfile?: string;
+      cookiesTxtPath?: string;
+    },
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    title?: string;
+    cookiesAttached?: boolean;
+    cookieSource?: string;
+  }> {
     const res = await fetch(`${this.baseUrl}/api/test-cookies`, {
       method: "POST",
       headers: this.headers(),
+      body: JSON.stringify(input ?? {}),
     });
     if (!res.ok) throw new Error(`/api/test-cookies ${res.status}`);
     return res.json();
