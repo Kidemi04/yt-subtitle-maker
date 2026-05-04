@@ -75,4 +75,4 @@ def update_config(payload: dict[str, Any] = Body(...)) -> dict:  # noqa: B008
         if snake_key and hasattr(cfg, snake_key):
             setattr(cfg, snake_key, value)
     save_config(cfg)
-    return {"ok": True}
+    return _mask_secrets(_to_camel(asdict(load_config())))

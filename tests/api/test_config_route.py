@@ -18,7 +18,12 @@ def test_config_post_partial_update_persists(tmp_path, monkeypatch):
 
     resp = client.post("/api/config", json={"geminiApiKey": "new-key"})
     assert resp.status_code == 200
-    assert resp.json() == {"ok": True}
+    body = resp.json()
+    # POST returns the full masked config (same shape as GET) so the frontend
+    # can update its in-memory copy in one round-trip.
+    assert body["geminiApiKey"] == "***"
+    assert "backendUrl" in body
+    assert "translatorProvider" in body
 
     # Verify it persisted (direct file inspection — GET masks secret keys)
     import json as _json

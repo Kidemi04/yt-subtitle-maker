@@ -112,3 +112,101 @@ def test_library_open_folder_invokes_os_opener(mock_popen, fake_output_dir):
 def test_library_open_folder_unknown_returns_404(fake_output_dir):
     resp = client.post("/api/library/open-folder", json={"videoId": "nonexistentX"})
     assert resp.status_code == 404
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_streams_youtube_with_translated_srt(
+    mock_which, mock_popen, fake_output_dir
+):
+    """Default: mpv streams the YouTube URL with the translated SRT overlaid."""
+    mock_which.return_value = "/fake/mpv"
+    _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["subtitle"] == "abcDEFghIJK_zh-CN.srt"
+    # Default playback uses the YouTube URL so the user gets actual video,
+    # not just the .wav audio that was downloaded for transcription.
+    assert body["media"] == "youtube:abcDEFghIJK"
+
+    mock_popen.assert_called_once()
+    cmd = mock_popen.call_args.args[0]
+    assert cmd[0] == "/fake/mpv"
+    assert "https://www.youtube.com/watch?v=abcDEFghIJK" in cmd
+    assert "--force-window=immediate" in cmd
+    sub_arg = next(arg for arg in cmd if arg.startswith("--sub-file="))
+    assert sub_arg.endswith("abcDEFghIJK_zh-CN.srt")
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_uses_local_video_when_present(
+    mock_which, mock_popen, fake_output_dir
+):
+    """If a local video file exists, prefer it over streaming (offline-OK)."""
+    mock_which.return_value = "/fake/mpv"
+    folder = _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
+    # Drop a local mp4 alongside the .wav.
+    (folder / "abcDEFghIJK.mp4").write_bytes(b"\x00" * 200)
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["media"] == "abcDEFghIJK.mp4"
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_falls_back_to_original_srt(
+    mock_which, mock_popen, fake_output_dir
+):
+    """When only the original SRT exists, that's what mpv should get."""
+    mock_which.return_value = "/fake/mpv"
+    _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=False)
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["subtitle"] == "abcDEFghIJK_original.srt"
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_no_subtitle_still_launches(
+    mock_which, mock_popen, fake_output_dir
+):
+    """Folder with no SRT yet (e.g. user opened mid-pipeline) still streams."""
+    mock_which.return_value = "/fake/mpv"
+    folder = fake_output_dir / "Empty_abcDEFghIJK"
+    folder.mkdir()
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["subtitle"] is None
+    assert body["media"] == "youtube:abcDEFghIJK"
+    cmd = mock_popen.call_args.args[0]
+    assert all(not arg.startswith("--sub-file=") for arg in cmd)
+
+
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_missing_executable_returns_soft_error(
+    mock_which, fake_output_dir
+):
+    """If mpv isn't in PATH and no config override, return ok:false with a hint."""
+    mock_which.return_value = None
+    _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video")
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert "mpv" in body["error"].lower()
+
+
+def test_library_play_mpv_unknown_video_returns_404(fake_output_dir):
+    resp = client.post("/api/library/play-mpv", json={"videoId": "nonexistentX"})
+    assert resp.status_code == 404
