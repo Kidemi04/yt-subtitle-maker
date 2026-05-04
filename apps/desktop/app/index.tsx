@@ -255,6 +255,46 @@ export default function Generate() {
   const [whisperDevice, setWhisperDevice] = React.useState<WhisperDevice>("auto");
   const [vadEnabled, setVadEnabled] = React.useState(true);
 
+  // Installed Whisper models — drives the dropdown so the user can't pick a
+  // model they haven't downloaded (which would 422 mid-pipeline). undefined
+  // = not yet probed; show full list to avoid flash. Empty set after probe
+  // means "nothing installed" — the init flow handles that case.
+  const [installedWhisperModels, setInstalledWhisperModels] = React.useState<
+    Set<WhisperModel> | undefined
+  >(undefined);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .fetchDependencies()
+      .then((dep) => {
+        if (cancelled) return;
+        const installed = new Set<WhisperModel>(
+          (Object.entries(dep.models ?? {})
+            .filter(([, v]) => v === true)
+            .map(([k]) => k) as WhisperModel[]),
+        );
+        setInstalledWhisperModels(installed);
+        // If the current pick isn't installed, swap to the first installed
+        // model so submitting won't fail. Falls back to leaving as-is when
+        // nothing is installed (init flow will redirect first anyway).
+        if (installed.size > 0 && !installed.has(whisperModel)) {
+          const first = Array.from(installed)[0];
+          if (first) setWhisperModel(first);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const whisperModelOptions = React.useMemo(() => {
+    if (!installedWhisperModels) return WHISPER_MODELS;
+    return WHISPER_MODELS.filter((opt) => installedWhisperModels.has(opt.value));
+  }, [installedWhisperModels]);
+
   // Translator provider — initialized from server config so the user's
   // Settings choice is the default. Per-job override stays in this state
   // and is sent in the process request, so flipping providers between
@@ -285,6 +325,39 @@ export default function Generate() {
   const [mpvStatus, setMpvStatus] = React.useState<
     { kind: "ok" | "error"; text: string } | undefined
   >(undefined);
+
+  // Inline translator-test feedback for the per-job provider switcher.
+  // Lets the user verify the chosen provider's credentials before kicking
+  // off a job; auto-clears when the provider changes.
+  const [translatorTest, setTranslatorTest] = React.useState<
+    { kind: "ok" | "error" | "busy"; text?: string } | undefined
+  >(undefined);
+
+  React.useEffect(() => {
+    setTranslatorTest(undefined);
+  }, [translatorProvider]);
+
+  const testCurrentTranslator = async () => {
+    setTranslatorTest({ kind: "busy" });
+    try {
+      // Send only `provider` — backend resolves baseUrl/model/apiKey from
+      // saved config (see backend/api/routes/translator.py::_resolve_field).
+      // Saves the user from re-typing credentials they've already saved.
+      const res = await apiClient.testTranslator({
+        provider: translatorProvider,
+      });
+      setTranslatorTest(
+        res.ok
+          ? { kind: "ok", text: "Reachable" }
+          : { kind: "error", text: res.error ?? "unreachable" },
+      );
+    } catch (err) {
+      setTranslatorTest({
+        kind: "error",
+        text: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
 
   const router = useRouter();
 
@@ -534,14 +607,51 @@ export default function Generate() {
                   </XStack>
 
                   {enableTranslation && !downloadOnly ? (
-                    <SegmentedControl
-                      value={translatorProvider}
-                      onValueChange={(v) =>
-                        setTranslatorProvider(v as TranslatorProvider)
-                      }
-                      options={TRANSLATOR_OPTIONS}
-                      aria-label="Translator provider"
-                    />
+                    <YStack gap="$xs">
+                      <SegmentedControl
+                        value={translatorProvider}
+                        onValueChange={(v) =>
+                          setTranslatorProvider(v as TranslatorProvider)
+                        }
+                        options={TRANSLATOR_OPTIONS}
+                        aria-label="Translator provider"
+                      />
+                      <XStack alignItems="center" gap="$sm">
+                        <ButtonGhost
+                          onPress={testCurrentTranslator}
+                          disabled={translatorTest?.kind === "busy"}
+                        >
+                          <Caption color="$textPrimary">
+                            {translatorTest?.kind === "busy"
+                              ? "Testing…"
+                              : "Test connection"}
+                          </Caption>
+                        </ButtonGhost>
+                        {translatorTest && translatorTest.kind !== "busy" ? (
+                          <XStack alignItems="center" gap="$xs">
+                            <Stack
+                              width={8}
+                              height={8}
+                              borderRadius="$pill"
+                              backgroundColor={
+                                translatorTest.kind === "ok"
+                                  ? "$success"
+                                  : "$error"
+                              }
+                            />
+                            <Caption
+                              color={
+                                translatorTest.kind === "ok"
+                                  ? "$success"
+                                  : "$error"
+                              }
+                            >
+                              {translatorTest.text}
+                            </Caption>
+                          </XStack>
+                        ) : null}
+                      </XStack>
+                    </YStack>
                   ) : null}
 
                   <XStack alignItems="center" justifyContent="space-between">
@@ -582,9 +692,17 @@ export default function Generate() {
                             onValueChange={(v) =>
                               setWhisperModel(v as WhisperModel)
                             }
-                            options={WHISPER_MODELS}
+                            options={whisperModelOptions}
                             width="100%"
                           />
+                          {installedWhisperModels &&
+                          installedWhisperModels.size <
+                            WHISPER_MODELS.length ? (
+                            <Caption>
+                              Only installed models shown · install more in
+                              first-run setup
+                            </Caption>
+                          ) : null}
                         </YStack>
                         <YStack flex={1} minWidth={180} gap="$xs">
                           <CaptionUpper>Device</CaptionUpper>

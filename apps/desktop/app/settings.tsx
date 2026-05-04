@@ -131,6 +131,16 @@ export default function Settings() {
     string[] | undefined
   >(undefined);
 
+  // Translator model dropdown sources. Gemini's list is fetched once
+  // (returns the hardcoded KNOWN_MODELS); LM Studio + OpenAI come from
+  // the configured server's actual /v1/models endpoint.
+  const [geminiModels, setGeminiModels] = React.useState<string[]>([]);
+  const [localOpenaiModels, setLocalOpenaiModels] = React.useState<string[]>([]);
+  const [openaiModels, setOpenaiModels] = React.useState<string[]>([]);
+  const [modelsBusy, setModelsBusy] = React.useState<
+    "gemini" | "local_openai" | "openai" | undefined
+  >(undefined);
+
   React.useEffect(() => {
     let cancelled = false;
     apiClient
@@ -149,10 +159,69 @@ export default function Settings() {
         setInstalledEngines(v.installedSttEngines ?? []);
       })
       .catch(() => undefined);
+    // Gemini list is static (KNOWN_MODELS in the backend) — fetch once on
+    // mount; doesn't depend on credentials.
+    apiClient
+      .listTranslatorModels({ provider: "gemini" })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.ok) setGeminiModels(res.models);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const refreshLocalOpenaiModels = async () => {
+    if (!draft) return;
+    setModelsBusy("local_openai");
+    try {
+      const res = await apiClient.listTranslatorModels({
+        provider: "local_openai",
+        baseUrl: draft.localOpenaiBaseUrl,
+        apiKey: draft.localOpenaiApiKey,
+      });
+      if (res.ok) setLocalOpenaiModels(res.models);
+    } catch {
+      /* surface via translator status */
+    } finally {
+      setModelsBusy(undefined);
+    }
+  };
+
+  const refreshOpenaiModels = async () => {
+    if (!draft) return;
+    setModelsBusy("openai");
+    try {
+      const res = await apiClient.listTranslatorModels({
+        provider: "openai",
+        baseUrl: draft.openaiBaseUrl,
+        apiKey: draft.openaiApiKey,
+      });
+      if (res.ok) setOpenaiModels(res.models);
+    } catch {
+      /* surface via translator status */
+    } finally {
+      setModelsBusy(undefined);
+    }
+  };
+
+  // Build dropdown option lists. If the saved value isn't in the fetched
+  // list (e.g. user edited config.json by hand, or we haven't fetched yet),
+  // include it as a "current" option so the dropdown can render the value
+  // without showing a stale placeholder.
+  const buildModelOptions = (
+    fetched: string[],
+    current: string | undefined,
+  ): { label: string; value: string }[] => {
+    const set = new Set(fetched);
+    const out = fetched.map((m) => ({ label: m, value: m }));
+    if (current && !set.has(current)) {
+      out.unshift({ label: `${current} (current)`, value: current });
+    }
+    return out;
+  };
 
   const sttEngineOptions = React.useMemo(() => {
     const installed = installedEngines;
@@ -235,12 +304,26 @@ export default function Settings() {
     }
   };
 
+  const [cookieSource, setCookieSource] = React.useState<string | undefined>();
+  const [cookiesAttached, setCookiesAttached] = React.useState<boolean | undefined>();
+
   const testCookies = async () => {
+    if (!draft) return;
     setCookieStatus("untested");
+    setCookieError(undefined);
+    setCookieSource(undefined);
+    setCookiesAttached(undefined);
     try {
-      const res = await apiClient.testCookies();
+      // Pass DRAFT values so the user can verify changes BEFORE saving.
+      const res = await apiClient.testCookies({
+        cookieBrowser: draft.cookieBrowser,
+        cookieProfile: draft.cookieProfile,
+        cookiesTxtPath: draft.cookiesTxtPath,
+      });
       setCookieStatus(res.ok ? "ok" : "error");
       setCookieError(res.error);
+      setCookieSource(res.cookieSource);
+      setCookiesAttached(res.cookiesAttached);
     } catch (err) {
       setCookieStatus("error");
       setCookieError(err instanceof Error ? err.message : String(err));
@@ -358,16 +441,26 @@ export default function Settings() {
                 : "$borderSubtle"
             }
           >
-            <XStack gap="$sm" alignItems="center" flex={1}>
-              <StatusDot status={cookieStatus} size={8} />
-              <BodySm>
-                {cookieStatus === "ok"
-                  ? "Cookies working"
-                  : cookieStatus === "error"
-                  ? `Failed: ${cookieError ?? "unknown"}`
-                  : "Untested — click Test to verify."}
-              </BodySm>
-            </XStack>
+            <YStack gap={2} flex={1}>
+              <XStack gap="$sm" alignItems="center">
+                <StatusDot status={cookieStatus} size={8} />
+                <BodySm>
+                  {cookieStatus === "ok"
+                    ? cookiesAttached
+                      ? `Cookies attached (${cookieSource ?? "configured"})`
+                      : "Reachable, but no cookies were sent"
+                    : cookieStatus === "error"
+                    ? `Failed: ${cookieError ?? "unknown"}`
+                    : "Untested — click Test to verify (uses your DRAFT settings)."}
+                </BodySm>
+              </XStack>
+              {cookieStatus === "ok" && !cookiesAttached ? (
+                <Caption>
+                  This only verified yt-dlp can reach a public video; it does
+                  not prove cookies will work on age-restricted content.
+                </Caption>
+              ) : null}
+            </YStack>
             <ButtonSecondary onPress={testCookies}>Test</ButtonSecondary>
           </XStack>
           {["chrome", "edge", "brave", "opera"].includes(
@@ -520,10 +613,12 @@ export default function Settings() {
               </YStack>
               <YStack gap="$xs">
                 <Field label="Gemini model" />
-                <TextInput
+                <Dropdown
                   value={draft.geminiModel}
-                  onChangeText={(v: string) => update("geminiModel", v)}
-                  placeholder="gemini-2.5-flash-lite"
+                  onValueChange={(v) => update("geminiModel", v)}
+                  options={buildModelOptions(geminiModels, draft.geminiModel)}
+                  width="100%"
+                  aria-label="Gemini model"
                 />
               </YStack>
             </YStack>
@@ -543,29 +638,34 @@ export default function Settings() {
                 />
               </YStack>
               <YStack gap="$xs">
-                <Field label="Model name" />
+                <Field
+                  label="Model name"
+                  helper={
+                    localOpenaiModels.length === 0
+                      ? "Click ↻ to fetch models from your LM Studio server."
+                      : undefined
+                  }
+                />
                 <XStack gap="$sm" alignItems="center">
-                  <TextInput
-                    flex={1}
-                    value={draft.localOpenaiModel}
-                    onChangeText={(v: string) => update("localOpenaiModel", v)}
-                    placeholder="gemma-3-27b-it"
-                  />
-                  <ButtonSecondary
-                    onPress={async () => {
-                      try {
-                        const res = await apiClient.listTranslatorModels({
-                          provider: "local_openai",
-                          baseUrl: draft.localOpenaiBaseUrl,
-                          apiKey: draft.localOpenaiApiKey,
-                        });
-                        if (res.ok && res.models[0]) {
-                          update("localOpenaiModel", res.models[0]);
-                        }
-                      } catch {
-                        /* surface in status */
+                  <Stack flex={1}>
+                    <Dropdown
+                      value={draft.localOpenaiModel}
+                      onValueChange={(v) => update("localOpenaiModel", v)}
+                      options={buildModelOptions(
+                        localOpenaiModels,
+                        draft.localOpenaiModel,
+                      )}
+                      placeholder="gemma-3-27b-it"
+                      width="100%"
+                      aria-label="Local AI model"
+                      disabled={
+                        localOpenaiModels.length === 0 && !draft.localOpenaiModel
                       }
-                    }}
+                    />
+                  </Stack>
+                  <ButtonSecondary
+                    onPress={refreshLocalOpenaiModels}
+                    disabled={modelsBusy === "local_openai"}
                   >
                     <RefreshCcw size={14} color="$textSecondary" />
                   </ButtonSecondary>
@@ -640,12 +740,33 @@ export default function Settings() {
                 </XStack>
               </YStack>
               <YStack gap="$xs">
-                <Field label="Model" />
-                <TextInput
-                  value={draft.openaiModel}
-                  onChangeText={(v: string) => update("openaiModel", v)}
-                  placeholder="gpt-4o-mini"
+                <Field
+                  label="Model"
+                  helper={
+                    openaiModels.length === 0
+                      ? "Click ↻ to fetch models from this OpenAI-compat endpoint."
+                      : undefined
+                  }
                 />
+                <XStack gap="$sm" alignItems="center">
+                  <Stack flex={1}>
+                    <Dropdown
+                      value={draft.openaiModel}
+                      onValueChange={(v) => update("openaiModel", v)}
+                      options={buildModelOptions(openaiModels, draft.openaiModel)}
+                      placeholder="gpt-4o-mini"
+                      width="100%"
+                      aria-label="OpenAI model"
+                      disabled={openaiModels.length === 0 && !draft.openaiModel}
+                    />
+                  </Stack>
+                  <ButtonSecondary
+                    onPress={refreshOpenaiModels}
+                    disabled={modelsBusy === "openai"}
+                  >
+                    <RefreshCcw size={14} color="$textSecondary" />
+                  </ButtonSecondary>
+                </XStack>
               </YStack>
             </YStack>
           ) : null}
