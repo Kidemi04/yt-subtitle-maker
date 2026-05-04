@@ -101,23 +101,30 @@ export interface HistoryItem {
   processingDurationMs: number;
 }
 
+/**
+ * LibraryItem — backend ships `files` as a 4-slot object, NOT an array.
+ * Each slot is either a download URL (string) or null when absent.
+ *
+ * Shape mirrors backend/api/routes/library.py::_scan_folder.
+ */
 export interface LibraryItem {
   videoId: string;
-  title: string;
-  channel?: string;
+  url: string;
+  titleOriginal: string;
+  titleTranslated?: string | null;
   thumbnailUrl?: string;
-  durationSeconds?: number;
-  files: LibraryFile[];
   createdAt: string;
+  files: LibraryFiles;
 }
 
-export interface LibraryFile {
-  kind: "video" | "audio" | "srt";
-  language?: string;
-  filename: string;
-  sizeBytes: number;
-  downloadUrl: string;
+export interface LibraryFiles {
+  originalSrt: string | null;
+  translatedSrt: string | null;
+  audio: string | null;
+  video: string | null;
 }
+
+export type LibraryFileKind = keyof LibraryFiles;
 
 export interface AppConfig {
   backendUrl: string;
@@ -157,14 +164,28 @@ export interface BackendCapabilities {
   version: string;
 }
 
+/**
+ * Backend ships per-model install state plus ffmpeg / mpv probe results.
+ * Shape matches backend/api/routes/dependencies.py::get_dependencies.
+ */
 export interface DependencyStatus {
-  whisperModelInstalled: boolean;
-  installedModelKey?: WhisperModel;
+  models: Partial<Record<WhisperModel, boolean>>;
+  ffmpegAvailable: boolean;
+  mpvAvailable: boolean;
 }
 
-export interface InstallEvent {
-  status: "starting" | "downloading" | "complete" | "error";
-  percent?: number;
-  message?: string;
-  error?: string;
+/** True if at least one Whisper model is installed. */
+export function anyModelInstalled(d: DependencyStatus): boolean {
+  return Object.values(d.models ?? {}).some(Boolean);
 }
+
+export type InstallEvent =
+  | {
+      status: "downloading";
+      downloaded?: number;
+      total?: number;
+      speed?: number;
+      percent?: number;
+    }
+  | { status: "done"; model: string; path?: string }
+  | { status: "error"; error: string; recoverable?: boolean };
