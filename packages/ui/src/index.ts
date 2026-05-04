@@ -91,3 +91,19 @@ export type { ToastProps, ToastTone } from "./components/Toast";
 
 export { Tooltip } from "./components/Tooltip";
 export type { TooltipProps } from "./components/Tooltip";
+
+export {
+  DisplayXl,
+  DisplayLg,
+  DisplayMd,
+  DisplaySm,
+  TitleLg,
+  TitleMd,
+  TitleSm,
+  BodyMd,
+  BodySm,
+  Caption,
+  CaptionUpper,
+  Timestamp,
+  Code,
+} from "./components/Typography";
