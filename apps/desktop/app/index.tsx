@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Stack, Text, XStack, YStack } from "tamagui";
+import { Stack, XStack, YStack } from "tamagui";
 import {
   Link2,
   ChevronDown,
@@ -28,42 +28,79 @@ import {
   RadioCard,
   Toggle,
   Dropdown,
+  SegmentedControl,
   Tooltip,
-  glassRecipes,
+  DisplayMd,
+  TitleLg,
+  TitleMd,
+  TitleSm,
+  BodyMd,
+  BodySm,
+  Caption,
+  CaptionUpper,
+  Timestamp,
 } from "@yt-subtitle-maker/ui";
 import { useGenerate } from "../src/state/generate";
+import { apiClient } from "../src/state/client";
+import { useRouter } from "expo-router";
 import type {
   SttSource,
   SttEngine,
   WhisperModel,
   WhisperDevice,
+  TranslatorProvider,
 } from "@yt-subtitle-maker/api-client";
 
-/* ───────────── helpers ───────────── */
+const TRANSLATOR_LABELS: Record<TranslatorProvider, string> = {
+  gemini: "Gemini",
+  local_openai: "Local AI",
+  openai: "OpenAI-compat",
+};
 
-function CaptionUpper({ children, color = "$textMuted" }: {
-  children: React.ReactNode;
-  color?: string;
-}) {
-  return (
-    <Text
-      fontFamily="$body"
-      fontSize={11}
-      fontWeight="600"
-      letterSpacing={1.5}
-      textTransform="uppercase"
-      color={color as never}
-    >
-      {children}
-    </Text>
-  );
-}
+const TRANSLATOR_OPTIONS: { label: string; value: TranslatorProvider }[] = [
+  { label: "Gemini", value: "gemini" },
+  { label: "Local AI", value: "local_openai" },
+  { label: "OpenAI-compat", value: "openai" },
+];
+
+/* ───────────── helpers ───────────── */
 
 function formatDuration(seconds: number | undefined): string {
   if (!seconds) return "—";
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/* ───────────── flow placeholder ─────────────
+ * Faded skeleton row used on the idle Generate screen to telegraph the
+ * coming steps (Video preview → Configure → Generate). Inert, no real data.
+ */
+function FlowPlaceholder({ label, hint }: { label: string; hint: string }) {
+  return (
+    <XStack
+      alignItems="center"
+      gap="$md"
+      paddingHorizontal="$lg"
+      paddingVertical="$md"
+      borderRadius="$lg"
+      backgroundColor="$surfaceGlass"
+      borderColor="$borderSubtle"
+      borderWidth={1}
+    >
+      <Stack
+        width={6}
+        height={6}
+        borderRadius="$pill"
+        backgroundColor="$textMuted"
+      />
+      <YStack gap={2} flex={1}>
+        <TitleSm color="$textSecondary">{label}</TitleSm>
+        <Caption>{hint}</Caption>
+      </YStack>
+      <ChevronRight size={14} color="$textMuted" />
+    </XStack>
+  );
 }
 
 /* ───────────── waveform ─────────────
@@ -192,10 +229,64 @@ export default function Generate() {
   const [downloadOnly, setDownloadOnly] = React.useState(false);
   const [configureOpen, setConfigureOpen] = React.useState(false);
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
-  const [sttEngine, setSttEngine] = React.useState<SttEngine>("faster-whisper");
+  // V1 backend currently only ships `openai-whisper`. The spec lists 4 engines
+  // but only this one is installed (faster-whisper / WhisperX / IFW are V1.1+).
+  // We probe /api/version.installedSttEngines on mount and switch if needed.
+  const [sttEngine, setSttEngine] = React.useState<SttEngine>("openai-whisper");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .fetchVersion()
+      .then((v) => {
+        if (cancelled) return;
+        const installed = v.installedSttEngines ?? [];
+        if (installed.length > 0 && !installed.includes(sttEngine)) {
+          setSttEngine(installed[0] as SttEngine);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [whisperModel, setWhisperModel] = React.useState<WhisperModel>("turbo");
   const [whisperDevice, setWhisperDevice] = React.useState<WhisperDevice>("auto");
   const [vadEnabled, setVadEnabled] = React.useState(true);
+
+  // Translator provider — initialized from server config so the user's
+  // Settings choice is the default. Per-job override stays in this state
+  // and is sent in the process request, so flipping providers between
+  // Gemini and Local AI doesn't require visiting Settings each time.
+  const [translatorProvider, setTranslatorProvider] =
+    React.useState<TranslatorProvider>("gemini");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .fetchConfig()
+      .then((cfg) => {
+        if (cancelled) return;
+        if (cfg.translatorProvider) {
+          setTranslatorProvider(cfg.translatorProvider);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // MPV launch feedback — tells the user the click did something even when
+  // the mpv window pops up behind/off-screen, and surfaces backend errors
+  // (mpv-not-found, etc.) inline instead of via window.alert.
+  const [mpvBusy, setMpvBusy] = React.useState(false);
+  const [mpvStatus, setMpvStatus] = React.useState<
+    { kind: "ok" | "error"; text: string } | undefined
+  >(undefined);
+
+  const router = useRouter();
 
   const isProcessing = status === "processing";
   const isDone = status === "done";
@@ -212,6 +303,11 @@ export default function Generate() {
       sourceLang,
       enableTranslation: !downloadOnly && enableTranslation,
       targetLang: enableTranslation ? targetLang : undefined,
+      // Forward the user's per-job provider choice. The matching credentials
+      // (api key / base url / model) come from server config — pipeline.py
+      // resolves them per-provider via `cfg.<gemini|local_openai|openai>_*`.
+      translatorProvider:
+        enableTranslation && !downloadOnly ? translatorProvider : undefined,
       downloadOnly,
     });
   };
@@ -222,28 +318,20 @@ export default function Generate() {
       <HeroCard variant="mid">
         <YStack gap="$md">
           <YStack gap="$xs">
-            <Text
-              fontFamily="$display"
-              fontSize={28}
-              lineHeight={34}
-              letterSpacing={-0.5}
-              color="$textPrimary"
-            >
-              What are we transcribing today?
-            </Text>
-            <Text fontFamily="$body" fontSize={14} color="$textSecondary">
+            <DisplayMd>What are we transcribing today?</DisplayMd>
+            <BodyMd color="$textSecondary">
               Drop a YouTube link to get started.
-            </Text>
+            </BodyMd>
           </YStack>
 
           <XStack gap="$sm" alignItems="center">
             <XStack flex={1} alignItems="center" position="relative">
-              <Stack position="absolute" left={14} zIndex={1}>
-                <Link2 size={16} color="#6e6e73" />
+              <Stack position="absolute" left={18} zIndex={1}>
+                <Link2 size={16} color="$textMuted" />
               </Stack>
               <TextInput
                 flex={1}
-                paddingLeft={40}
+                paddingLeft={44}
                 height={52}
                 value={url}
                 onChangeText={setUrl}
@@ -261,12 +349,22 @@ export default function Generate() {
           </XStack>
 
           {metaError ? (
-            <Text fontFamily="$body" fontSize={13} color="$error">
-              {metaError}
-            </Text>
+            <BodySm color="$error">{metaError}</BodySm>
           ) : null}
         </YStack>
       </HeroCard>
+
+      {/* IDLE FLOW HINT — three faded placeholder rows that telegraph the
+          coming steps so the page doesn't feel half-empty before a URL is
+          loaded. They fade out the moment metadata arrives. (Spec: design
+          handoff §"Generate — Idle".) */}
+      {!showVideoPreview && status !== "loading-meta" ? (
+        <YStack gap="$sm" opacity={0.35} pointerEvents="none">
+          <FlowPlaceholder label="Video preview" hint="Title, channel, thumbnail" />
+          <FlowPlaceholder label="Configure" hint="Source · language · engine" />
+          <FlowPlaceholder label="Generate" hint="One click to start" />
+        </YStack>
+      ) : null}
 
       {/* VIDEO PREVIEW (after metadata) */}
       {showVideoPreview && metadata?.videoId ? (
@@ -287,19 +385,13 @@ export default function Generate() {
               }}
             />
             <YStack flex={1} gap="$xs">
-              <Text
-                fontFamily="$body"
-                fontSize={18}
-                fontWeight="600"
-                color="$textPrimary"
-                numberOfLines={2}
-              >
+              <TitleLg numberOfLines={2}>
                 {metadata.titleOriginal ?? "Untitled"}
-              </Text>
-              <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+              </TitleLg>
+              <BodySm color="$textSecondary">
                 {metadata.channel ?? "Unknown channel"} ·{" "}
                 {formatDuration(metadata.durationSeconds)}
-              </Text>
+              </BodySm>
               <XStack gap="$xs" marginTop="$xs" flexWrap="wrap">
                 <BadgePill tone="neutral">{metadata.videoId}</BadgePill>
                 {metadata.titleTranslated ? (
@@ -323,20 +415,13 @@ export default function Generate() {
             >
               <XStack gap="$sm" alignItems="center">
                 {configureOpen ? (
-                  <ChevronDown size={16} color="#a1a1a6" />
+                  <ChevronDown size={16} color="$textSecondary" />
                 ) : (
-                  <ChevronRight size={16} color="#a1a1a6" />
+                  <ChevronRight size={16} color="$textSecondary" />
                 )}
-                <Text
-                  fontFamily="$body"
-                  fontSize={15}
-                  fontWeight="600"
-                  color="$textPrimary"
-                >
-                  Configure
-                </Text>
+                <TitleMd>Configure</TitleMd>
               </XStack>
-              <Text fontFamily="$body" fontSize={13} color="$textMuted">
+              <Caption>
                 {sttSource === "auto"
                   ? "Auto + faster-whisper"
                   : sttSource === "yt_captions"
@@ -347,7 +432,7 @@ export default function Generate() {
                 {enableTranslation && !downloadOnly
                   ? ` → ${targetLang.toUpperCase()}`
                   : ""}
-              </Text>
+              </Caption>
             </XStack>
 
             {configureOpen ? (
@@ -362,23 +447,12 @@ export default function Generate() {
                     >
                       <YStack gap={2} flex={1}>
                         <XStack alignItems="center" gap="$xs">
-                          <Text
-                            fontFamily="$body"
-                            fontSize={14}
-                            fontWeight="600"
-                            color="$textPrimary"
-                          >
-                            Auto
-                          </Text>
+                          <TitleSm>Auto</TitleSm>
                           <BadgeAccent>recommended</BadgeAccent>
                         </XStack>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={13}
-                          color="$textSecondary"
-                        >
+                        <BodySm color="$textSecondary">
                           Try YouTube auto-captions first, fall back to Whisper.
-                        </Text>
+                        </BodySm>
                       </YStack>
                     </RadioCard>
                     <RadioCard
@@ -386,21 +460,10 @@ export default function Generate() {
                       onPress={() => setSttSource("yt_captions")}
                     >
                       <YStack gap={2}>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={14}
-                          fontWeight="600"
-                          color="$textPrimary"
-                        >
-                          YouTube auto-captions only
-                        </Text>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={13}
-                          color="$textSecondary"
-                        >
+                        <TitleSm>YouTube auto-captions only</TitleSm>
+                        <BodySm color="$textSecondary">
                           Free + instant, but unavailable on many videos.
-                        </Text>
+                        </BodySm>
                       </YStack>
                     </RadioCard>
                     <RadioCard
@@ -408,21 +471,10 @@ export default function Generate() {
                       onPress={() => setSttSource("whisper")}
                     >
                       <YStack gap={2}>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={14}
-                          fontWeight="600"
-                          color="$textPrimary"
-                        >
-                          Whisper only
-                        </Text>
-                        <Text
-                          fontFamily="$body"
-                          fontSize={13}
-                          color="$textSecondary"
-                        >
+                        <TitleSm>Whisper only</TitleSm>
+                        <BodySm color="$textSecondary">
                           Skip YT captions, run Whisper directly on the audio.
-                        </Text>
+                        </BodySm>
                       </YStack>
                     </RadioCard>
                   </YStack>
@@ -456,22 +508,22 @@ export default function Generate() {
                 {/* Toggles */}
                 <YStack gap="$sm">
                   <XStack alignItems="center" justifyContent="space-between">
-                    <YStack gap={2}>
-                      <Text
-                        fontFamily="$body"
-                        fontSize={14}
-                        fontWeight="500"
-                        color="$textPrimary"
-                      >
-                        Translate subtitles
-                      </Text>
-                      <Text
-                        fontFamily="$body"
-                        fontSize={12}
-                        color="$textMuted"
-                      >
-                        Using Gemini · change in Settings
-                      </Text>
+                    <YStack gap={2} flex={1}>
+                      <BodyMd fontWeight="500">Translate subtitles</BodyMd>
+                      <XStack gap={4} alignItems="center" flexWrap="wrap">
+                        <Caption>
+                          Using {TRANSLATOR_LABELS[translatorProvider]}
+                        </Caption>
+                        <Caption>·</Caption>
+                        <Caption
+                          color="$accent"
+                          cursor="pointer"
+                          hoverStyle={{ opacity: 0.8 }}
+                          onPress={() => router.push("/settings")}
+                        >
+                          configure credentials
+                        </Caption>
+                      </XStack>
                     </YStack>
                     <Toggle
                       value={enableTranslation && !downloadOnly}
@@ -480,23 +532,22 @@ export default function Generate() {
                       aria-label="Translate subtitles"
                     />
                   </XStack>
+
+                  {enableTranslation && !downloadOnly ? (
+                    <SegmentedControl
+                      value={translatorProvider}
+                      onValueChange={(v) =>
+                        setTranslatorProvider(v as TranslatorProvider)
+                      }
+                      options={TRANSLATOR_OPTIONS}
+                      aria-label="Translator provider"
+                    />
+                  ) : null}
+
                   <XStack alignItems="center" justifyContent="space-between">
                     <YStack gap={2}>
-                      <Text
-                        fontFamily="$body"
-                        fontSize={14}
-                        fontWeight="500"
-                        color="$textPrimary"
-                      >
-                        Just download, no subtitles
-                      </Text>
-                      <Text
-                        fontFamily="$body"
-                        fontSize={12}
-                        color="$textMuted"
-                      >
-                        Skip transcription entirely.
-                      </Text>
+                      <BodyMd fontWeight="500">Just download, no subtitles</BodyMd>
+                      <Caption>Skip transcription entirely.</Caption>
                     </YStack>
                     <Toggle
                       value={downloadOnly}
@@ -515,9 +566,9 @@ export default function Generate() {
                     onPress={() => setAdvancedOpen((v) => !v)}
                   >
                     {advancedOpen ? (
-                      <ChevronDown size={14} color="#a1a1a6" />
+                      <ChevronDown size={14} color="$textSecondary" />
                     ) : (
-                      <ChevronRight size={14} color="#a1a1a6" />
+                      <ChevronRight size={14} color="$textSecondary" />
                     )}
                     <CaptionUpper>Advanced</CaptionUpper>
                   </XStack>
@@ -549,16 +600,13 @@ export default function Generate() {
                       </XStack>
                       <XStack alignItems="center" justifyContent="space-between">
                         <XStack gap="$xs" alignItems="center">
-                          <Text
-                            fontFamily="$body"
-                            fontSize={14}
-                            fontWeight="500"
-                            color="$textPrimary"
-                          >
+                          <BodyMd fontWeight="500">
                             VAD (Voice Activity Detection)
-                          </Text>
+                          </BodyMd>
                           <Tooltip content="Skips silent sections of the audio. Prevents Whisper from inventing text in silence.">
-                            <Info size={14} color="#6e6e73" />
+                            <Stack>
+                              <Info size={14} color="$textMuted" />
+                            </Stack>
                           </Tooltip>
                         </XStack>
                         <Toggle
@@ -580,10 +628,10 @@ export default function Generate() {
       {showVideoPreview && !isProcessing && !isDone ? (
         <ButtonPrimary onPress={onGenerate} disabled={!metadata?.ok}>
           <XStack gap="$xs" alignItems="center">
-            <Sparkles size={16} color="#f5f5f7" />
-            <Text fontFamily="$body" fontSize={15} fontWeight="600" color="$textPrimary">
+            <Sparkles size={16} color="$textPrimary" />
+            <TitleMd>
               {downloadOnly ? "Download only" : "Generate Subtitles"}
-            </Text>
+            </TitleMd>
           </XStack>
         </ButtonPrimary>
       ) : null}
@@ -594,7 +642,7 @@ export default function Generate() {
             <XStack alignItems="center" justifyContent="space-between">
               <CaptionUpper>processing</CaptionUpper>
               <IconButton
-                icon={<X size={14} color="#a1a1a6" />}
+                icon={<X size={14} color="$textSecondary" />}
                 aria-label="Cancel"
                 size={32}
                 onPress={cancel}
@@ -604,12 +652,7 @@ export default function Generate() {
             <Waveform active />
 
             <YStack gap="$xs" alignItems="center">
-              <Text
-                fontFamily="$body"
-                fontSize={15}
-                fontWeight="600"
-                color="$textPrimary"
-              >
+              <TitleMd>
                 {phaseMessage ??
                   (phase === "download"
                     ? "Downloading audio…"
@@ -618,7 +661,7 @@ export default function Generate() {
                     : phase === "translate"
                     ? "Translating segments…"
                     : "Working…")}
-              </Text>
+              </TitleMd>
             </YStack>
 
             <ProgressBar
@@ -685,18 +728,13 @@ export default function Generate() {
                 alignItems="center"
                 justifyContent="center"
               >
-                <CheckCircle2 size={20} color="#5db872" />
+                <CheckCircle2 size={20} color="$success" />
               </Stack>
               <YStack gap={2}>
-                <Text
-                  fontFamily="$body"
-                  fontSize={18}
-                  fontWeight="600"
-                  color="$textPrimary"
-                >
+                <TitleLg>
                   Done · {Math.round(result.durationMs / 1000)}s
-                </Text>
-                <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+                </TitleLg>
+                <BodySm color="$textSecondary">
                   {result.sttSourceUsed === "yt_captions"
                     ? "YouTube auto-captions"
                     : `Whisper · ${sttEngine}`}
@@ -705,7 +743,7 @@ export default function Generate() {
                   {enableTranslation && !downloadOnly
                     ? ` → ${targetLang.toUpperCase()}`
                     : ""}
-                </Text>
+                </BodySm>
               </YStack>
             </XStack>
 
@@ -719,17 +757,10 @@ export default function Generate() {
               >
                 <YStack gap="$xs">
                   <CaptionUpper color="$accent">translated title</CaptionUpper>
-                  <Text
-                    fontFamily="$body"
-                    fontSize={15}
-                    fontWeight="600"
-                    color="$textPrimary"
-                  >
-                    {metadata.titleTranslated}
-                  </Text>
-                  <Text fontFamily="$body" fontSize={13} color="$textSecondary">
+                  <TitleMd>{metadata.titleTranslated}</TitleMd>
+                  <BodySm color="$textSecondary">
                     {metadata.titleOriginal}
-                  </Text>
+                  </BodySm>
                 </YStack>
               </Stack>
             ) : null}
@@ -753,100 +784,129 @@ export default function Generate() {
                     }
                     borderBottomColor="$borderSubtle"
                   >
-                    <Text
-                      fontFamily="$mono"
-                      fontSize={11}
-                      fontWeight="500"
-                      color="$textMuted"
-                      style={{ fontFeatureSettings: "'tnum'" }}
-                    >
+                    <Timestamp>
                       {formatTimestamp(seg.start)} → {formatTimestamp(seg.end)}
-                    </Text>
-                    <Text
-                      fontFamily="$body"
-                      fontSize={13}
-                      color="$textPrimary"
-                    >
-                      {seg.text}
-                    </Text>
+                    </Timestamp>
+                    <BodySm>{seg.text}</BodySm>
                     {seg.translated ? (
-                      <Text
-                        fontFamily="$body"
-                        fontSize={13}
-                        color="$accent"
-                      >
-                        {seg.translated}
-                      </Text>
+                      <BodySm color="$accent">{seg.translated}</BodySm>
                     ) : null}
                   </YStack>
                 ))}
               </Stack>
             ) : null}
 
-            <XStack gap="$xs" flexWrap="wrap">
-              <ButtonPrimary onPress={() => undefined}>
+            {/* Action buttons — Play takes prime real estate, admin actions cluster below. */}
+            <YStack gap="$xs">
+              <ButtonPrimary
+                disabled={mpvBusy}
+                onPress={async () => {
+                  setMpvBusy(true);
+                  setMpvStatus(undefined);
+                  try {
+                    const res = await apiClient.playMpv(result.videoId);
+                    if (res.ok) {
+                      setMpvStatus({
+                        kind: "ok",
+                        text: res.subtitle
+                          ? `Launched mpv · subs ${res.subtitle}`
+                          : "Launched mpv",
+                      });
+                    } else {
+                      setMpvStatus({
+                        kind: "error",
+                        text: res.error ?? "mpv launch failed",
+                      });
+                    }
+                  } catch (err) {
+                    setMpvStatus({
+                      kind: "error",
+                      text: err instanceof Error ? err.message : String(err),
+                    });
+                  } finally {
+                    setMpvBusy(false);
+                  }
+                }}
+              >
                 <XStack gap="$xs" alignItems="center">
-                  <PlayCircle size={14} color="#f5f5f7" />
-                  <Text
-                    fontFamily="$body"
-                    fontSize={15}
-                    fontWeight="600"
-                    color="$textPrimary"
-                  >
-                    Play with MPV
-                  </Text>
+                  <PlayCircle size={14} color="$textPrimary" />
+                  <TitleMd>
+                    {mpvBusy ? "Opening mpv…" : "Play with MPV"}
+                  </TitleMd>
                 </XStack>
               </ButtonPrimary>
-              <ButtonSecondary onPress={() => undefined}>
-                <XStack gap="$xs" alignItems="center">
-                  <FolderOpen size={14} color="#a1a1a6" />
-                  <Text
-                    fontFamily="$body"
-                    fontSize={13}
-                    fontWeight="500"
-                    color="$textSecondary"
-                  >
-                    Open folder
-                  </Text>
-                </XStack>
-              </ButtonSecondary>
-              <ButtonSecondary onPress={() => undefined}>
-                <XStack gap="$xs" alignItems="center">
-                  <RotateCcw size={14} color="#a1a1a6" />
-                  <Text
-                    fontFamily="$body"
-                    fontSize={13}
-                    fontWeight="500"
-                    color="$textSecondary"
-                  >
-                    Re-transcribe with…
-                  </Text>
-                </XStack>
-              </ButtonSecondary>
-              <ButtonSecondary onPress={() => undefined}>
-                <XStack gap="$xs" alignItems="center">
-                  <Download size={14} color="#a1a1a6" />
-                  <Text
-                    fontFamily="$body"
-                    fontSize={13}
-                    fontWeight="500"
-                    color="$textSecondary"
-                  >
-                    Download SRT
-                  </Text>
-                </XStack>
-              </ButtonSecondary>
-              <ButtonGhost onPress={reset}>
-                <Text
-                  fontFamily="$body"
-                  fontSize={13}
-                  fontWeight="500"
-                  color="$textSecondary"
+
+              {mpvStatus ? (
+                <XStack
+                  alignItems="center"
+                  gap="$xs"
+                  paddingHorizontal="$sm"
+                  paddingVertical="$xs"
+                  borderRadius="$sm"
+                  backgroundColor={
+                    mpvStatus.kind === "ok"
+                      ? "rgba(93,184,114,0.10)"
+                      : "rgba(255,90,95,0.10)"
+                  }
+                  borderWidth={1}
+                  borderColor={
+                    mpvStatus.kind === "ok"
+                      ? "rgba(93,184,114,0.25)"
+                      : "rgba(255,90,95,0.25)"
+                  }
                 >
-                  New transcription
-                </Text>
-              </ButtonGhost>
-            </XStack>
+                  <Caption
+                    color={mpvStatus.kind === "ok" ? "$success" : "$error"}
+                  >
+                    {mpvStatus.text}
+                  </Caption>
+                </XStack>
+              ) : null}
+              <XStack gap="$xs" flexWrap="wrap">
+                <ButtonSecondary
+                  onPress={() =>
+                    apiClient
+                      .openLibraryFolder(result.videoId)
+                      .catch(() => undefined)
+                  }
+                >
+                  <XStack gap="$xs" alignItems="center">
+                    <FolderOpen size={14} color="$textSecondary" />
+                    <BodySm fontWeight="500" color="$textSecondary">
+                      Open folder
+                    </BodySm>
+                  </XStack>
+                </ButtonSecondary>
+                <ButtonSecondary onPress={() => undefined} disabled={true}>
+                  <XStack gap="$xs" alignItems="center">
+                    <RotateCcw size={14} color="$textSecondary" />
+                    <BodySm fontWeight="500" color="$textSecondary">
+                      Re-transcribe with… (coming soon)
+                    </BodySm>
+                  </XStack>
+                </ButtonSecondary>
+                <ButtonSecondary
+                  onPress={() => {
+                    if (typeof window === "undefined") return;
+                    const baseUrl = "http://127.0.0.1:8000";
+                    const path = `/api/library/${result.videoId}/file/${result.videoId}_original.srt`;
+                    window.open(`${baseUrl}${path}`, "_blank");
+                  }}
+                >
+                  <XStack gap="$xs" alignItems="center">
+                    <Download size={14} color="$textSecondary" />
+                    <BodySm fontWeight="500" color="$textSecondary">
+                      Download SRT
+                    </BodySm>
+                  </XStack>
+                </ButtonSecondary>
+                <ButtonGhost onPress={reset}>
+                  <BodySm fontWeight="500" color="$textSecondary">
+                    New transcription
+                  </BodySm>
+                </ButtonGhost>
+              </XStack>
+            </YStack>
           </YStack>
         </GlassCard>
       ) : null}
@@ -855,9 +915,7 @@ export default function Generate() {
         <GlassCard variant="mid">
           <YStack gap="$xs">
             <CaptionUpper color="$error">error</CaptionUpper>
-            <Text fontFamily="$body" fontSize={13} color="$textPrimary">
-              {errorMessage}
-            </Text>
+            <BodySm>{errorMessage}</BodySm>
             <XStack>
               <ButtonSecondary onPress={reset}>Try again</ButtonSecondary>
             </XStack>
