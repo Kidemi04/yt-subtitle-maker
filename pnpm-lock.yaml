@@ -50,6 +50,9 @@ importers:
       '@tamagui/shorthands':
         specifier: 1.115.5
         version: 1.115.5
+      '@yt-subtitle-maker/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
       '@yt-subtitle-maker/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -92,6 +95,9 @@ importers:
       tamagui:
         specifier: 1.115.5
         version: 1.115.5(@types/react@18.2.79)(react-dom@18.2.0(react@18.2.0))(react-native@0.74.5(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
+      zustand:
+        specifier: ^4.5.5
+        version: 4.5.7(@types/react@18.2.79)(react@18.2.0)
     devDependencies:
       '@babel/core':
         specifier: 7.25.2
@@ -105,6 +111,12 @@ importers:
       babel-preset-expo:
         specifier: 11.0.15
         version: 11.0.15(@babel/core@7.25.2)(@babel/preset-env@7.29.3(@babel/core@7.25.2))
+      typescript:
+        specifier: 5.3.3
+        version: 5.3.3
+
+  packages/api-client:
+    devDependencies:
       typescript:
         specifier: 5.3.3
         version: 5.3.3
@@ -4815,6 +4827,11 @@ packages:
       '@types/react':
         optional: true
 
+  use-sync-external-store@1.6.0:
+    resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
+    peerDependencies:
+      react: 18.2.0
+
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
@@ -5039,6 +5056,21 @@ packages:
 
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zustand@4.5.7:
+    resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
+    engines: {node: '>=12.7.0'}
+    peerDependencies:
+      '@types/react': '>=16.8'
+      immer: '>=9.0.6'
+      react: 18.2.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
 
 snapshots:
 
@@ -11153,6 +11185,10 @@ snapshots:
     optionalDependencies:
       '@types/react': 18.2.79
 
+  use-sync-external-store@1.6.0(react@18.2.0):
+    dependencies:
+      react: 18.2.0
+
   util-deprecate@1.0.2: {}
 
   util@0.12.5:
@@ -11369,3 +11405,10 @@ snapshots:
       zod: 3.25.76
 
   zod@3.25.76: {}
+
+  zustand@4.5.7(@types/react@18.2.79)(react@18.2.0):
+    dependencies:
+      use-sync-external-store: 1.6.0(react@18.2.0)
+    optionalDependencies:
+      '@types/react': 18.2.79
+      react: 18.2.0
