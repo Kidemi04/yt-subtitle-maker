@@ -38,7 +38,10 @@ class ProcessRequest(BaseModel):
     enableTranslation: bool
     targetLang: str | None = None
 
-    translatorProvider: TranslatorProvider = "gemini"
+    # Default is None so the pipeline falls through to `cfg.translator_provider`.
+    # Hard-coding "gemini" here would override the user's Settings choice
+    # because pipeline.py uses `request.get(...) or cfg.<field>`.
+    translatorProvider: TranslatorProvider | None = None
     translatorBaseUrl: str | None = None
     translatorModel: str | None = None
     translatorApiKey: str | None = None
