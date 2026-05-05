@@ -4,8 +4,9 @@ import {
   RefreshCcw,
   Search,
   PlayCircle,
-  Download,
-  MoreHorizontal,
+  Languages,
+  Plus,
+  Trash2,
   Library as LibraryIconLucide,
 } from "@tamagui/lucide-icons";
 import {
@@ -17,8 +18,11 @@ import {
   BadgePill,
   ButtonPrimary,
   ButtonSecondary,
+  ButtonGhost,
   Modal,
   DisplayMd,
+  DisplaySm,
+  TitleLg,
   TitleSm,
   BodyMd,
   BodySm,
@@ -28,7 +32,12 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
-import type { LibraryItem } from "@yt-subtitle-maker/api-client";
+import type {
+  LibraryItem,
+  TranscribeRun,
+  TranslateRun,
+  VideoDetail,
+} from "@yt-subtitle-maker/api-client";
 
 type FilterKind = "all" | "video" | "audio" | "srt";
 
@@ -38,40 +47,6 @@ const FILTERS: { label: string; value: FilterKind }[] = [
   { label: "Audio", value: "audio" },
   { label: "SRT", value: "srt" },
 ];
-
-const BACKEND_BASE_URL = "http://127.0.0.1:8000"; // Phase 11 will read from config
-
-function absolutize(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
-  if (/^https?:\/\//i.test(url)) return url;
-  return `${BACKEND_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
-}
-
-interface PresentFile {
-  kind: "video" | "audio" | "srt";
-  label: string;
-  filename: string;
-  url: string;
-}
-
-/**
- * V2 transitional helper: the list endpoint no longer returns per-file URLs
- * (those move to GET /api/library/{id} → VideoDetail). For the existing
- * LibraryDetail modal we surface only what the summary shape carries today
- * — audio + an SRT count line. Phase 9 swaps this out for VideoDetailModal.
- */
-function presentFiles(item: LibraryItem): PresentFile[] {
-  const out: PresentFile[] = [];
-  if (item.audio) {
-    out.push({
-      kind: "audio",
-      label: "audio",
-      filename: (item.audio.split("/").pop() ?? "").trim(),
-      url: absolutize(item.audio) ?? item.audio,
-    });
-  }
-  return out;
-}
 
 function fileKinds(item: LibraryItem): Set<"video" | "audio" | "srt"> {
   const out = new Set<"video" | "audio" | "srt">();
@@ -268,19 +243,23 @@ export default function Library() {
         </XStack>
       ) : null}
 
-      {/* Detail modal */}
+      {/* Detail modal — fetches VideoDetail on open and renders per-run cards. */}
       <Modal
         open={!!openItem}
         onOpenChange={(open) => {
           if (!open) setOpenItem(undefined);
         }}
         title={openItem?.titleTranslated ?? openItem?.titleOriginal}
-        width={640}
+        width={720}
       >
         {openItem ? (
-          <LibraryDetail
+          <VideoDetailModal
             item={openItem}
             onClose={() => setOpenItem(undefined)}
+            onDeleted={() => {
+              setOpenItem(undefined);
+              refresh();
+            }}
           />
         ) : null}
       </Modal>
@@ -295,8 +274,9 @@ function LibraryCard({
   item: LibraryItem;
   onPress: () => void;
 }) {
-  const kinds = Array.from(fileKinds(item));
   const title = item.titleTranslated ?? item.titleOriginal;
+  const tCount = item.transcribesCount ?? 0;
+  const trCount = item.translationsCount ?? 0;
   return (
     <Stack
       width={216}
@@ -330,11 +310,19 @@ function LibraryCard({
           </BodySm>
         ) : null}
         <XStack gap="$xs" flexWrap="wrap" alignItems="center">
-          {kinds.map((t) => (
-            <BadgePill key={t} tone="neutral">
-              {t}
+          {tCount > 0 ? (
+            <BadgePill tone="neutral">
+              {tCount} transcript{tCount === 1 ? "" : "s"}
             </BadgePill>
-          ))}
+          ) : null}
+          {trCount > 0 ? (
+            <BadgePill tone="accent">
+              {trCount} translation{trCount === 1 ? "" : "s"}
+            </BadgePill>
+          ) : null}
+          {tCount === 0 && trCount === 0 && item.audio ? (
+            <BadgePill tone="neutral">audio only</BadgePill>
+          ) : null}
           <Caption fontSize={11}>{formatRelative(item.createdAt)}</Caption>
         </XStack>
       </YStack>
@@ -342,22 +330,53 @@ function LibraryCard({
   );
 }
 
-function LibraryDetail({
+/**
+ * VideoDetailModal — replaces the legacy "Files" list with a per-run view.
+ *
+ * Fetches GET /api/library/{videoId} on open and renders Transcripts + Translations
+ * sections. Each row plays via mpv with the exact run id and supports Delete.
+ *
+ * "+ New transcript" and "+ New translation" are placeholders here; Phase 10
+ * wires them to NewTranscribeModal / NewTranslationModal.
+ */
+function VideoDetailModal({
   item,
   onClose,
+  onDeleted,
 }: {
   item: LibraryItem;
   onClose: () => void;
+  onDeleted: () => void;
 }) {
   const router = useRouter();
+  const [detail, setDetail] = React.useState<VideoDetail | null>(null);
+  const [error, setError] = React.useState<string | undefined>();
   const [busy, setBusy] = React.useState(false);
-  const files = presentFiles(item);
 
-  const onDelete = async () => {
+  const refreshDetail = React.useCallback(async () => {
+    setError(undefined);
+    try {
+      const d = await apiClient.fetchVideoDetail(item.videoId);
+      setDetail(d);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [item.videoId]);
+
+  React.useEffect(() => {
+    void refreshDetail();
+  }, [refreshDetail]);
+
+  const onDeleteVideo = async () => {
+    if (typeof window !== "undefined" && !window.confirm(
+      `Delete the entire library entry for "${item.titleOriginal}"? This removes the audio and all SRTs.`,
+    )) {
+      return;
+    }
     setBusy(true);
     try {
       await apiClient.deleteLibraryItem(item.videoId);
-      onClose();
+      onDeleted();
     } finally {
       setBusy(false);
     }
@@ -367,32 +386,201 @@ function LibraryDetail({
     try {
       await apiClient.openLibraryFolder(item.videoId);
     } catch {
-      /* backend may not support on this platform */
+      /* backend may not support this on the current platform */
     }
   };
 
-  return (
-    <YStack gap="$md">
-      <YStack gap="$xs">
-        <BodySm color="$textSecondary">
-          {item.url ?? `youtube.com/watch?v=${item.videoId}`}
-        </BodySm>
-        <BadgePill tone="neutral">{item.videoId}</BadgePill>
-      </YStack>
+  const onPlayTranscript = async (id: string) => {
+    await apiClient.playMpv(item.videoId, { transcribeId: id });
+  };
+  const onPlayTranslation = async (id: string) => {
+    await apiClient.playMpv(item.videoId, { translateId: id });
+  };
+  const onDeleteTranscript = async (id: string) => {
+    if (typeof window !== "undefined" && !window.confirm(
+      "Delete this transcript? Any translations derived from it will also be deleted.",
+    )) {
+      return;
+    }
+    await apiClient.deleteSrt(item.videoId, "transcribe", id);
+    await refreshDetail();
+  };
+  const onDeleteTranslation = async (id: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Delete this translation?")) {
+      return;
+    }
+    await apiClient.deleteSrt(item.videoId, "translate", id);
+    await refreshDetail();
+  };
 
-      <YStack gap="$xs">
-        <CaptionUpper>Files</CaptionUpper>
-        {files.length === 0 ? (
-          <BodySm color="$textMuted">No files in this folder.</BodySm>
+  // Group translations by their source transcript so each transcript "owns"
+  // the translations derived from it (cascade-delete is the contract).
+  const translationsBySource = React.useMemo(() => {
+    const map = new Map<string, TranslateRun[]>();
+    for (const tr of detail?.translations ?? []) {
+      const arr = map.get(tr.sourceTranscribeId) ?? [];
+      arr.push(tr);
+      map.set(tr.sourceTranscribeId, arr);
+    }
+    return map;
+  }, [detail?.translations]);
+
+  return (
+    <YStack gap="$lg">
+      {/* Header: thumbnail + url + meta */}
+      <XStack gap="$md" alignItems="flex-start">
+        <Stack
+          width={192}
+          height={108}
+          borderRadius="$md"
+          overflow="hidden"
+          backgroundColor="$bgElevated"
+          flexShrink={0}
+          style={{
+            backgroundImage: detail?.thumbnailUrl
+              ? `url(${detail.thumbnailUrl})`
+              : item.thumbnailUrl
+                ? `url(${item.thumbnailUrl})`
+                : "linear-gradient(135deg, #1a1a1d 0%, #0a0a0c 100%)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <YStack flex={1} gap="$xs" minWidth={0}>
+          <TitleLg numberOfLines={2}>
+            {detail?.titleTranslated ?? detail?.titleOriginal ?? item.titleOriginal}
+          </TitleLg>
+          <BodySm color="$textSecondary" numberOfLines={1}>
+            {detail?.url ?? item.url}
+          </BodySm>
+          <XStack gap="$xs" flexWrap="wrap" alignItems="center">
+            <BadgePill tone="neutral">{item.videoId}</BadgePill>
+            {typeof detail?.durationSeconds === "number" ? (
+              <Caption fontSize={11}>{formatDuration(detail.durationSeconds)}</Caption>
+            ) : null}
+            <Caption fontSize={11}>
+              added {formatRelative(detail?.createdAt ?? item.createdAt)}
+            </Caption>
+          </XStack>
+        </YStack>
+      </XStack>
+
+      {error ? (
+        <GlassCard variant="mid">
+          <BodySm color="$error">Failed to load detail: {error}</BodySm>
+        </GlassCard>
+      ) : null}
+
+      {/* Transcripts section */}
+      <YStack gap="$sm">
+        <DisplaySm>
+          Transcripts ({detail?.transcribes.length ?? 0})
+        </DisplaySm>
+        {detail && detail.transcribes.length === 0 ? (
+          <BodySm color="$textMuted">No transcripts yet.</BodySm>
         ) : (
           <YStack gap="$xs">
-            {files.map((f) => (
-              <FileRow key={f.url} file={f} />
+            {detail?.transcribes.map((t) => (
+              <TranscribeRow
+                key={t.id}
+                run={t}
+                onPlay={() => onPlayTranscript(t.id)}
+                onTranslate={() => {
+                  /* Phase 10: open NewTranslationModal pre-filled with this transcribe id */
+                }}
+                onDelete={() => onDeleteTranscript(t.id)}
+              />
             ))}
           </YStack>
         )}
+        <ButtonGhost
+          onPress={() => {
+            /* Phase 10: open NewTranscribeModal */
+          }}
+          disabled
+        >
+          <XStack gap="$xs" alignItems="center">
+            <Plus size={14} color="$textMuted" />
+            <BodySm fontWeight="500" color="$textMuted">
+              New transcript
+            </BodySm>
+          </XStack>
+        </ButtonGhost>
       </YStack>
 
+      {/* Translations section */}
+      <YStack gap="$sm">
+        <DisplaySm>
+          Translations ({detail?.translations.length ?? 0})
+        </DisplaySm>
+        {detail && detail.translations.length === 0 ? (
+          <BodySm color="$textMuted">
+            No translations yet. Translations are derived from a transcript above.
+          </BodySm>
+        ) : (
+          <YStack gap="$md">
+            {detail?.transcribes.map((t) => {
+              const group = translationsBySource.get(t.id) ?? [];
+              if (group.length === 0) return null;
+              return (
+                <YStack key={t.id} gap="$xs">
+                  <CaptionUpper>from {t.id}</CaptionUpper>
+                  <YStack gap="$xs">
+                    {group.map((tr) => (
+                      <TranslateRow
+                        key={tr.id}
+                        run={tr}
+                        onPlay={() => onPlayTranslation(tr.id)}
+                        onDelete={() => onDeleteTranslation(tr.id)}
+                      />
+                    ))}
+                  </YStack>
+                </YStack>
+              );
+            })}
+            {/* Orphan translations whose source transcript was deleted */}
+            {(() => {
+              const orphans = (detail?.translations ?? []).filter(
+                (tr) =>
+                  !(detail?.transcribes ?? []).some(
+                    (t) => t.id === tr.sourceTranscribeId,
+                  ),
+              );
+              if (orphans.length === 0) return null;
+              return (
+                <YStack gap="$xs">
+                  <CaptionUpper>orphan (source deleted)</CaptionUpper>
+                  <YStack gap="$xs">
+                    {orphans.map((tr) => (
+                      <TranslateRow
+                        key={tr.id}
+                        run={tr}
+                        onPlay={() => onPlayTranslation(tr.id)}
+                        onDelete={() => onDeleteTranslation(tr.id)}
+                      />
+                    ))}
+                  </YStack>
+                </YStack>
+              );
+            })()}
+          </YStack>
+        )}
+        <ButtonGhost
+          onPress={() => {
+            /* Phase 10: open NewTranslationModal */
+          }}
+          disabled={!detail || detail.transcribes.length === 0}
+        >
+          <XStack gap="$xs" alignItems="center">
+            <Plus size={14} color="$textMuted" />
+            <BodySm fontWeight="500" color="$textMuted">
+              New translation
+            </BodySm>
+          </XStack>
+        </ButtonGhost>
+      </YStack>
+
+      {/* Footer */}
       <XStack gap="$xs" justifyContent="flex-end" flexWrap="wrap">
         <ButtonSecondary
           onPress={() => {
@@ -410,9 +598,9 @@ function LibraryDetail({
             </BodySm>
           </XStack>
         </ButtonSecondary>
-        <ButtonSecondary onPress={onDelete} disabled={busy}>
+        <ButtonSecondary onPress={onDeleteVideo} disabled={busy}>
           <BodySm fontWeight="500" color="$error">
-            Delete
+            Delete entire video
           </BodySm>
         </ButtonSecondary>
       </XStack>
@@ -420,7 +608,25 @@ function LibraryDetail({
   );
 }
 
-function FileRow({ file }: { file: PresentFile }) {
+function TranscribeRow({
+  run,
+  onPlay,
+  onTranslate,
+  onDelete,
+}: {
+  run: TranscribeRun;
+  onPlay: () => void;
+  onTranslate: () => void;
+  onDelete: () => void;
+}) {
+  const facets = [run.engine, run.model, run.language].filter(Boolean).join(" · ");
+  const meta = [
+    formatDurationMs(run.durationMs),
+    `${run.segmentCount} segment${run.segmentCount === 1 ? "" : "s"}`,
+    formatRelative(run.createdAt),
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <XStack
       alignItems="center"
@@ -431,35 +637,96 @@ function FileRow({ file }: { file: PresentFile }) {
       borderWidth={1}
       borderColor="$borderSubtle"
     >
-      <Stack
-        width={36}
-        height={36}
-        borderRadius="$sm"
-        backgroundColor="$bgElevated"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <CaptionUpper color="$textSecondary">{file.kind}</CaptionUpper>
-      </Stack>
+      <XStack gap="$xs">
+        <IconButton
+          icon={<PlayCircle size={14} color="$textSecondary" />}
+          aria-label="Play with this transcript"
+          size={32}
+          onPress={onPlay}
+        />
+        <IconButton
+          icon={<Languages size={14} color="$textSecondary" />}
+          aria-label="Translate this transcript"
+          size={32}
+          onPress={onTranslate}
+        />
+      </XStack>
       <YStack flex={1} gap={2} minWidth={0}>
-        <Code numberOfLines={1}>{file.filename}</Code>
-        <Caption fontSize={11}>{file.label}</Caption>
+        <Code numberOfLines={1}>{facets}</Code>
+        <Caption fontSize={11}>{meta}</Caption>
       </YStack>
       <IconButton
-        icon={<Download size={14} color="$textSecondary" />}
-        aria-label="Download"
+        icon={<Trash2 size={14} color="$textSecondary" />}
+        aria-label="Delete this transcript"
         size={32}
-        onPress={() => {
-          if (typeof window !== "undefined") {
-            window.open(file.url, "_blank");
-          }
-        }}
-      />
-      <IconButton
-        icon={<MoreHorizontal size={14} color="$textSecondary" />}
-        aria-label="More"
-        size={32}
+        onPress={onDelete}
       />
     </XStack>
   );
+}
+
+function TranslateRow({
+  run,
+  onPlay,
+  onDelete,
+}: {
+  run: TranslateRun;
+  onPlay: () => void;
+  onDelete: () => void;
+}) {
+  const facets = [run.translator, run.translatorModel, run.targetLang]
+    .filter(Boolean)
+    .join(" · ");
+  const meta = [
+    formatDurationMs(run.durationMs),
+    `${run.segmentCount} segment${run.segmentCount === 1 ? "" : "s"}`,
+    formatRelative(run.createdAt),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <XStack
+      alignItems="center"
+      gap="$sm"
+      padding="$sm"
+      borderRadius="$md"
+      backgroundColor="$surfaceGlass"
+      borderWidth={1}
+      borderColor="$borderSubtle"
+    >
+      <IconButton
+        icon={<PlayCircle size={14} color="$textSecondary" />}
+        aria-label="Play with this translation"
+        size={32}
+        onPress={onPlay}
+      />
+      <YStack flex={1} gap={2} minWidth={0}>
+        <Code numberOfLines={1}>{facets}</Code>
+        <Caption fontSize={11}>{meta}</Caption>
+      </YStack>
+      <IconButton
+        icon={<Trash2 size={14} color="$textSecondary" />}
+        aria-label="Delete this translation"
+        size={32}
+        onPress={onDelete}
+      />
+    </XStack>
+  );
+}
+
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds < 0) return "";
+  const minutes = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
+}
+
+function formatDurationMs(ms: number): string {
+  if (!ms || ms < 0) return "";
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remSec = Math.floor(seconds % 60);
+  return `${minutes}m ${remSec}s`;
 }
