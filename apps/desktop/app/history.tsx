@@ -24,6 +24,7 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
+import { useGenerate } from "../src/state/generate";
 import type { HistoryItem } from "@yt-subtitle-maker/api-client";
 
 type TimeFilter = "all" | "today" | "week" | "month";
@@ -214,10 +215,42 @@ export default function History() {
 
 function HistoryRow({ item }: { item: HistoryItem }) {
   const router = useRouter();
+  const setUrl = useGenerate((s) => s.setUrl);
+  const loadMetadata = useGenerate((s) => s.loadMetadata);
+
+  // Reload = drop the URL into the Generate store and trigger metadata
+  // fetch, then navigate. The user lands on Generate with the video
+  // preview already loaded — they pick a new translator/whisper engine
+  // (via the inline switchers) and click Generate to re-run.
   const onReload = () => {
-    // Phase 12: hydrate generate store from this item before navigating.
+    setUrl(item.url);
+    void loadMetadata();
     router.push("/");
   };
+
+  const onPlay = async () => {
+    try {
+      await apiClient.playMpv(item.videoId, {
+        subtitlePreference: item.titleTranslated || item.targetLang
+          ? "translated"
+          : "original",
+      });
+    } catch {
+      /* surfaced via mpv's window or noop on transient network */
+    }
+  };
+
+  const onOpenFolder = async () => {
+    try {
+      await apiClient.openLibraryFolder(item.videoId);
+    } catch {
+      /* backend may not support on this platform */
+    }
+  };
+
+  // Row is inert (no onPress) — action buttons are the explicit click
+  // surface so clicking Play doesn't also navigate to Generate via the
+  // row handler. Hover style still works for visual feedback.
   return (
     <XStack
       gap="$md"
@@ -230,8 +263,6 @@ function HistoryRow({ item }: { item: HistoryItem }) {
       borderWidth={1}
       hoverStyle={{ y: -1, borderColor: "$borderStrong" }}
       animation="quick"
-      cursor="pointer"
-      onPress={onReload}
     >
       <Stack
         width={80}
@@ -270,20 +301,22 @@ function HistoryRow({ item }: { item: HistoryItem }) {
 
       <XStack gap="$xs">
         <IconButton
-          icon={<PlayCircle size={14} color="$textSecondary" />}
-          aria-label="Play"
+          icon={<PlayCircle size={14} color="$accent" />}
+          aria-label="Play with mpv"
           size={32}
+          onPress={onPlay}
         />
         <IconButton
           icon={<RotateCcw size={14} color="$textSecondary" />}
-          aria-label="Reload in Generate"
+          aria-label="Re-run in Generate (pre-fills URL so you can change model + re-translate or re-transcribe)"
           size={32}
           onPress={onReload}
         />
         <IconButton
           icon={<MoreHorizontal size={14} color="$textSecondary" />}
-          aria-label="More"
+          aria-label="Open folder"
           size={32}
+          onPress={onOpenFolder}
         />
       </XStack>
     </XStack>
