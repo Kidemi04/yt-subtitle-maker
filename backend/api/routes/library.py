@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from core import library_runs
 from core.config import load_config
 from core.downloader.js_runtime import detect_js_runtime
 
@@ -38,6 +39,11 @@ class PlayMpvRequest(BaseModel):
     # and falls back to the original if no translation exists. "original"
     # forces the source-language transcript. "none" disables subtitle overlay.
     subtitlePreference: Literal["translated", "original", "none"] | None = None
+
+
+class DeleteSrtRequest(BaseModel):
+    id: str
+    kind: Literal["transcribe", "translate"]
 
 
 def _output_dir() -> Path:
@@ -128,9 +134,11 @@ def list_library() -> dict[str, Any]:
     return {"items": items}
 
 
-@router.get("/{video_id}/file/{filename}")
+@router.get("/{video_id}/file/{filename:path}")
 def download_file(video_id: str, filename: str):
-    """Serve a file from a video's folder. Sandboxed to that folder."""
+    """Serve a file from a video's folder (or its transcripts/ / translations/
+    subdirs). Sandboxed: any attempt to resolve outside the folder is rejected.
+    """
     folder = _find_folder_for(video_id)
     if folder is None:
         raise HTTPException(status_code=404, detail="video not found")
@@ -146,6 +154,90 @@ def download_file(video_id: str, filename: str):
     if not target.is_file():
         raise HTTPException(status_code=404, detail="file not found")
     return FileResponse(str(target))
+
+
+def _file_url(video_id: str, folder: Path, filename: str, subdir: str) -> str | None:
+    """Build a download URL for a sidecar entry.
+
+    Tries the new layout (`<subdir>/<filename>`) first, then falls back to the
+    folder root for legacy entries that haven't been migrated yet.
+    """
+    if (folder / subdir / filename).is_file():
+        return f"/api/library/{video_id}/file/{subdir}/{filename}"
+    if (folder / filename).is_file():
+        return f"/api/library/{video_id}/file/{filename}"
+    return None
+
+
+def _audio_url(video_id: str, folder: Path) -> str | None:
+    for ext in (".wav", ".m4a", ".mp3"):
+        f = folder / f"{video_id}{ext}"
+        if f.is_file():
+            return f"/api/library/{video_id}/file/{f.name}"
+    return None
+
+
+def _has_video_file(video_id: str, folder: Path) -> bool:
+    return any(
+        (folder / f"{video_id}{ext}").is_file()
+        for ext in (".mp4", ".webm", ".mkv")
+    )
+
+
+@router.get("/{video_id}")
+def get_video_detail(video_id: str) -> dict[str, Any]:
+    """Full detail for a single video: metadata + every transcribe/translation run."""
+    folder = _find_folder_for(video_id)
+    if folder is None:
+        raise HTTPException(status_code=404, detail=f"video not found: {video_id}")
+
+    sidecar = library_runs.read_sidecar(folder)
+
+    transcribes_with_url = []
+    for t in sidecar.get("transcribes", []):
+        entry = dict(t)
+        entry["url"] = _file_url(video_id, folder, t["filename"], "transcripts")
+        transcribes_with_url.append(entry)
+
+    translations_with_url = []
+    for tr in sidecar.get("translations", []):
+        entry = dict(tr)
+        entry["url"] = _file_url(video_id, folder, tr["filename"], "translations")
+        translations_with_url.append(entry)
+
+    return {
+        "videoId": sidecar.get("videoId") or video_id,
+        "url": sidecar.get("url") or f"https://www.youtube.com/watch?v={video_id}",
+        "titleOriginal": sidecar.get("titleOriginal", ""),
+        "titleTranslated": sidecar.get("titleTranslated"),
+        "thumbnailUrl": sidecar.get("thumbnailUrl")
+            or f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+        "channel": sidecar.get("channel"),
+        "durationSeconds": sidecar.get("durationSeconds"),
+        "createdAt": sidecar.get("createdAt") or datetime.fromtimestamp(folder.stat().st_mtime).isoformat(),
+        "updatedAt": sidecar.get("updatedAt") or sidecar.get("createdAt") or "",
+        "audio": _audio_url(video_id, folder),
+        "hasVideo": _has_video_file(video_id, folder),
+        "transcribes": transcribes_with_url,
+        "translations": translations_with_url,
+    }
+
+
+@router.post("/{video_id}/delete-srt")
+def delete_srt(video_id: str, req: DeleteSrtRequest) -> dict[str, Any]:
+    """Delete one transcript or translation by id.
+
+    For `kind == "transcribe"`, child translations are cascade-deleted.
+    """
+    folder = _find_folder_for(video_id)
+    if folder is None:
+        raise HTTPException(status_code=404, detail=f"video not found: {video_id}")
+
+    deleted = library_runs.remove_entry(folder, req.kind, req.id)
+    return {
+        "ok": True,
+        "deleted": [p.name for p in deleted],
+    }
 
 
 @router.post("/delete")
