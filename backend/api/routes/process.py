@@ -8,17 +8,13 @@ import threading
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
+from api import jobs
 from api.routes.metadata import _video_id_from_url, fetch_video_metadata
 from api.schemas import ProcessRequest
 from core.config import load_config
 from core.pipeline import PipelineCancelled, run_pipeline
 
 router = APIRouter(prefix="/api", tags=["process"])
-
-# Single in-flight job slot. V1 only supports one process at a time; if a new
-# job arrives while one is running, the old slot is replaced and the older job
-# is effectively orphaned (won't be cancellable from the new POST /cancel call).
-_active_cancel: dict[str, threading.Event | None] = {"event": None}
 
 
 @router.post("/process")
@@ -28,8 +24,7 @@ def process(req: ProcessRequest):
     q: queue.Queue = queue.Queue()
     SENTINEL = object()
 
-    cancel_event = threading.Event()
-    _active_cancel["event"] = cancel_event
+    cancel_event = jobs.claim_slot()
 
     # Pre-fetch metadata so pipeline can name folder by title
     meta = fetch_video_metadata(
@@ -60,11 +55,7 @@ def process(req: ProcessRequest):
         except Exception as e:
             q.put({"status": "error", "error": str(e), "recoverable": False})
         finally:
-            # Clear the slot so /process/cancel correctly reports "no active job"
-            # after this run finishes. Guard against a newer job already taking
-            # the slot — only clear if we still own it.
-            if _active_cancel.get("event") is cancel_event:
-                _active_cancel["event"] = None
+            jobs.release_slot(cancel_event)
             q.put(SENTINEL)
 
     threading.Thread(target=runner, daemon=True).start()
@@ -81,14 +72,9 @@ def process(req: ProcessRequest):
 
 @router.post("/process/cancel")
 def cancel_process() -> dict:
-    """Set the cancel flag on the in-flight pipeline job, if any.
-
-    The pipeline polls this flag at every phase boundary + progress callback
-    and raises PipelineCancelled when set, which the runner converts to a
-    clean stream termination.
+    """Set the cancel flag on the in-flight job (process / transcribe /
+    translate — all three share one slot). The pipeline polls this flag at
+    every phase boundary and raises PipelineCancelled when set, which the
+    runner converts to a clean stream termination.
     """
-    evt = _active_cancel.get("event")
-    if evt is None:
-        return {"ok": False, "error": "no active job"}
-    evt.set()
-    return {"ok": True}
+    return jobs.cancel_active()

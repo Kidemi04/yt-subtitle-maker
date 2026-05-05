@@ -7,15 +7,15 @@ import time
 
 from fastapi.testclient import TestClient
 
+from api import jobs
 from api.main import app
-from api.routes import process as process_route
 
 client = TestClient(app)
 
 
 def test_cancel_with_no_active_job_returns_ok_false():
     # Make sure no active event from prior tests is hanging around.
-    process_route._active_cancel["event"] = None
+    jobs._slot["event"] = None
     resp = client.post("/api/process/cancel")
     assert resp.status_code == 200
     body = resp.json()

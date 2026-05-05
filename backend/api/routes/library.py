@@ -8,20 +8,25 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+from api import jobs
 from core import library_runs
 from core.config import load_config
 from core.downloader.js_runtime import detect_js_runtime
+from core.pipeline import PipelineCancelled
 
 router = APIRouter(prefix="/api/library", tags=["library"])
 
@@ -44,6 +49,19 @@ class PlayMpvRequest(BaseModel):
 class DeleteSrtRequest(BaseModel):
     id: str
     kind: Literal["transcribe", "translate"]
+
+
+class LibraryTranscribeRequest(BaseModel):
+    """Body for POST /api/library/{videoId}/transcribe.
+
+    `sttEngine` is the explicit engine ("openai-whisper" or "yt_captions").
+    Frontend resolves "auto" before calling.
+    """
+    sttEngine: str
+    whisperModel: str | None = None
+    whisperDevice: str | None = None
+    vadEnabled: bool = False
+    sourceLang: str
 
 
 def _output_dir() -> Path:
@@ -427,3 +445,149 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
         "media": media_label,
         "subtitle": sub.name if sub else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Re-transcribe — runs another STT on the existing audio file
+# ---------------------------------------------------------------------------
+
+def _find_existing_audio(folder: Path, video_id: str) -> Path | None:
+    for ext in (".wav", ".m4a", ".mp3"):
+        p = folder / f"{video_id}{ext}"
+        if p.is_file():
+            return p
+    return None
+
+
+@router.post("/{video_id}/transcribe")
+def transcribe_existing(video_id: str, req: LibraryTranscribeRequest):
+    """Re-run STT on the audio.wav already in this video's folder.
+
+    Returns NDJSON stream like /api/process. The audio file is reused — we
+    never re-download. yt_captions providers don't need audio and are also
+    supported.
+    """
+    folder = _find_folder_for(video_id)
+    if folder is None:
+        raise HTTPException(status_code=404, detail=f"video not found: {video_id}")
+
+    cfg = load_config()
+    library_runs.migrate_legacy_folder(folder)
+
+    # Load sidecar to recover the original URL (yt_captions needs it).
+    sidecar = library_runs.read_sidecar(folder)
+    url = sidecar.get("url") or f"https://www.youtube.com/watch?v={video_id}"
+
+    audio_path: Path | None = None
+    if req.sttEngine != "yt_captions":
+        audio_path = _find_existing_audio(folder, video_id)
+        if audio_path is None:
+            return {
+                "ok": False,
+                "error": "no audio file in folder; download a fresh job first",
+            }
+
+    cancel_event = jobs.claim_slot()
+    q: queue.Queue = queue.Queue()
+    SENTINEL = object()
+
+    def runner() -> None:
+        try:
+            # Lazy import keeps test patching points consistent with /api/process.
+            from core.stt import get_provider
+            from core.stt.yt_captions import YtCaptionsProvider
+            from core.subtitles import write_srt
+
+            engine = req.sttEngine
+            if engine == "yt_captions":
+                provider = YtCaptionsProvider()
+                model_used = None
+                device_used = None
+                vad_used = None
+            else:
+                model_used = req.whisperModel or cfg.default_whisper_model
+                device_used = req.whisperDevice or cfg.default_whisper_device
+                vad_used = bool(req.vadEnabled)
+                provider = get_provider(engine, model=model_used, device=device_used)
+
+            if cancel_event.is_set():
+                raise PipelineCancelled("cancelled")
+
+            start = time.monotonic()
+            q.put({"status": "transcribing", "engine": provider.name, "progress": None})
+
+            def stt_progress(p: float) -> None:
+                if cancel_event.is_set():
+                    raise PipelineCancelled("cancelled")
+                q.put({"status": "transcribing", "engine": provider.name, "progress": p})
+
+            result = provider.transcribe(
+                audio_path=str(audio_path) if audio_path else None,
+                url=url,
+                language=req.sourceLang,
+                progress=stt_progress,
+            )
+            if cancel_event.is_set():
+                raise PipelineCancelled("cancelled")
+            duration_ms = int((time.monotonic() - start) * 1000)
+
+            t_id = library_runs.transcribe_id(engine, model_used, req.sourceLang)
+            transcripts_dir = folder / "transcripts"
+            transcripts_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{t_id}.srt"
+            srt_path = transcripts_dir / filename
+            write_srt(
+                [
+                    {"id": s.id, "start": s.start, "end": s.end, "text": s.text}
+                    for s in result.segments
+                ],
+                str(srt_path),
+                field="text",
+            )
+            library_runs.append_transcribe(
+                folder,
+                {
+                    "id": t_id,
+                    "engine": engine,
+                    "model": model_used,
+                    "device": device_used,
+                    "vadEnabled": vad_used,
+                    "language": req.sourceLang,
+                    "filename": filename,
+                    "createdAt": library_runs._now_iso(),
+                    "durationMs": duration_ms,
+                    "segmentCount": len(result.segments),
+                },
+            )
+
+            q.put({
+                "status": "done",
+                "videoId": video_id,
+                "transcribeId": t_id,
+                "filename": filename,
+                "url": f"/api/library/{video_id}/file/transcripts/{filename}",
+                "durationMs": duration_ms,
+                "segmentCount": len(result.segments),
+                "previewSegments": [
+                    {"id": s.id, "start": s.start, "end": s.end, "text": s.text}
+                    for s in result.segments[:5]
+                ],
+            })
+        except PipelineCancelled:
+            q.put({"status": "error", "error": "cancelled", "recoverable": True})
+        except Exception as e:  # noqa: BLE001
+            q.put({"status": "error", "error": str(e), "recoverable": False})
+        finally:
+            jobs.release_slot(cancel_event)
+            q.put(SENTINEL)
+
+    threading.Thread(target=runner, daemon=True).start()
+
+    def gen():
+        while True:
+            evt = q.get()
+            if evt is SENTINEL:
+                break
+            yield json.dumps(evt) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
