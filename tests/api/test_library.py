@@ -137,8 +137,13 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert cmd[0] == "/fake/mpv"
     assert "https://www.youtube.com/watch?v=abcDEFghIJK" in cmd
     assert "--force-window=immediate" in cmd
-    sub_arg = next(arg for arg in cmd if arg.startswith("--sub-file="))
+    sub_arg = next(arg for arg in cmd if arg.startswith("--sub-files-append="))
     assert sub_arg.endswith("abcDEFghIJK_zh-CN.srt")
+    # Stream path needs mpv pointed at our yt-dlp + must enable EJS
+    # remote components so n-challenge solving works.
+    assert any(
+        arg.startswith("--ytdl-raw-options-append=remote-components=") for arg in cmd
+    )
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -171,6 +176,9 @@ def test_library_play_mpv_falls_back_to_original_srt(
     body = resp.json()
     assert body["ok"] is True
     assert body["subtitle"] == "abcDEFghIJK_original.srt"
+    cmd = mock_popen.call_args.args[0]
+    sub_arg = next(arg for arg in cmd if arg.startswith("--sub-files-append="))
+    assert sub_arg.endswith("abcDEFghIJK_original.srt")
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -189,7 +197,7 @@ def test_library_play_mpv_no_subtitle_still_launches(
     assert body["subtitle"] is None
     assert body["media"] == "youtube:abcDEFghIJK"
     cmd = mock_popen.call_args.args[0]
-    assert all(not arg.startswith("--sub-file=") for arg in cmd)
+    assert all(not arg.startswith("--sub-files-append=") for arg in cmd)
 
 
 @patch("api.routes.library.shutil.which")

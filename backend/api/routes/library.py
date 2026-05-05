@@ -7,6 +7,7 @@ so V2 mobile can consume the same API over ngrok without local paths.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from core.config import load_config
+from core.downloader.js_runtime import detect_js_runtime
 
 router = APIRouter(prefix="/api/library", tags=["library"])
 
@@ -195,6 +197,32 @@ def _pick_local_media(folder: Path) -> Path | None:
     )
 
 
+def _resolve_ytdlp_for_mpv() -> str | None:
+    """Find a yt-dlp executable mpv can shell out to.
+
+    mpv's built-in `ytdl_hook` looks for `yt-dlp` (or `youtube-dl`) on PATH.
+    When the backend runs under a Python venv (`pip install yt-dlp`), the
+    binary lives at `<venv>/Scripts/yt-dlp.exe` — invisible to mpv unless
+    we tell it explicitly via `--script-opts=ytdl_hook-ytdl_path=<path>`.
+    """
+    found = shutil.which("yt-dlp") or shutil.which("youtube-dl")
+    if found:
+        return found
+    # Fallback: same Python venv that runs the backend has it as a script.
+    py_dir = os.path.dirname(sys.executable)
+    candidates = [
+        os.path.join(py_dir, "Scripts", "yt-dlp.exe"),  # Windows venv
+        os.path.join(py_dir, "Scripts", "yt-dlp"),
+        os.path.join(py_dir, "bin", "yt-dlp"),  # Unix venv
+        os.path.join(py_dir, "yt-dlp"),
+        os.path.join(py_dir, "yt-dlp.exe"),
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return None
+
+
 @router.post("/play-mpv")
 def play_mpv(req: VideoIdRequest) -> dict[str, Any]:
     """Launch mpv to play the video with the local subtitle overlaid.
@@ -247,7 +275,29 @@ def play_mpv(req: VideoIdRequest) -> dict[str, Any]:
         "--force-window=immediate",  # guarantees a visible window
     ]
     if sub is not None:
-        cmd.append(f"--sub-file={sub}")
+        # Modern mpv accepts both --sub-file and --sub-files-append; the
+        # latter is the documented form on current builds.
+        cmd.append(f"--sub-files-append={sub}")
+
+    # When we're streaming from YouTube, wire mpv to the same yt-dlp + JS
+    # runtime our backend uses. Without this, mpv finds no `yt-dlp.exe` on
+    # PATH (it's in the venv) and hits the same n-challenge that requires
+    # the EJS solver — both fail silently to a black screen with -/0 streams.
+    if media_arg == youtube_url:
+        ytdlp_exe = _resolve_ytdlp_for_mpv()
+        if ytdlp_exe:
+            cmd.append(f"--script-opts=ytdl_hook-ytdl_path={ytdlp_exe}")
+        # Forward our js-runtime + remote-components into mpv's yt-dlp call
+        # via --ytdl-raw-options. Underscores are converted to hyphens for
+        # the CLI form ("js-runtimes" not "js_runtimes").
+        js_spec = detect_js_runtime(cfg.js_runtime_path)
+        if js_spec:
+            # Strip the "name:" prefix; mpv's --ytdl-raw-options expects
+            # the same shape as the yt-dlp CLI flag value.
+            cmd.append(f"--ytdl-raw-options-append=js-runtimes={js_spec}")
+        cmd.append(
+            "--ytdl-raw-options-append=remote-components=ejs:github,ejs:npm",
+        )
 
     try:
         subprocess.Popen(cmd, cwd=str(folder))
