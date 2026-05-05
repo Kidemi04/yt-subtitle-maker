@@ -472,13 +472,17 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
         "--force-window=immediate",  # guarantees a visible window
     ]
     if sub is not None:
-        # Two-arg form (`--option value`) instead of `--option=value` so paths
-        # with `=`, spaces, or non-ASCII chars in the folder name don't trip
-        # mpv's option parser. Pass the basename + sub-file-paths so mpv
-        # resolves it inside the SRT's parent dir (which may be transcripts/
-        # or translations/ under the new multi-SRT layout).
-        cmd.extend(["--sub-files-append", sub.name])
-        cmd.extend(["--sub-file-paths", str(sub.parent)])
+        # mpv on Windows REQUIRES the `--option=value` form for these flags;
+        # passing them as separate `--option` `value` args makes mpv exit
+        # rc=1 with "option requires parameter". `subprocess.Popen` with a
+        # list arg quotes each element correctly, so embedded spaces /
+        # unicode in the folder name still work — only the literal `=`
+        # would be a problem and it cannot legally appear in a Windows
+        # path. We pass just the basename and use --sub-file-paths to
+        # point at the SRT's parent dir (which may be transcripts/ or
+        # translations/ under the V2 multi-SRT layout).
+        cmd.append(f"--sub-files-append={sub.name}")
+        cmd.append(f"--sub-file-paths={sub.parent}")
         cmd.append("--sub-auto=exact")  # actually load the sub we attached
 
     # When we're streaming from YouTube, wire mpv to the same yt-dlp + JS
@@ -501,10 +505,69 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
             "--ytdl-raw-options-append=remote-components=ejs:github,ejs:npm",
         )
 
+    # Echo the resolved command to the uvicorn console so a missing mpv
+    # window can be debugged without re-instrumenting handlers.
+    print("[play-mpv] cmd:", cmd, flush=True)
+    print("[play-mpv] cwd:", str(folder), flush=True)
+
+    import threading
+    import time
+
+    out_chunks: list[bytes] = []
+
     try:
-        subprocess.Popen(cmd, cwd=str(folder))
+        # Capture BOTH stdout and stderr (merged via STDOUT) so we can
+        # detect instant-exits (mpv exits before opening a window, e.g.
+        # yt-dlp ETIMEDOUT, missing codec, bad sub path). On Windows mpv
+        # often writes diagnostics to stdout rather than stderr; merging
+        # gets us both. A daemon thread drains the pipe forwards-to-
+        # console while mpv is alive, so the OS-level pipe buffer never
+        # fills up and blocks the player.
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(folder),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
     except Exception as e:  # noqa: BLE001 — surface whatever Popen raised
         return {"ok": False, "error": f"failed to launch mpv: {e}"}
+
+    def _drain_output() -> None:
+        try:
+            assert proc.stdout is not None
+            for raw in iter(proc.stdout.readline, b""):
+                out_chunks.append(raw)
+                # Mirror to the uvicorn console so the user sees mpv's
+                # own diagnostics in real time.
+                try:
+                    sys.stderr.write("[mpv] " + raw.decode("utf-8", errors="replace"))
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    threading.Thread(target=_drain_output, daemon=True).start()
+
+    # Wait briefly: mpv usually opens its window within a second or so.
+    # If it has already exited by then, treat as a failure and surface
+    # whatever diagnostic the drain thread has already collected.
+    # We accept ONLY an int as "exited" — real Popen returns None or an
+    # int, but the unit tests mock Popen with MagicMock, whose .poll()
+    # returns another MagicMock; an `is not None` check would falsely
+    # treat the mock as exited and break those tests.
+    time.sleep(1.0)
+    rc = proc.poll()
+    if isinstance(rc, int):
+        # Give the drain thread a moment to flush any remaining output.
+        time.sleep(0.3)
+        out_bytes_list = [c for c in out_chunks if isinstance(c, (bytes, bytearray))]
+        out_text = b"".join(out_bytes_list).decode("utf-8", errors="replace").strip()
+        print(f"[play-mpv] mpv exited rc={rc}", flush=True)
+        return {
+            "ok": False,
+            "error": f"mpv exited immediately (rc={rc}): {out_text[:1000] or 'no output'}",
+        }
 
     return {
         "ok": True,

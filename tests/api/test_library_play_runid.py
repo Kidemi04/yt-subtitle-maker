@@ -93,12 +93,11 @@ def test_play_mpv_with_transcribeId_picks_exact_srt(
     assert body["subtitle"] == "yt_captions-en.srt"
 
     cmd = mock_popen.call_args.args[0]
-    assert "--sub-files-append" in cmd
-    idx = cmd.index("--sub-files-append")
-    assert cmd[idx + 1] == "yt_captions-en.srt"
+    assert "--sub-files-append=yt_captions-en.srt" in cmd
     # --sub-file-paths now points at the SRT's parent (transcripts/), not folder root
-    sf_idx = cmd.index("--sub-file-paths")
-    assert cmd[sf_idx + 1].endswith("transcripts")
+    sub_paths = next((a for a in cmd if a.startswith("--sub-file-paths=")), None)
+    assert sub_paths is not None
+    assert sub_paths.endswith("transcripts")
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -121,8 +120,9 @@ def test_play_mpv_with_translateId_picks_exact_srt(
     assert body["subtitle"] == "openai-whisper-tiny-en__gemini-flash__ja.srt"
 
     cmd = mock_popen.call_args.args[0]
-    sf_idx = cmd.index("--sub-file-paths")
-    assert cmd[sf_idx + 1].endswith("translations")
+    sub_paths = next((a for a in cmd if a.startswith("--sub-file-paths=")), None)
+    assert sub_paths is not None
+    assert sub_paths.endswith("translations")
 
 
 @patch("api.routes.library.subprocess.Popen")

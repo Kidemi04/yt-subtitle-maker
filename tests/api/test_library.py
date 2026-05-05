@@ -142,12 +142,10 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert cmd[0] == "/fake/mpv"
     assert "https://www.youtube.com/watch?v=abcDEFghIJK" in cmd
     assert "--force-window=immediate" in cmd
-    # Two-arg form (NOT --sub-files-append=path) so non-ASCII / `=` in path
-    # don't trip mpv's option parser.
-    assert "--sub-files-append" in cmd
-    idx = cmd.index("--sub-files-append")
-    assert cmd[idx + 1] == "abcDEFghIJK_zh-CN.srt"  # basename, not full path
-    assert "--sub-file-paths" in cmd
+    # mpv on Windows requires the `--option=value` form for these flags;
+    # the previous two-arg form caused mpv to exit rc=1 immediately.
+    assert "--sub-files-append=abcDEFghIJK_zh-CN.srt" in cmd
+    assert any(arg.startswith("--sub-file-paths=") for arg in cmd)
     assert "--sub-auto=exact" in cmd
     # Stream path needs mpv pointed at our yt-dlp + must enable EJS
     # remote components so n-challenge solving works.
@@ -187,8 +185,7 @@ def test_library_play_mpv_falls_back_to_original_srt(
     assert body["ok"] is True
     assert body["subtitle"] == "abcDEFghIJK_original.srt"
     cmd = mock_popen.call_args.args[0]
-    idx = cmd.index("--sub-files-append")
-    assert cmd[idx + 1] == "abcDEFghIJK_original.srt"
+    assert "--sub-files-append=abcDEFghIJK_original.srt" in cmd
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -226,7 +223,7 @@ def test_library_play_mpv_subtitle_preference_none(
     assert body["ok"] is True
     assert body["subtitle"] is None
     cmd = mock_popen.call_args.args[0]
-    assert "--sub-files-append" not in cmd
+    assert not any(arg.startswith("--sub-files-append") for arg in cmd)
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -245,7 +242,7 @@ def test_library_play_mpv_no_subtitle_still_launches(
     assert body["subtitle"] is None
     assert body["media"] == "youtube:abcDEFghIJK"
     cmd = mock_popen.call_args.args[0]
-    assert "--sub-files-append" not in cmd
+    assert not any(arg.startswith("--sub-files-append") for arg in cmd)
 
 
 @patch("api.routes.library.shutil.which")
