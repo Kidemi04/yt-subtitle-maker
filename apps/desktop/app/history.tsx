@@ -253,15 +253,17 @@ function HistoryRow({
   // fetch, then navigate. The user lands on Generate with the video
   // preview already loaded — they pick a new translator/whisper engine
   // (via the inline switchers) and click Generate to re-run.
-  const onReload = (e?: { stopPropagation?: () => void }) => {
-    e?.stopPropagation?.();
+  // IconButton's onPress signature is `() => void` — it doesn't pass through
+  // the underlying event, so stopPropagation can't be wired here. We instead
+  // limit the row's "open detail" click target to the thumbnail + title
+  // region so the action IconButtons live outside it (see render below).
+  const onReload = () => {
     setUrl(item.url);
     void loadMetadata();
     router.push("/");
   };
 
-  const onPlay = async (e?: { stopPropagation?: () => void }) => {
-    e?.stopPropagation?.();
+  const onPlay = async () => {
     try {
       await apiClient.playMpv(item.videoId, {
         subtitlePreference:
@@ -272,8 +274,7 @@ function HistoryRow({
     }
   };
 
-  const onOpenFolder = async (e?: { stopPropagation?: () => void }) => {
-    e?.stopPropagation?.();
+  const onOpenFolder = async () => {
     try {
       await apiClient.openLibraryFolder(item.videoId);
     } catch {
@@ -302,44 +303,55 @@ function HistoryRow({
       borderWidth={1}
       hoverStyle={{ y: -1, borderColor: "$borderStrong" }}
       animation="quick"
-      cursor="pointer"
-      onPress={onOpenDetail}
     >
-      <Stack
-        width={80}
-        height={48}
-        borderRadius="$sm"
-        backgroundColor="$bgElevated"
-        flexShrink={0}
-        style={{
-          backgroundImage: item.thumbnailUrl
-            ? `url(${item.thumbnailUrl})`
-            : "linear-gradient(135deg, #1a1a1d 0%, #0a0a0c 100%)",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      />
+      {/* Click target = thumbnail + title only; action buttons sit OUTSIDE
+          this region so their onPress doesn't risk bubbling up to the row.
+          (Tamagui IconButton's onPress is `() => void` and gives no event
+          for stopPropagation, so we isolate physically instead.) */}
+      <XStack
+        flex={1}
+        gap="$md"
+        alignItems="center"
+        cursor="pointer"
+        onPress={onOpenDetail}
+        minWidth={0}
+      >
+        <Stack
+          width={80}
+          height={48}
+          borderRadius="$sm"
+          backgroundColor="$bgElevated"
+          flexShrink={0}
+          style={{
+            backgroundImage: item.thumbnailUrl
+              ? `url(${item.thumbnailUrl})`
+              : "linear-gradient(135deg, #1a1a1d 0%, #0a0a0c 100%)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
 
-      <YStack flex={1} gap={2} minWidth={0}>
-        <TitleSm numberOfLines={1}>
-          {item.titleTranslated ?? item.titleOriginal}
-        </TitleSm>
-        {item.titleTranslated ? (
-          <BodySm color="$textSecondary" numberOfLines={1}>
-            {item.titleOriginal}
-          </BodySm>
-        ) : null}
-        <XStack gap="$xs" marginTop={4} flexWrap="wrap" alignItems="center">
-          {countsLabel ? (
-            <BadgePill tone={trCount > 0 ? "accent" : "neutral"}>
-              {countsLabel}
-            </BadgePill>
-          ) : (
-            <BadgePill tone="neutral">{item.sttEngineUsed}</BadgePill>
-          )}
-          <Caption fontSize={11}>{formatRelative(item.createdAt)}</Caption>
-        </XStack>
-      </YStack>
+        <YStack flex={1} gap={2} minWidth={0}>
+          <TitleSm numberOfLines={1}>
+            {item.titleTranslated ?? item.titleOriginal}
+          </TitleSm>
+          {item.titleTranslated ? (
+            <BodySm color="$textSecondary" numberOfLines={1}>
+              {item.titleOriginal}
+            </BodySm>
+          ) : null}
+          <XStack gap="$xs" marginTop={4} flexWrap="wrap" alignItems="center">
+            {countsLabel ? (
+              <BadgePill tone={trCount > 0 ? "accent" : "neutral"}>
+                {countsLabel}
+              </BadgePill>
+            ) : (
+              <BadgePill tone="neutral">{item.sttEngineUsed}</BadgePill>
+            )}
+            <Caption fontSize={11}>{formatRelative(item.createdAt)}</Caption>
+          </XStack>
+        </YStack>
+      </XStack>
 
       <Timestamp fontSize={12}>{formatElapsed(item.processingDurationMs)}</Timestamp>
 
