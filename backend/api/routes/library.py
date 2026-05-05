@@ -13,7 +13,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -30,6 +30,14 @@ SRT_AUDIO_EXTS = {".srt", ".wav", ".m4a", ".mp3", ".mp4"}
 
 class VideoIdRequest(BaseModel):
     videoId: str
+
+
+class PlayMpvRequest(BaseModel):
+    videoId: str
+    # Which SRT to overlay. "translated" (default) prefers the translated SRT
+    # and falls back to the original if no translation exists. "original"
+    # forces the source-language transcript. "none" disables subtitle overlay.
+    subtitlePreference: Literal["translated", "original", "none"] | None = None
 
 
 def _output_dir() -> Path:
@@ -171,14 +179,28 @@ _VIDEO_EXTS = (".mp4", ".webm", ".mkv")
 _AUDIO_EXTS = (".wav", ".m4a", ".mp3")
 
 
-def _pick_subtitle(folder: Path) -> Path | None:
-    """Translated SRT preferred (that's what the user actually wants to read);
-    fall back to the original SRT if no translation exists."""
+def _pick_subtitle(
+    folder: Path, preference: str | None = "translated"
+) -> Path | None:
+    """Pick which SRT (if any) to overlay in mpv based on user preference.
+
+    "translated" → translated SRT first, original as fallback (default).
+    "original"   → original (source-language) SRT only, no fallback.
+    "none"       → return None (caller skips the --sub-files-append flag).
+    """
+    if preference == "none":
+        return None
     srts = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() == ".srt"]
-    return (
-        next((f for f in srts if not f.name.endswith("_original.srt")), None)
-        or next((f for f in srts if f.name.endswith("_original.srt")), None)
+    translated = next(
+        (f for f in srts if not f.name.endswith("_original.srt")), None,
     )
+    original = next(
+        (f for f in srts if f.name.endswith("_original.srt")), None,
+    )
+    if preference == "original":
+        return original
+    # Default: translated preferred, original as fallback.
+    return translated or original
 
 
 def _pick_local_media(folder: Path) -> Path | None:
@@ -224,7 +246,7 @@ def _resolve_ytdlp_for_mpv() -> str | None:
 
 
 @router.post("/play-mpv")
-def play_mpv(req: VideoIdRequest) -> dict[str, Any]:
+def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
     """Launch mpv to play the video with the local subtitle overlaid.
 
     By default mpv streams the YouTube video directly via its built-in yt-dlp
@@ -256,7 +278,7 @@ def play_mpv(req: VideoIdRequest) -> dict[str, Any]:
             "error": "mpv not found. Install mpv or set its path in Settings → Advanced.",
         }
 
-    sub = _pick_subtitle(folder)
+    sub = _pick_subtitle(folder, req.subtitlePreference)
 
     # Prefer streaming the actual YouTube video (gives the user real picture).
     # Fall back to a local media file if one exists (works offline).
@@ -275,9 +297,13 @@ def play_mpv(req: VideoIdRequest) -> dict[str, Any]:
         "--force-window=immediate",  # guarantees a visible window
     ]
     if sub is not None:
-        # Modern mpv accepts both --sub-file and --sub-files-append; the
-        # latter is the documented form on current builds.
-        cmd.append(f"--sub-files-append={sub}")
+        # Two-arg form (`--option value`) instead of `--option=value` so paths
+        # with `=`, spaces, or non-ASCII chars in the folder name don't trip
+        # mpv's option parser. Pass the basename + sub-file-paths so mpv
+        # resolves it in the video's folder regardless of cwd quirks.
+        cmd.extend(["--sub-files-append", sub.name])
+        cmd.extend(["--sub-file-paths", str(folder)])
+        cmd.append("--sub-auto=exact")  # actually load the sub we attached
 
     # When we're streaming from YouTube, wire mpv to the same yt-dlp + JS
     # runtime our backend uses. Without this, mpv finds no `yt-dlp.exe` on

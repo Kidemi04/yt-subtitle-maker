@@ -326,6 +326,18 @@ export default function Generate() {
     { kind: "ok" | "error"; text: string } | undefined
   >(undefined);
 
+  // Which SRT to overlay when launching mpv. Snaps to a sensible default
+  // every time a new result lands: "translated" if the pipeline produced
+  // one, "original" otherwise. User can override via SegmentedControl.
+  type SubPreference = "translated" | "original" | "none";
+  const [subPreference, setSubPreference] =
+    React.useState<SubPreference>("translated");
+
+  React.useEffect(() => {
+    if (!result) return;
+    setSubPreference(result.translatedSrtPath ? "translated" : "original");
+  }, [result]);
+
   // Inline translator-test feedback for the per-job provider switcher.
   // Lets the user verify the chosen provider's credentials before kicking
   // off a job; auto-clears when the provider changes.
@@ -916,13 +928,32 @@ export default function Generate() {
 
             {/* Action buttons — Play takes prime real estate, admin actions cluster below. */}
             <YStack gap="$xs">
+              {/* Subtitle picker for mpv playback. Only show "Translated"
+                  when the pipeline actually produced one. */}
+              <XStack alignItems="center" gap="$sm" flexWrap="wrap">
+                <Caption>Subtitles</Caption>
+                <SegmentedControl
+                  value={subPreference}
+                  onValueChange={(v) => setSubPreference(v as SubPreference)}
+                  options={[
+                    ...(result.translatedSrtPath
+                      ? [{ label: "Translated", value: "translated" as const }]
+                      : []),
+                    { label: "Original", value: "original" as const },
+                    { label: "None", value: "none" as const },
+                  ]}
+                  aria-label="Subtitle preference for mpv"
+                />
+              </XStack>
               <ButtonPrimary
                 disabled={mpvBusy}
                 onPress={async () => {
                   setMpvBusy(true);
                   setMpvStatus(undefined);
                   try {
-                    const res = await apiClient.playMpv(result.videoId);
+                    const res = await apiClient.playMpv(result.videoId, {
+                      subtitlePreference: subPreference,
+                    });
                     if (res.ok) {
                       setMpvStatus({
                         kind: "ok",

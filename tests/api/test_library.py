@@ -137,8 +137,13 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert cmd[0] == "/fake/mpv"
     assert "https://www.youtube.com/watch?v=abcDEFghIJK" in cmd
     assert "--force-window=immediate" in cmd
-    sub_arg = next(arg for arg in cmd if arg.startswith("--sub-files-append="))
-    assert sub_arg.endswith("abcDEFghIJK_zh-CN.srt")
+    # Two-arg form (NOT --sub-files-append=path) so non-ASCII / `=` in path
+    # don't trip mpv's option parser.
+    assert "--sub-files-append" in cmd
+    idx = cmd.index("--sub-files-append")
+    assert cmd[idx + 1] == "abcDEFghIJK_zh-CN.srt"  # basename, not full path
+    assert "--sub-file-paths" in cmd
+    assert "--sub-auto=exact" in cmd
     # Stream path needs mpv pointed at our yt-dlp + must enable EJS
     # remote components so n-challenge solving works.
     assert any(
@@ -177,8 +182,46 @@ def test_library_play_mpv_falls_back_to_original_srt(
     assert body["ok"] is True
     assert body["subtitle"] == "abcDEFghIJK_original.srt"
     cmd = mock_popen.call_args.args[0]
-    sub_arg = next(arg for arg in cmd if arg.startswith("--sub-files-append="))
-    assert sub_arg.endswith("abcDEFghIJK_original.srt")
+    idx = cmd.index("--sub-files-append")
+    assert cmd[idx + 1] == "abcDEFghIJK_original.srt"
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_subtitle_preference_original(
+    mock_which, mock_popen, fake_output_dir
+):
+    """preference="original" forces original SRT even when translation exists."""
+    mock_which.return_value = "/fake/mpv"
+    _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
+
+    resp = client.post(
+        "/api/library/play-mpv",
+        json={"videoId": "abcDEFghIJK", "subtitlePreference": "original"},
+    )
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["subtitle"] == "abcDEFghIJK_original.srt"
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_subtitle_preference_none(
+    mock_which, mock_popen, fake_output_dir
+):
+    """preference="none" launches without any subtitle overlay."""
+    mock_which.return_value = "/fake/mpv"
+    _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
+
+    resp = client.post(
+        "/api/library/play-mpv",
+        json={"videoId": "abcDEFghIJK", "subtitlePreference": "none"},
+    )
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["subtitle"] is None
+    cmd = mock_popen.call_args.args[0]
+    assert "--sub-files-append" not in cmd
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -197,7 +240,7 @@ def test_library_play_mpv_no_subtitle_still_launches(
     assert body["subtitle"] is None
     assert body["media"] == "youtube:abcDEFghIJK"
     cmd = mock_popen.call_args.args[0]
-    assert all(not arg.startswith("--sub-files-append=") for arg in cmd)
+    assert "--sub-files-append" not in cmd
 
 
 @patch("api.routes.library.shutil.which")

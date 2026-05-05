@@ -168,11 +168,15 @@ export class ApiClient {
 
   async playMpv(
     videoId: string,
+    opts?: { subtitlePreference?: "translated" | "original" | "none" },
   ): Promise<{ ok: boolean; error?: string; media?: string; subtitle?: string | null }> {
     const res = await fetch(`${this.baseUrl}/api/library/play-mpv`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify({ videoId }),
+      body: JSON.stringify({
+        videoId,
+        subtitlePreference: opts?.subtitlePreference,
+      }),
     });
     if (!res.ok) throw new Error(`/api/library/play-mpv ${res.status}`);
     return res.json();
