@@ -41,6 +41,9 @@ def process(req: ProcessRequest):
     video_id = _video_id_from_url(req.url)
     request_dict = req.model_dump()
     request_dict["_meta_title"] = meta.get("title", "")
+    request_dict["_meta_thumbnail_url"] = meta.get("thumbnail_url")
+    request_dict["_meta_channel"] = meta.get("channel")
+    request_dict["_meta_duration"] = meta.get("duration")
     request_dict["_video_id"] = video_id
 
     def on_event(evt: dict) -> None:

@@ -3,19 +3,28 @@
 Single entry point `run_pipeline()` chains:
   fetch_metadata -> select_stt -> [download_audio?] -> transcribe -> translate? -> write_srt
 Emits NDJSON-friendly dict events via `on_event` callback for streaming endpoints.
+
+SRTs land in the Plan-C subdirectory layout:
+    output/<Title>_<videoId>/
+        <videoId>.wav
+        transcripts/<transcribeId>.srt
+        translations/<translateId>.srt
+        _history.json   # via core.library_runs
+
+Sidecar mutations go through `core.library_runs` so concurrent runs (e.g.
+the Library re-transcribe + re-translate endpoints landing in Phase 4-5) can
+share locks and stay consistent.
 """
 from __future__ import annotations
 
-import contextlib
-import json
 import os
 import re
 import threading
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
 from pathlib import Path
 
+from core import library_runs
 from core.config import AppConfig
 from core.downloader.youtube import download_audio, safe_folder_name
 from core.stt import get_provider
@@ -105,35 +114,27 @@ def _make_translator(request: dict, cfg: AppConfig):
     raise ValueError(f"unknown translator provider: {provider!r}")
 
 
-def _write_history_sidecar(
-    out_dir: str,
+def _seed_metadata(
+    folder: Path,
     *,
     video_id: str,
     url: str,
     title_original: str,
-    title_translated: str | None,
-    target_lang: str | None,
-    stt_engine_used: str,
-    duration_ms: int,
+    thumbnail_url: str | None,
+    channel: str | None,
+    duration_seconds: int | None,
 ) -> None:
-    """Persist a per-video sidecar that GET /api/history reads."""
-    sidecar = {
-        "videoId": video_id,
-        "url": url,
-        "titleOriginal": title_original,
-        "titleTranslated": title_translated,
-        "targetLang": target_lang,
-        "sttEngineUsed": stt_engine_used,
-        "createdAt": datetime.now(UTC).isoformat(),
-        "processingDurationMs": duration_ms,
-        "thumbnailUrl": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
-    }
-    # Sidecar is best-effort; never fail the pipeline because of it.
-    with contextlib.suppress(Exception):
-        Path(out_dir, "_history.json").write_text(
-            json.dumps(sidecar, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+    """Lazy-migrate the folder if needed, then write top-level video metadata."""
+    library_runs.migrate_legacy_folder(folder)
+    library_runs.update_metadata(
+        folder,
+        url=url,
+        title_original=title_original,
+        thumbnail_url=thumbnail_url
+            or f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+        channel=channel,
+        duration_seconds=duration_seconds,
+    )
 
 
 def run_pipeline(
@@ -151,9 +152,19 @@ def run_pipeline(
     # focused on the chain. Caller passes title via request['_meta_title'].
     title = request.get("_meta_title", "")
     video_id = request["_video_id"]
-    folder = safe_folder_name(title, video_id, ascii_only=False)
-    out_dir = os.path.join(cfg.output_dir or "output", folder)
-    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    folder_name = safe_folder_name(title, video_id, ascii_only=False)
+    folder = Path(cfg.output_dir or "output", folder_name)
+    folder.mkdir(parents=True, exist_ok=True)
+
+    _seed_metadata(
+        folder,
+        video_id=video_id,
+        url=url,
+        title_original=title,
+        thumbnail_url=request.get("_meta_thumbnail_url"),
+        channel=request.get("_meta_channel"),
+        duration_seconds=request.get("_meta_duration"),
+    )
 
     # Download-only short circuit: skip STT + translation entirely. The
     # frontend's "Just download, no subtitles" toggle hits this path.
@@ -170,7 +181,7 @@ def run_pipeline(
             })
 
         audio_path, _ = download_audio(
-            url, out_dir,
+            url, str(folder),
             cookie_browser=cfg.cookie_browser,
             cookie_profile=cfg.cookie_profile,
             cookies_txt_path=cfg.cookies_txt_path,
@@ -179,16 +190,6 @@ def run_pipeline(
         _check_cancel(cancel_event)
 
         duration_ms = int((time.monotonic() - start_time) * 1000)
-        _write_history_sidecar(
-            out_dir,
-            video_id=video_id,
-            url=url,
-            title_original=title,
-            title_translated=None,
-            target_lang=None,
-            stt_engine_used="download_only",
-            duration_ms=duration_ms,
-        )
         on_event({
             "status": "done",
             "videoId": video_id,
@@ -218,7 +219,7 @@ def run_pipeline(
             })
 
         audio_path, _ = download_audio(
-            url, out_dir,
+            url, str(folder),
             cookie_browser=cfg.cookie_browser,
             cookie_profile=cfg.cookie_profile,
             cookies_txt_path=cfg.cookies_txt_path,
@@ -226,6 +227,7 @@ def run_pipeline(
         )
         _check_cancel(cancel_event)
 
+    transcribe_started = time.monotonic()
     on_event({"status": "transcribing", "engine": provider.name, "progress": None})
     _check_cancel(cancel_event)
 
@@ -240,8 +242,56 @@ def run_pipeline(
         progress=_stt_progress,
     )
     _check_cancel(cancel_event)
+    transcribe_duration_ms = int((time.monotonic() - transcribe_started) * 1000)
 
+    # Write transcript SRT into transcripts/<id>.srt
+    transcribe_engine = (
+        "yt_captions" if provider.name == "yt_captions" else provider.name
+    )
+    transcribe_model = (
+        None
+        if transcribe_engine == "yt_captions"
+        else request.get("whisperModel") or cfg.default_whisper_model
+    )
+    t_id = library_runs.transcribe_id(
+        transcribe_engine, transcribe_model, request["sourceLang"]
+    )
+    transcripts_dir = folder / "transcripts"
+    transcripts_dir.mkdir(parents=True, exist_ok=True)
+    transcript_filename = f"{t_id}.srt"
+    transcript_path = transcripts_dir / transcript_filename
+
+    from core.subtitles import write_srt  # legacy module; kept as-is, refactor optional
+    write_srt(
+        [{"id": s.id, "start": s.start, "end": s.end, "text": s.text} for s in result.segments],
+        str(transcript_path),
+        field="text",
+    )
+    library_runs.append_transcribe(
+        folder,
+        {
+            "id": t_id,
+            "engine": transcribe_engine,
+            "model": transcribe_model,
+            "device": (
+                None
+                if transcribe_engine == "yt_captions"
+                else request.get("whisperDevice") or cfg.default_whisper_device
+            ),
+            "vadEnabled": (
+                None if transcribe_engine == "yt_captions" else bool(request.get("vadEnabled"))
+            ),
+            "language": request["sourceLang"],
+            "filename": transcript_filename,
+            "createdAt": library_runs._now_iso(),
+            "durationMs": transcribe_duration_ms,
+            "segmentCount": len(result.segments),
+        },
+    )
+
+    translated_path: Path | None = None
     if request.get("enableTranslation") and request.get("targetLang"):
+        translate_started = time.monotonic()
         on_event({"status": "translating", "progress": None})
         _check_cancel(cancel_event)
         translator = _make_translator(request, cfg)
@@ -256,51 +306,76 @@ def run_pipeline(
             progress=_tx_progress,
         )
         _check_cancel(cancel_event)
+        translate_duration_ms = int((time.monotonic() - translate_started) * 1000)
 
-    # Write SRTs
-    from core.subtitles import write_srt  # legacy module; kept as-is, refactor optional
-    original_path = os.path.join(out_dir, f"{video_id}_original.srt")
-    write_srt(
-        [{"id": s.id, "start": s.start, "end": s.end, "text": s.text} for s in result.segments],
-        original_path,
-        field="text",
-    )
-    translated_path = None
-    if request.get("enableTranslation") and request.get("targetLang"):
-        translated_path = os.path.join(out_dir, f"{video_id}_{request['targetLang']}.srt")
+        translator_provider = request.get("translatorProvider") or cfg.translator_provider
+        translator_model = _translator_model_for(translator_provider, request, cfg)
+        tr_id = library_runs.translate_id(
+            t_id, translator_provider, translator_model, request["targetLang"]
+        )
+        translations_dir = folder / "translations"
+        translations_dir.mkdir(parents=True, exist_ok=True)
+        translated_filename = f"{tr_id}.srt"
+        translated_path = translations_dir / translated_filename
         write_srt(
             [
                 {"id": s.id, "start": s.start, "end": s.end, "translated": s.translated or ""}
                 for s in result.segments
             ],
-            translated_path,
+            str(translated_path),
             field="translated",
+        )
+        library_runs.append_translation(
+            folder,
+            {
+                "id": tr_id,
+                "sourceTranscribeId": t_id,
+                "translator": translator_provider,
+                "translatorModel": translator_model,
+                "targetLang": request["targetLang"],
+                "filename": translated_filename,
+                "createdAt": library_runs._now_iso(),
+                "durationMs": translate_duration_ms,
+                "segmentCount": len(result.segments),
+            },
         )
 
     duration_ms = int((time.monotonic() - start_time) * 1000)
 
-    _write_history_sidecar(
-        out_dir,
-        video_id=video_id,
-        url=url,
-        title_original=title,
-        # title-translator feature isn't wired in V1; sidecar leaves this null.
-        title_translated=None,
-        target_lang=request.get("targetLang"),
-        stt_engine_used=result.source or provider.name,
-        duration_ms=duration_ms,
-    )
-
     on_event({
         "status": "done",
         "videoId": video_id,
-        "originalSrtPath": os.path.abspath(original_path),
-        "translatedSrtPath": os.path.abspath(translated_path) if translated_path else None,
+        "originalSrtPath": os.path.abspath(str(transcript_path)),
+        "translatedSrtPath": os.path.abspath(str(translated_path)) if translated_path else None,
         "audioPath": audio_path,
         "sttSourceUsed": result.source,
         "durationMs": duration_ms,
+        "transcribeId": t_id,
+        "translateId": (
+            library_runs.translate_id(
+                t_id,
+                request.get("translatorProvider") or cfg.translator_provider,
+                _translator_model_for(
+                    request.get("translatorProvider") or cfg.translator_provider, request, cfg
+                ),
+                request["targetLang"],
+            )
+            if translated_path
+            else None
+        ),
         "previewSegments": [
             {"id": s.id, "start": s.start, "end": s.end, "text": s.text, "translated": s.translated}
             for s in result.segments[:5]
         ],
     })
+
+
+def _translator_model_for(provider: str, request: dict, cfg: AppConfig) -> str:
+    """Resolve the model string actually used for a translator provider."""
+    if provider == "gemini":
+        return request.get("translatorModel") or cfg.gemini_model
+    if provider == "local_openai":
+        return request.get("translatorModel") or cfg.local_openai_model
+    if provider == "openai":
+        return request.get("translatorModel") or cfg.openai_model
+    return request.get("translatorModel") or "unknown"

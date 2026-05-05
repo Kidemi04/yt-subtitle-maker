@@ -89,15 +89,17 @@ def test_download_only_skips_stt_and_writes_no_srt(tmp_path, monkeypatch):
     assert done["durationMs"] >= 0
     assert done["previewSegments"] == []
 
-    # No SRT files should have been written.
+    # No SRT files should have been written (anywhere — including subdirs).
     folder = next(p for p in out_dir.iterdir() if p.is_dir())
-    srts = list(folder.glob("*.srt"))
+    srts = list(folder.rglob("*.srt"))
     assert srts == [], f"expected no SRTs in downloadOnly mode, found {srts}"
 
-    # History sidecar must be present and report download_only.
+    # New-shape sidecar exists with empty transcribes/translations.
     sidecar = folder / "_history.json"
     assert sidecar.is_file()
     saved = json.loads(sidecar.read_text(encoding="utf-8"))
-    assert saved["sttEngineUsed"] == "download_only"
-    assert saved["targetLang"] is None
+    assert saved["videoId"] == "abcDEFghIJK"
+    assert saved["titleOriginal"] == "Fake Video"
     assert saved["titleTranslated"] is None
+    assert saved["transcribes"] == []
+    assert saved["translations"] == []
