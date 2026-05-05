@@ -3,10 +3,6 @@ import { Stack, XStack, YStack } from "tamagui";
 import {
   RefreshCcw,
   Search,
-  PlayCircle,
-  Languages,
-  Plus,
-  Trash2,
   Library as LibraryIconLucide,
 } from "@tamagui/lucide-icons";
 import {
@@ -18,28 +14,16 @@ import {
   BadgePill,
   ButtonPrimary,
   ButtonSecondary,
-  ButtonGhost,
-  Modal,
   DisplayMd,
-  DisplaySm,
-  TitleLg,
   TitleSm,
   BodyMd,
   BodySm,
   Caption,
-  CaptionUpper,
-  Code,
 } from "@yt-subtitle-maker/ui";
 import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
-import { NewTranscribeModal } from "../src/components/NewTranscribeModal";
-import { NewTranslationModal } from "../src/components/NewTranslationModal";
-import type {
-  LibraryItem,
-  TranscribeRun,
-  TranslateRun,
-  VideoDetail,
-} from "@yt-subtitle-maker/api-client";
+import { VideoDetailModal } from "../src/components/VideoDetailModal";
+import type { LibraryItem } from "@yt-subtitle-maker/api-client";
 
 type FilterKind = "all" | "video" | "audio" | "srt";
 
@@ -246,25 +230,23 @@ export default function Library() {
       ) : null}
 
       {/* Detail modal — fetches VideoDetail on open and renders per-run cards. */}
-      <Modal
-        open={!!openItem}
-        onOpenChange={(open) => {
-          if (!open) setOpenItem(undefined);
-        }}
-        title={openItem?.titleTranslated ?? openItem?.titleOriginal}
-        width={720}
-      >
-        {openItem ? (
-          <VideoDetailModal
-            item={openItem}
-            onClose={() => setOpenItem(undefined)}
-            onDeleted={() => {
-              setOpenItem(undefined);
-              refresh();
-            }}
-          />
-        ) : null}
-      </Modal>
+      {openItem ? (
+        <VideoDetailModal
+          open={!!openItem}
+          onOpenChange={(open) => {
+            if (!open) setOpenItem(undefined);
+          }}
+          videoId={openItem.videoId}
+          fallbackTitle={openItem.titleTranslated ?? openItem.titleOriginal}
+          fallbackThumbnailUrl={openItem.thumbnailUrl}
+          fallbackUrl={openItem.url}
+          fallbackCreatedAt={openItem.createdAt}
+          onDeleted={() => {
+            setOpenItem(undefined);
+            refresh();
+          }}
+        />
+      ) : null}
     </YStack>
   );
 }
@@ -332,420 +314,3 @@ function LibraryCard({
   );
 }
 
-/**
- * VideoDetailModal — replaces the legacy "Files" list with a per-run view.
- *
- * Fetches GET /api/library/{videoId} on open and renders Transcripts + Translations
- * sections. Each row plays via mpv with the exact run id and supports Delete.
- *
- * "+ New transcript" and "+ New translation" are placeholders here; Phase 10
- * wires them to NewTranscribeModal / NewTranslationModal.
- */
-function VideoDetailModal({
-  item,
-  onClose,
-  onDeleted,
-}: {
-  item: LibraryItem;
-  onClose: () => void;
-  onDeleted: () => void;
-}) {
-  const router = useRouter();
-  const [detail, setDetail] = React.useState<VideoDetail | null>(null);
-  const [error, setError] = React.useState<string | undefined>();
-  const [busy, setBusy] = React.useState(false);
-  const [newTranscribeOpen, setNewTranscribeOpen] = React.useState(false);
-  const [newTranslationOpen, setNewTranslationOpen] = React.useState(false);
-  const [translationSourceId, setTranslationSourceId] = React.useState<
-    string | undefined
-  >(undefined);
-
-  const refreshDetail = React.useCallback(async () => {
-    setError(undefined);
-    try {
-      const d = await apiClient.fetchVideoDetail(item.videoId);
-      setDetail(d);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [item.videoId]);
-
-  React.useEffect(() => {
-    void refreshDetail();
-  }, [refreshDetail]);
-
-  const onDeleteVideo = async () => {
-    if (typeof window !== "undefined" && !window.confirm(
-      `Delete the entire library entry for "${item.titleOriginal}"? This removes the audio and all SRTs.`,
-    )) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await apiClient.deleteLibraryItem(item.videoId);
-      onDeleted();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onOpenFolder = async () => {
-    try {
-      await apiClient.openLibraryFolder(item.videoId);
-    } catch {
-      /* backend may not support this on the current platform */
-    }
-  };
-
-  const onPlayTranscript = async (id: string) => {
-    await apiClient.playMpv(item.videoId, { transcribeId: id });
-  };
-  const onPlayTranslation = async (id: string) => {
-    await apiClient.playMpv(item.videoId, { translateId: id });
-  };
-  const onDeleteTranscript = async (id: string) => {
-    if (typeof window !== "undefined" && !window.confirm(
-      "Delete this transcript? Any translations derived from it will also be deleted.",
-    )) {
-      return;
-    }
-    await apiClient.deleteSrt(item.videoId, "transcribe", id);
-    await refreshDetail();
-  };
-  const onDeleteTranslation = async (id: string) => {
-    if (typeof window !== "undefined" && !window.confirm("Delete this translation?")) {
-      return;
-    }
-    await apiClient.deleteSrt(item.videoId, "translate", id);
-    await refreshDetail();
-  };
-
-  // Group translations by their source transcript so each transcript "owns"
-  // the translations derived from it (cascade-delete is the contract).
-  const translationsBySource = React.useMemo(() => {
-    const map = new Map<string, TranslateRun[]>();
-    for (const tr of detail?.translations ?? []) {
-      const arr = map.get(tr.sourceTranscribeId) ?? [];
-      arr.push(tr);
-      map.set(tr.sourceTranscribeId, arr);
-    }
-    return map;
-  }, [detail?.translations]);
-
-  return (
-    <YStack gap="$lg">
-      {/* Header: thumbnail + url + meta */}
-      <XStack gap="$md" alignItems="flex-start">
-        <Stack
-          width={192}
-          height={108}
-          borderRadius="$md"
-          overflow="hidden"
-          backgroundColor="$bgElevated"
-          flexShrink={0}
-          style={{
-            backgroundImage: detail?.thumbnailUrl
-              ? `url(${detail.thumbnailUrl})`
-              : item.thumbnailUrl
-                ? `url(${item.thumbnailUrl})`
-                : "linear-gradient(135deg, #1a1a1d 0%, #0a0a0c 100%)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <YStack flex={1} gap="$xs" minWidth={0}>
-          <TitleLg numberOfLines={2}>
-            {detail?.titleTranslated ?? detail?.titleOriginal ?? item.titleOriginal}
-          </TitleLg>
-          <BodySm color="$textSecondary" numberOfLines={1}>
-            {detail?.url ?? item.url}
-          </BodySm>
-          <XStack gap="$xs" flexWrap="wrap" alignItems="center">
-            <BadgePill tone="neutral">{item.videoId}</BadgePill>
-            {typeof detail?.durationSeconds === "number" ? (
-              <Caption fontSize={11}>{formatDuration(detail.durationSeconds)}</Caption>
-            ) : null}
-            <Caption fontSize={11}>
-              added {formatRelative(detail?.createdAt ?? item.createdAt)}
-            </Caption>
-          </XStack>
-        </YStack>
-      </XStack>
-
-      {error ? (
-        <GlassCard variant="mid">
-          <BodySm color="$error">Failed to load detail: {error}</BodySm>
-        </GlassCard>
-      ) : null}
-
-      {/* Transcripts section */}
-      <YStack gap="$sm">
-        <DisplaySm>
-          Transcripts ({detail?.transcribes.length ?? 0})
-        </DisplaySm>
-        {detail && detail.transcribes.length === 0 ? (
-          <BodySm color="$textMuted">No transcripts yet.</BodySm>
-        ) : (
-          <YStack gap="$xs">
-            {detail?.transcribes.map((t) => (
-              <TranscribeRow
-                key={t.id}
-                run={t}
-                onPlay={() => onPlayTranscript(t.id)}
-                onTranslate={() => {
-                  setTranslationSourceId(t.id);
-                  setNewTranslationOpen(true);
-                }}
-                onDelete={() => onDeleteTranscript(t.id)}
-              />
-            ))}
-          </YStack>
-        )}
-        <ButtonGhost onPress={() => setNewTranscribeOpen(true)}>
-          <XStack gap="$xs" alignItems="center">
-            <Plus size={14} color="$textSecondary" />
-            <BodySm fontWeight="500" color="$textSecondary">
-              New transcript
-            </BodySm>
-          </XStack>
-        </ButtonGhost>
-      </YStack>
-
-      {/* Translations section */}
-      <YStack gap="$sm">
-        <DisplaySm>
-          Translations ({detail?.translations.length ?? 0})
-        </DisplaySm>
-        {detail && detail.translations.length === 0 ? (
-          <BodySm color="$textMuted">
-            No translations yet. Translations are derived from a transcript above.
-          </BodySm>
-        ) : (
-          <YStack gap="$md">
-            {detail?.transcribes.map((t) => {
-              const group = translationsBySource.get(t.id) ?? [];
-              if (group.length === 0) return null;
-              return (
-                <YStack key={t.id} gap="$xs">
-                  <CaptionUpper>from {t.id}</CaptionUpper>
-                  <YStack gap="$xs">
-                    {group.map((tr) => (
-                      <TranslateRow
-                        key={tr.id}
-                        run={tr}
-                        onPlay={() => onPlayTranslation(tr.id)}
-                        onDelete={() => onDeleteTranslation(tr.id)}
-                      />
-                    ))}
-                  </YStack>
-                </YStack>
-              );
-            })}
-            {/* Orphan translations whose source transcript was deleted */}
-            {(() => {
-              const orphans = (detail?.translations ?? []).filter(
-                (tr) =>
-                  !(detail?.transcribes ?? []).some(
-                    (t) => t.id === tr.sourceTranscribeId,
-                  ),
-              );
-              if (orphans.length === 0) return null;
-              return (
-                <YStack gap="$xs">
-                  <CaptionUpper>orphan (source deleted)</CaptionUpper>
-                  <YStack gap="$xs">
-                    {orphans.map((tr) => (
-                      <TranslateRow
-                        key={tr.id}
-                        run={tr}
-                        onPlay={() => onPlayTranslation(tr.id)}
-                        onDelete={() => onDeleteTranslation(tr.id)}
-                      />
-                    ))}
-                  </YStack>
-                </YStack>
-              );
-            })()}
-          </YStack>
-        )}
-        <ButtonGhost
-          onPress={() => {
-            setTranslationSourceId(undefined);
-            setNewTranslationOpen(true);
-          }}
-          disabled={!detail || detail.transcribes.length === 0}
-        >
-          <XStack gap="$xs" alignItems="center">
-            <Plus size={14} color="$textSecondary" />
-            <BodySm fontWeight="500" color="$textSecondary">
-              New translation
-            </BodySm>
-          </XStack>
-        </ButtonGhost>
-      </YStack>
-
-      {/* Footer */}
-      <XStack gap="$xs" justifyContent="flex-end" flexWrap="wrap">
-        <ButtonSecondary
-          onPress={() => {
-            router.push("/");
-            onClose();
-          }}
-        >
-          Reload in Generate
-        </ButtonSecondary>
-        <ButtonSecondary onPress={onOpenFolder}>
-          <XStack gap="$xs" alignItems="center">
-            <PlayCircle size={14} color="$textSecondary" />
-            <BodySm fontWeight="500" color="$textSecondary">
-              Open folder
-            </BodySm>
-          </XStack>
-        </ButtonSecondary>
-        <ButtonSecondary onPress={onDeleteVideo} disabled={busy}>
-          <BodySm fontWeight="500" color="$error">
-            Delete entire video
-          </BodySm>
-        </ButtonSecondary>
-      </XStack>
-
-      <NewTranscribeModal
-        open={newTranscribeOpen}
-        onOpenChange={setNewTranscribeOpen}
-        videoId={item.videoId}
-        onComplete={() => void refreshDetail()}
-      />
-      <NewTranslationModal
-        open={newTranslationOpen}
-        onOpenChange={setNewTranslationOpen}
-        videoId={item.videoId}
-        transcribes={detail?.transcribes ?? []}
-        initialSourceTranscribeId={translationSourceId}
-        onComplete={() => void refreshDetail()}
-      />
-    </YStack>
-  );
-}
-
-function TranscribeRow({
-  run,
-  onPlay,
-  onTranslate,
-  onDelete,
-}: {
-  run: TranscribeRun;
-  onPlay: () => void;
-  onTranslate: () => void;
-  onDelete: () => void;
-}) {
-  const facets = [run.engine, run.model, run.language].filter(Boolean).join(" · ");
-  const meta = [
-    formatDurationMs(run.durationMs),
-    `${run.segmentCount} segment${run.segmentCount === 1 ? "" : "s"}`,
-    formatRelative(run.createdAt),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <XStack
-      alignItems="center"
-      gap="$sm"
-      padding="$sm"
-      borderRadius="$md"
-      backgroundColor="$surfaceGlass"
-      borderWidth={1}
-      borderColor="$borderSubtle"
-    >
-      <XStack gap="$xs">
-        <IconButton
-          icon={<PlayCircle size={14} color="$textSecondary" />}
-          aria-label="Play with this transcript"
-          size={32}
-          onPress={onPlay}
-        />
-        <IconButton
-          icon={<Languages size={14} color="$textSecondary" />}
-          aria-label="Translate this transcript"
-          size={32}
-          onPress={onTranslate}
-        />
-      </XStack>
-      <YStack flex={1} gap={2} minWidth={0}>
-        <Code numberOfLines={1}>{facets}</Code>
-        <Caption fontSize={11}>{meta}</Caption>
-      </YStack>
-      <IconButton
-        icon={<Trash2 size={14} color="$textSecondary" />}
-        aria-label="Delete this transcript"
-        size={32}
-        onPress={onDelete}
-      />
-    </XStack>
-  );
-}
-
-function TranslateRow({
-  run,
-  onPlay,
-  onDelete,
-}: {
-  run: TranslateRun;
-  onPlay: () => void;
-  onDelete: () => void;
-}) {
-  const facets = [run.translator, run.translatorModel, run.targetLang]
-    .filter(Boolean)
-    .join(" · ");
-  const meta = [
-    formatDurationMs(run.durationMs),
-    `${run.segmentCount} segment${run.segmentCount === 1 ? "" : "s"}`,
-    formatRelative(run.createdAt),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <XStack
-      alignItems="center"
-      gap="$sm"
-      padding="$sm"
-      borderRadius="$md"
-      backgroundColor="$surfaceGlass"
-      borderWidth={1}
-      borderColor="$borderSubtle"
-    >
-      <IconButton
-        icon={<PlayCircle size={14} color="$textSecondary" />}
-        aria-label="Play with this translation"
-        size={32}
-        onPress={onPlay}
-      />
-      <YStack flex={1} gap={2} minWidth={0}>
-        <Code numberOfLines={1}>{facets}</Code>
-        <Caption fontSize={11}>{meta}</Caption>
-      </YStack>
-      <IconButton
-        icon={<Trash2 size={14} color="$textSecondary" />}
-        aria-label="Delete this translation"
-        size={32}
-        onPress={onDelete}
-      />
-    </XStack>
-  );
-}
-
-function formatDuration(seconds: number): string {
-  if (!seconds || seconds < 0) return "";
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  if (minutes > 0) return `${minutes}m ${secs}s`;
-  return `${secs}s`;
-}
-
-function formatDurationMs(ms: number): string {
-  if (!ms || ms < 0) return "";
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remSec = Math.floor(seconds % 60);
-  return `${minutes}m ${remSec}s`;
-}

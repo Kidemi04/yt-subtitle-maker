@@ -4,6 +4,7 @@ import {
   PlayCircle,
   RotateCcw,
   RefreshCcw,
+  Info,
   MoreHorizontal,
   History as HistoryIconLucide,
 } from "@tamagui/lucide-icons";
@@ -25,6 +26,7 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
 import { useGenerate } from "../src/state/generate";
+import { VideoDetailModal } from "../src/components/VideoDetailModal";
 import type { HistoryItem } from "@yt-subtitle-maker/api-client";
 
 type TimeFilter = "all" | "today" | "week" | "month";
@@ -81,6 +83,7 @@ export default function History() {
   const [error, setError] = React.useState<string | undefined>();
   const [time, setTime] = React.useState<TimeFilter>("all");
   const [sort, setSort] = React.useState<SortOrder>("recent");
+  const [openItem, setOpenItem] = React.useState<HistoryItem | undefined>();
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -205,15 +208,43 @@ export default function History() {
       {filtered.length > 0 ? (
         <YStack gap="$xs">
           {filtered.map((item) => (
-            <HistoryRow key={item.videoId + item.createdAt} item={item} />
+            <HistoryRow
+              key={item.videoId + item.createdAt}
+              item={item}
+              onOpenDetail={() => setOpenItem(item)}
+            />
           ))}
         </YStack>
+      ) : null}
+
+      {openItem ? (
+        <VideoDetailModal
+          open={!!openItem}
+          onOpenChange={(open) => {
+            if (!open) setOpenItem(undefined);
+          }}
+          videoId={openItem.videoId}
+          fallbackTitle={openItem.titleTranslated ?? openItem.titleOriginal}
+          fallbackThumbnailUrl={openItem.thumbnailUrl}
+          fallbackUrl={openItem.url}
+          fallbackCreatedAt={openItem.createdAt}
+          onDeleted={() => {
+            setOpenItem(undefined);
+            refresh();
+          }}
+        />
       ) : null}
     </YStack>
   );
 }
 
-function HistoryRow({ item }: { item: HistoryItem }) {
+function HistoryRow({
+  item,
+  onOpenDetail,
+}: {
+  item: HistoryItem;
+  onOpenDetail: () => void;
+}) {
   const router = useRouter();
   const setUrl = useGenerate((s) => s.setUrl);
   const loadMetadata = useGenerate((s) => s.loadMetadata);
@@ -222,25 +253,27 @@ function HistoryRow({ item }: { item: HistoryItem }) {
   // fetch, then navigate. The user lands on Generate with the video
   // preview already loaded — they pick a new translator/whisper engine
   // (via the inline switchers) and click Generate to re-run.
-  const onReload = () => {
+  const onReload = (e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
     setUrl(item.url);
     void loadMetadata();
     router.push("/");
   };
 
-  const onPlay = async () => {
+  const onPlay = async (e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
     try {
       await apiClient.playMpv(item.videoId, {
-        subtitlePreference: item.titleTranslated || item.targetLang
-          ? "translated"
-          : "original",
+        subtitlePreference:
+          item.titleTranslated || item.targetLang ? "translated" : "original",
       });
     } catch {
       /* surfaced via mpv's window or noop on transient network */
     }
   };
 
-  const onOpenFolder = async () => {
+  const onOpenFolder = async (e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
     try {
       await apiClient.openLibraryFolder(item.videoId);
     } catch {
@@ -248,9 +281,15 @@ function HistoryRow({ item }: { item: HistoryItem }) {
     }
   };
 
-  // Row is inert (no onPress) — action buttons are the explicit click
-  // surface so clicking Play doesn't also navigate to Generate via the
-  // row handler. Hover style still works for visual feedback.
+  const tCount = item.transcribesCount ?? 0;
+  const trCount = item.translationsCount ?? 0;
+  const countsLabel =
+    tCount + trCount === 0
+      ? null
+      : trCount > 0
+        ? `${tCount} transcript${tCount === 1 ? "" : "s"} · ${trCount} translation${trCount === 1 ? "" : "s"}`
+        : `${tCount} transcript${tCount === 1 ? "" : "s"}`;
+
   return (
     <XStack
       gap="$md"
@@ -263,6 +302,8 @@ function HistoryRow({ item }: { item: HistoryItem }) {
       borderWidth={1}
       hoverStyle={{ y: -1, borderColor: "$borderStrong" }}
       animation="quick"
+      cursor="pointer"
+      onPress={onOpenDetail}
     >
       <Stack
         width={80}
@@ -289,10 +330,13 @@ function HistoryRow({ item }: { item: HistoryItem }) {
           </BodySm>
         ) : null}
         <XStack gap="$xs" marginTop={4} flexWrap="wrap" alignItems="center">
-          {item.targetLang ? (
-            <BadgePill tone="accent">{item.targetLang}</BadgePill>
-          ) : null}
-          <BadgePill tone="neutral">{item.sttEngineUsed}</BadgePill>
+          {countsLabel ? (
+            <BadgePill tone={trCount > 0 ? "accent" : "neutral"}>
+              {countsLabel}
+            </BadgePill>
+          ) : (
+            <BadgePill tone="neutral">{item.sttEngineUsed}</BadgePill>
+          )}
           <Caption fontSize={11}>{formatRelative(item.createdAt)}</Caption>
         </XStack>
       </YStack>
@@ -300,6 +344,15 @@ function HistoryRow({ item }: { item: HistoryItem }) {
       <Timestamp fontSize={12}>{formatElapsed(item.processingDurationMs)}</Timestamp>
 
       <XStack gap="$xs">
+        <IconButton
+          icon={<Info size={14} color="$textSecondary" />}
+          aria-label="Open detail"
+          size={32}
+          onPress={(e?: { stopPropagation?: () => void }) => {
+            e?.stopPropagation?.();
+            onOpenDetail();
+          }}
+        />
         <IconButton
           icon={<PlayCircle size={14} color="$accent" />}
           aria-label="Play with mpv"
