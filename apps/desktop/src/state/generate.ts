@@ -35,6 +35,10 @@ export interface DoneResult {
   audioPath?: string;
   durationMs: number;
   sttSourceUsed: "yt_captions" | "whisper";
+  /** V2 multi-SRT: id of the transcript run produced by this job (if any). */
+  transcribeId?: string;
+  /** V2 multi-SRT: id of the translation run produced by this job (if any). */
+  translateId?: string | null;
   previewSegments: TranscriptionSegment[];
 }
 
@@ -140,6 +144,8 @@ export const useGenerate = create<GenerateState>((set, get) => ({
               audioPath: ev.audioPath,
               durationMs: ev.durationMs,
               sttSourceUsed: ev.sttSourceUsed,
+              transcribeId: ev.transcribeId,
+              translateId: ev.translateId,
               previewSegments: ev.previewSegments,
             },
             abort: undefined,

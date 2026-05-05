@@ -42,6 +42,7 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { useGenerate } from "../src/state/generate";
 import { apiClient } from "../src/state/client";
+import { NewTranscribeModal } from "../src/components/NewTranscribeModal";
 import { useRouter } from "expo-router";
 import type {
   SttSource,
@@ -325,6 +326,10 @@ export default function Generate() {
   const [mpvStatus, setMpvStatus] = React.useState<
     { kind: "ok" | "error"; text: string } | undefined
   >(undefined);
+
+  // Re-transcribe modal — opens for the just-finished video so the user can
+  // try a different engine/model on the same audio without re-downloading.
+  const [reTranscribeOpen, setReTranscribeOpen] = React.useState(false);
 
   // Which SRT to overlay when launching mpv. Snaps to a sensible default
   // every time a new result lands: "translated" if the pipeline produced
@@ -1026,11 +1031,11 @@ export default function Generate() {
                     </BodySm>
                   </XStack>
                 </ButtonSecondary>
-                <ButtonSecondary onPress={() => undefined} disabled={true}>
+                <ButtonSecondary onPress={() => setReTranscribeOpen(true)}>
                   <XStack gap="$xs" alignItems="center">
                     <RotateCcw size={14} color="$textSecondary" />
                     <BodySm fontWeight="500" color="$textSecondary">
-                      Re-transcribe with… (coming soon)
+                      Re-transcribe with…
                     </BodySm>
                   </XStack>
                 </ButtonSecondary>
@@ -1038,7 +1043,12 @@ export default function Generate() {
                   onPress={() => {
                     if (typeof window === "undefined") return;
                     const baseUrl = "http://127.0.0.1:8000";
-                    const path = `/api/library/${result.videoId}/file/${result.videoId}_original.srt`;
+                    // V2 multi-SRT: file is in transcripts/<id>.srt. Fall back
+                    // to the legacy filename for jobs created before the
+                    // pipeline migration.
+                    const path = result.transcribeId
+                      ? `/api/library/${result.videoId}/file/transcripts/${result.transcribeId}.srt`
+                      : `/api/library/${result.videoId}/file/${result.videoId}_original.srt`;
                     window.open(`${baseUrl}${path}`, "_blank");
                   }}
                 >
@@ -1070,6 +1080,15 @@ export default function Generate() {
             </XStack>
           </YStack>
         </GlassCard>
+      ) : null}
+
+      {result ? (
+        <NewTranscribeModal
+          open={reTranscribeOpen}
+          onOpenChange={setReTranscribeOpen}
+          videoId={result.videoId}
+          onComplete={() => undefined}
+        />
       ) : null}
     </YStack>
   );

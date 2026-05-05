@@ -32,6 +32,8 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
+import { NewTranscribeModal } from "../src/components/NewTranscribeModal";
+import { NewTranslationModal } from "../src/components/NewTranslationModal";
 import type {
   LibraryItem,
   TranscribeRun,
@@ -352,6 +354,11 @@ function VideoDetailModal({
   const [detail, setDetail] = React.useState<VideoDetail | null>(null);
   const [error, setError] = React.useState<string | undefined>();
   const [busy, setBusy] = React.useState(false);
+  const [newTranscribeOpen, setNewTranscribeOpen] = React.useState(false);
+  const [newTranslationOpen, setNewTranslationOpen] = React.useState(false);
+  const [translationSourceId, setTranslationSourceId] = React.useState<
+    string | undefined
+  >(undefined);
 
   const refreshDetail = React.useCallback(async () => {
     setError(undefined);
@@ -486,22 +493,18 @@ function VideoDetailModal({
                 run={t}
                 onPlay={() => onPlayTranscript(t.id)}
                 onTranslate={() => {
-                  /* Phase 10: open NewTranslationModal pre-filled with this transcribe id */
+                  setTranslationSourceId(t.id);
+                  setNewTranslationOpen(true);
                 }}
                 onDelete={() => onDeleteTranscript(t.id)}
               />
             ))}
           </YStack>
         )}
-        <ButtonGhost
-          onPress={() => {
-            /* Phase 10: open NewTranscribeModal */
-          }}
-          disabled
-        >
+        <ButtonGhost onPress={() => setNewTranscribeOpen(true)}>
           <XStack gap="$xs" alignItems="center">
-            <Plus size={14} color="$textMuted" />
-            <BodySm fontWeight="500" color="$textMuted">
+            <Plus size={14} color="$textSecondary" />
+            <BodySm fontWeight="500" color="$textSecondary">
               New transcript
             </BodySm>
           </XStack>
@@ -567,13 +570,14 @@ function VideoDetailModal({
         )}
         <ButtonGhost
           onPress={() => {
-            /* Phase 10: open NewTranslationModal */
+            setTranslationSourceId(undefined);
+            setNewTranslationOpen(true);
           }}
           disabled={!detail || detail.transcribes.length === 0}
         >
           <XStack gap="$xs" alignItems="center">
-            <Plus size={14} color="$textMuted" />
-            <BodySm fontWeight="500" color="$textMuted">
+            <Plus size={14} color="$textSecondary" />
+            <BodySm fontWeight="500" color="$textSecondary">
               New translation
             </BodySm>
           </XStack>
@@ -604,6 +608,21 @@ function VideoDetailModal({
           </BodySm>
         </ButtonSecondary>
       </XStack>
+
+      <NewTranscribeModal
+        open={newTranscribeOpen}
+        onOpenChange={setNewTranscribeOpen}
+        videoId={item.videoId}
+        onComplete={() => void refreshDetail()}
+      />
+      <NewTranslationModal
+        open={newTranslationOpen}
+        onOpenChange={setNewTranslationOpen}
+        videoId={item.videoId}
+        transcribes={detail?.transcribes ?? []}
+        initialSourceTranscribeId={translationSourceId}
+        onComplete={() => void refreshDetail()}
+      />
     </YStack>
   );
 }
