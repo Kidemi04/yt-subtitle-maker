@@ -29,6 +29,9 @@ def fake_output_dir(tmp_path, monkeypatch):
 
 
 def _make_video_dir(out: Path, video_id: str, title: str = "Test Video", with_translated: bool = False):
+    """Build a legacy-layout folder. The library endpoint now reads via
+    library_runs.read_sidecar which synthesizes legacy → new shape, so the
+    list response will report 1 transcribe + (0 or 1) translations."""
     folder = out / f"{title}_{video_id}"
     folder.mkdir()
     (folder / f"{video_id}_original.srt").write_text("1\n00:00:01,000 --> 00:00:02,000\nHello\n", encoding="utf-8")
@@ -44,7 +47,7 @@ def test_library_get_empty_when_no_videos(fake_output_dir):
     assert resp.json() == {"items": []}
 
 
-def test_library_get_lists_one_video_with_url_endpoints(fake_output_dir):
+def test_library_get_lists_one_video_with_summary_counts(fake_output_dir):
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
     resp = client.get("/api/library")
     assert resp.status_code == 200
@@ -61,10 +64,12 @@ def test_library_get_lists_one_video_with_url_endpoints(fake_output_dir):
     assert "C:\\\\" not in serialized and "C:/" not in serialized
     assert str(fake_output_dir) not in serialized
 
-    # Files exposed as download URLs (relative paths under /api/library/...)
-    assert item["files"]["originalSrt"] == "/api/library/abcDEFghIJK/file/abcDEFghIJK_original.srt"
-    assert item["files"]["translatedSrt"] == "/api/library/abcDEFghIJK/file/abcDEFghIJK_zh-CN.srt"
-    assert item["files"]["audio"] == "/api/library/abcDEFghIJK/file/abcDEFghIJK.wav"
+    # New summary shape: counts replace the 4-slot files object
+    assert "files" not in item
+    assert item["transcribesCount"] == 1
+    assert item["translationsCount"] == 1
+    assert item["audio"] == "/api/library/abcDEFghIJK/file/abcDEFghIJK.wav"
+    assert item["hasVideo"] is False
 
 
 def test_library_download_serves_file(fake_output_dir):

@@ -93,48 +93,26 @@ def _find_folder_for(video_id: str) -> Path | None:
 
 
 def _scan_folder(folder: Path, video_id: str) -> dict[str, Any]:
-    """Build the per-item shape from a video folder."""
-    files = list(folder.iterdir())
-    original_srt = next((f for f in files if f.name == f"{video_id}_original.srt"), None)
-    translated_srt = next(
-        (f for f in files if f.name.startswith(f"{video_id}_") and f.name.endswith(".srt") and not f.name.endswith("_original.srt")),
-        None,
-    )
-    audio = next((f for f in files if f.name.startswith(f"{video_id}.") and f.suffix in {".wav", ".m4a", ".mp3"}), None)
-    video = next((f for f in files if f.name.startswith(f"{video_id}.") and f.suffix in {".mp4", ".webm", ".mkv"}), None)
+    """Build the per-item LibraryItem summary shape (V2 multi-SRT layout).
 
-    def _url(f: Path | None) -> str | None:
-        return f"/api/library/{video_id}/file/{f.name}" if f else None
-
-    # Title is the folder name with the trailing _{video_id} stripped
-    title = folder.name[: -(len(video_id) + 1)] if folder.name.endswith(f"_{video_id}") else folder.name
-
-    # If a _history.json sidecar exists (written by the pipeline), use it to
-    # populate the translated title. Otherwise leave it None.
-    title_translated: str | None = None
-    sidecar = folder / "_history.json"
-    if sidecar.is_file():
-        try:
-            data = json.loads(sidecar.read_text(encoding="utf-8"))
-            tt = data.get("titleTranslated")
-            if isinstance(tt, str) and tt:
-                title_translated = tt
-        except Exception:
-            pass
-
+    Returns counts (transcribesCount/translationsCount) instead of a fixed
+    {originalSrt, translatedSrt, audio, video} 4-slot files object — clients
+    that need the per-run breakdown call GET /api/library/{videoId}.
+    """
+    sidecar = library_runs.read_sidecar(folder)
     return {
-        "videoId": video_id,
-        "url": f"https://www.youtube.com/watch?v={video_id}",
-        "titleOriginal": title,
-        "titleTranslated": title_translated,
-        "thumbnailUrl": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
-        "createdAt": datetime.fromtimestamp(folder.stat().st_mtime).isoformat(),
-        "files": {
-            "originalSrt": _url(original_srt),
-            "translatedSrt": _url(translated_srt),
-            "audio": _url(audio),
-            "video": _url(video),
-        },
+        "videoId": sidecar.get("videoId") or video_id,
+        "url": sidecar.get("url") or f"https://www.youtube.com/watch?v={video_id}",
+        "titleOriginal": sidecar.get("titleOriginal", ""),
+        "titleTranslated": sidecar.get("titleTranslated"),
+        "thumbnailUrl": sidecar.get("thumbnailUrl")
+            or f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+        "createdAt": sidecar.get("createdAt")
+            or datetime.fromtimestamp(folder.stat().st_mtime).isoformat(),
+        "transcribesCount": len(sidecar.get("transcribes") or []),
+        "translationsCount": len(sidecar.get("translations") or []),
+        "audio": _audio_url(video_id, folder),
+        "hasVideo": _has_video_file(video_id, folder),
     }
 
 

@@ -36,6 +36,30 @@ def _make_video_dir(out: Path, video_id: str, title: str = "Test Video", sidecar
     return folder
 
 
+def _new_sidecar(
+    *,
+    video_id: str,
+    title_original: str,
+    title_translated: str | None = None,
+    transcribes: list[dict] | None = None,
+    translations: list[dict] | None = None,
+    created_at: str = "2026-05-01T00:00:00+00:00",
+) -> dict:
+    return {
+        "videoId": video_id,
+        "url": f"https://www.youtube.com/watch?v={video_id}",
+        "titleOriginal": title_original,
+        "titleTranslated": title_translated,
+        "thumbnailUrl": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+        "channel": None,
+        "durationSeconds": None,
+        "createdAt": created_at,
+        "updatedAt": created_at,
+        "transcribes": transcribes or [],
+        "translations": translations or [],
+    }
+
+
 def test_history_get_empty(fake_output_dir):
     resp = client.get("/api/history")
     assert resp.status_code == 200
@@ -43,17 +67,27 @@ def test_history_get_empty(fake_output_dir):
 
 
 def test_history_get_uses_sidecar_when_present(fake_output_dir):
-    sidecar = {
-        "videoId": "abcDEFghIJK",
-        "url": "https://www.youtube.com/watch?v=abcDEFghIJK",
-        "titleOriginal": "My Video",
-        "titleTranslated": "Mi Video",
-        "targetLang": "es",
-        "sttEngineUsed": "openai-whisper",
-        "createdAt": "2026-01-15T12:00:00+00:00",
-        "processingDurationMs": 12345,
-        "thumbnailUrl": "https://img.youtube.com/vi/abcDEFghIJK/hqdefault.jpg",
-    }
+    sidecar = _new_sidecar(
+        video_id="abcDEFghIJK",
+        title_original="My Video",
+        title_translated="Mi Video",
+        created_at="2026-01-15T12:00:00+00:00",
+        transcribes=[{
+            "id": "openai-whisper-tiny-en", "engine": "openai-whisper",
+            "model": "tiny", "device": "cpu", "vadEnabled": True,
+            "language": "en", "filename": "openai-whisper-tiny-en.srt",
+            "createdAt": "2026-01-15T12:00:00+00:00",
+            "durationMs": 10000, "segmentCount": 1,
+        }],
+        translations=[{
+            "id": "openai-whisper-tiny-en__gemini-flash__es",
+            "sourceTranscribeId": "openai-whisper-tiny-en",
+            "translator": "gemini", "translatorModel": "flash",
+            "targetLang": "es", "filename": "x.srt",
+            "createdAt": "2026-01-15T12:00:30+00:00",
+            "durationMs": 2345, "segmentCount": 1,
+        }],
+    )
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", sidecar=sidecar)
 
     resp = client.get("/api/history")
@@ -66,14 +100,63 @@ def test_history_get_uses_sidecar_when_present(fake_output_dir):
     assert item["titleOriginal"] == "My Video"
     assert item["titleTranslated"] == "Mi Video"
     assert item["targetLang"] == "es"
+    # sttEngineUsed = latest transcribe's engine
     assert item["sttEngineUsed"] == "openai-whisper"
     assert item["createdAt"] == "2026-01-15T12:00:00+00:00"
-    assert item["processingDurationMs"] == 12345
+    # processingDurationMs = SUM of all run durations (transcribes + translations)
+    assert item["processingDurationMs"] == 10000 + 2345
     assert item["thumbnailUrl"] == "https://img.youtube.com/vi/abcDEFghIJK/hqdefault.jpg"
+    assert item["transcribesCount"] == 1
+    assert item["translationsCount"] == 1
     # Path fields are intentionally null in V1; library page handles file URLs.
     assert item["subtitlePath"] is None
     assert item["audioPath"] is None
     assert item["videoPath"] is None
+
+
+def test_history_aggregates_multiple_runs(fake_output_dir):
+    """3 transcripts + 2 translations → counts surfaced, latest engine reported."""
+    sidecar = _new_sidecar(
+        video_id="abcDEFghIJK", title_original="My Video",
+        transcribes=[
+            {"id": "yt_captions-en", "engine": "yt_captions", "model": None,
+             "device": None, "vadEnabled": None, "language": "en",
+             "filename": "yt_captions-en.srt", "createdAt": "2026-05-01T00:00:00+00:00",
+             "durationMs": 100, "segmentCount": 1},
+            {"id": "openai-whisper-tiny-en", "engine": "openai-whisper",
+             "model": "tiny", "device": "cpu", "vadEnabled": True, "language": "en",
+             "filename": "openai-whisper-tiny-en.srt",
+             "createdAt": "2026-05-01T00:01:00+00:00",
+             "durationMs": 1000, "segmentCount": 1},
+            {"id": "openai-whisper-turbo-en", "engine": "openai-whisper",
+             "model": "turbo", "device": "auto", "vadEnabled": True, "language": "en",
+             "filename": "openai-whisper-turbo-en.srt",
+             "createdAt": "2026-05-01T00:02:00+00:00",
+             "durationMs": 2000, "segmentCount": 1},
+        ],
+        translations=[
+            {"id": "x", "sourceTranscribeId": "openai-whisper-tiny-en",
+             "translator": "gemini", "translatorModel": "flash",
+             "targetLang": "zh", "filename": "x.srt",
+             "createdAt": "2026-05-01T00:03:00+00:00",
+             "durationMs": 100, "segmentCount": 1},
+            {"id": "y", "sourceTranscribeId": "openai-whisper-turbo-en",
+             "translator": "openai", "translatorModel": "gpt-4o",
+             "targetLang": "ja", "filename": "y.srt",
+             "createdAt": "2026-05-01T00:04:00+00:00",
+             "durationMs": 200, "segmentCount": 1},
+        ],
+    )
+    _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", sidecar=sidecar)
+
+    item = client.get("/api/history").json()["items"][0]
+    assert item["transcribesCount"] == 3
+    assert item["translationsCount"] == 2
+    # Latest transcribe is openai-whisper (turbo)
+    assert item["sttEngineUsed"] == "openai-whisper"
+    # Latest translation's targetLang
+    assert item["targetLang"] == "ja"
+    assert item["processingDurationMs"] == 100 + 1000 + 2000 + 100 + 200
 
 
 def test_history_get_synthesizes_when_no_sidecar(fake_output_dir):
@@ -87,28 +170,28 @@ def test_history_get_synthesizes_when_no_sidecar(fake_output_dir):
     assert item["videoId"] == "abcDEFghIJK"
     assert item["titleOriginal"] == "My_Video"
     assert item["titleTranslated"] is None
+    # Legacy folder synthesis returns 1 transcribe with engine "unknown"
+    # (no sidecar to remember the original engine), so count is 1 here.
+    assert item["transcribesCount"] == 1
     assert item["sttEngineUsed"] == "unknown"
-    assert item["processingDurationMs"] == 0
     assert item["thumbnailUrl"] == "https://img.youtube.com/vi/abcDEFghIJK/hqdefault.jpg"
     assert "createdAt" in item
 
 
 def test_history_sorted_newest_first(fake_output_dir):
     _make_video_dir(
-        fake_output_dir, "aaaaaaaaaaa", title="Old", sidecar={
-            "videoId": "aaaaaaaaaaa", "url": "u", "titleOriginal": "Old",
-            "titleTranslated": None, "targetLang": None, "sttEngineUsed": "x",
-            "createdAt": "2020-01-01T00:00:00+00:00", "processingDurationMs": 1,
-            "thumbnailUrl": "t",
-        },
+        fake_output_dir, "aaaaaaaaaaa", title="Old",
+        sidecar=_new_sidecar(
+            video_id="aaaaaaaaaaa", title_original="Old",
+            created_at="2020-01-01T00:00:00+00:00",
+        ),
     )
     _make_video_dir(
-        fake_output_dir, "bbbbbbbbbbb", title="New", sidecar={
-            "videoId": "bbbbbbbbbbb", "url": "u", "titleOriginal": "New",
-            "titleTranslated": None, "targetLang": None, "sttEngineUsed": "x",
-            "createdAt": "2026-01-01T00:00:00+00:00", "processingDurationMs": 1,
-            "thumbnailUrl": "t",
-        },
+        fake_output_dir, "bbbbbbbbbbb", title="New",
+        sidecar=_new_sidecar(
+            video_id="bbbbbbbbbbb", title_original="New",
+            created_at="2026-01-01T00:00:00+00:00",
+        ),
     )
     items = client.get("/api/history").json()["items"]
     assert [i["videoId"] for i in items] == ["bbbbbbbbbbb", "aaaaaaaaaaa"]
