@@ -26,7 +26,7 @@ import {
   CaptionUpper,
   Code,
 } from "@yt-subtitle-maker/ui";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
 import type { LibraryItem } from "@yt-subtitle-maker/api-client";
 
@@ -144,9 +144,13 @@ export default function Library() {
     }
   }, []);
 
-  React.useEffect(() => {
-    refresh();
-  }, [refresh]);
+  // Re-fetch every time this route is focused so a freshly-finished job
+  // appears without a manual page refresh.
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
 
   const filtered = items.filter((item) => {
     const kinds = fileKinds(item);

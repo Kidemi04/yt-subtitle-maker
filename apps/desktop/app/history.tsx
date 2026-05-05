@@ -3,6 +3,7 @@ import { Stack, XStack, YStack } from "tamagui";
 import {
   PlayCircle,
   RotateCcw,
+  RefreshCcw,
   MoreHorizontal,
   History as HistoryIconLucide,
 } from "@tamagui/lucide-icons";
@@ -21,7 +22,7 @@ import {
   Caption,
   Timestamp,
 } from "@yt-subtitle-maker/ui";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
 import type { HistoryItem } from "@yt-subtitle-maker/api-client";
 
@@ -80,24 +81,27 @@ export default function History() {
   const [time, setTime] = React.useState<TimeFilter>("all");
   const [sort, setSort] = React.useState<SortOrder>("recent");
 
-  React.useEffect(() => {
-    let cancelled = false;
+  const refresh = React.useCallback(async () => {
     setLoading(true);
-    apiClient
-      .fetchHistory()
-      .then((res) => {
-        if (!cancelled) setItems(res.items);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setError(undefined);
+    try {
+      const res = await apiClient.fetchHistory();
+      setItems(res.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Re-fetch every time this route is focused — finishing a job in
+  // Generate then tabbing back to History should show the new item
+  // immediately, not wait for a full app reload.
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
 
   const filtered = items
     .filter((it) => withinTime(it, time))
@@ -115,13 +119,21 @@ export default function History() {
 
   return (
     <YStack gap="$lg">
-      <YStack gap="$xs">
-        <DisplayMd>Past sessions</DisplayMd>
-        <BodySm color="$textSecondary">
-          {items.length} session{items.length === 1 ? "" : "s"} · click to
-          reload settings into Generate.
-        </BodySm>
-      </YStack>
+      <XStack alignItems="center" justifyContent="space-between" gap="$md">
+        <YStack gap="$xs" flex={1}>
+          <DisplayMd>Past sessions</DisplayMd>
+          <BodySm color="$textSecondary">
+            {loading
+              ? "Refreshing…"
+              : `${items.length} session${items.length === 1 ? "" : "s"} · click to reload settings into Generate.`}
+          </BodySm>
+        </YStack>
+        <IconButton
+          icon={<RefreshCcw size={16} color="$textSecondary" />}
+          aria-label="Refresh history"
+          onPress={refresh}
+        />
+      </XStack>
 
       <GlassCard variant="low">
         <XStack gap="$sm" alignItems="center" flexWrap="wrap">
