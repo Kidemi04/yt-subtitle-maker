@@ -64,6 +64,16 @@ class LibraryTranscribeRequest(BaseModel):
     sourceLang: str
 
 
+class LibraryTranslateRequest(BaseModel):
+    """Body for POST /api/library/{videoId}/translate."""
+    sourceTranscribeId: str
+    targetLang: str
+    translatorProvider: Literal["gemini", "local_openai", "openai"] | None = None
+    translatorModel: str | None = None
+    translatorBaseUrl: str | None = None
+    translatorApiKey: str | None = None
+
+
 def _output_dir() -> Path:
     cfg = load_config()
     out = cfg.output_dir or "output"
@@ -571,6 +581,193 @@ def transcribe_existing(video_id: str, req: LibraryTranscribeRequest):
                 "previewSegments": [
                     {"id": s.id, "start": s.start, "end": s.end, "text": s.text}
                     for s in result.segments[:5]
+                ],
+            })
+        except PipelineCancelled:
+            q.put({"status": "error", "error": "cancelled", "recoverable": True})
+        except Exception as e:  # noqa: BLE001
+            q.put({"status": "error", "error": str(e), "recoverable": False})
+        finally:
+            jobs.release_slot(cancel_event)
+            q.put(SENTINEL)
+
+    threading.Thread(target=runner, daemon=True).start()
+
+    def gen():
+        while True:
+            evt = q.get()
+            if evt is SENTINEL:
+                break
+            yield json.dumps(evt) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+# ---------------------------------------------------------------------------
+# Re-translate — re-run translator on an existing transcript
+# ---------------------------------------------------------------------------
+
+def _build_translator(provider: str, req: LibraryTranslateRequest, cfg):
+    """Build a TranslationProvider from request + config defaults.
+
+    Mirrors the resolution logic in core.pipeline._make_translator: request
+    fields override, otherwise fall back to the saved AppConfig values.
+    """
+    from core.translator import get_translator
+
+    if provider == "gemini":
+        return get_translator(
+            "gemini",
+            api_key=req.translatorApiKey or cfg.gemini_api_key,
+            model=req.translatorModel or cfg.gemini_model,
+        )
+    if provider == "local_openai":
+        return get_translator(
+            "local_openai",
+            base_url=req.translatorBaseUrl or cfg.local_openai_base_url,
+            model=req.translatorModel or cfg.local_openai_model,
+            api_key=req.translatorApiKey or cfg.local_openai_api_key or "lm-studio",
+        )
+    if provider == "openai":
+        return get_translator(
+            "openai",
+            base_url=req.translatorBaseUrl or cfg.openai_base_url,
+            model=req.translatorModel or cfg.openai_model,
+            api_key=req.translatorApiKey or cfg.openai_api_key,
+        )
+    raise ValueError(f"unknown translator provider: {provider!r}")
+
+
+def _resolve_translator_model(provider: str, req: LibraryTranslateRequest, cfg) -> str:
+    if provider == "gemini":
+        return req.translatorModel or cfg.gemini_model
+    if provider == "local_openai":
+        return req.translatorModel or cfg.local_openai_model
+    if provider == "openai":
+        return req.translatorModel or cfg.openai_model
+    return req.translatorModel or "unknown"
+
+
+def _find_transcript_path(folder: Path, source_id: str) -> Path | None:
+    """Locate the SRT for a transcribe id. Tries new layout first, then root
+    (for legacy entries that haven't been lazy-migrated yet).
+    """
+    p = folder / "transcripts" / f"{source_id}.srt"
+    if p.is_file():
+        return p
+    if source_id == "legacy":
+        legacy = list(folder.glob("*_original.srt"))
+        if legacy:
+            return legacy[0]
+    return None
+
+
+@router.post("/{video_id}/translate")
+def translate_existing(video_id: str, req: LibraryTranslateRequest):
+    """Re-translate an existing transcript into another target language.
+
+    Reads `transcripts/<sourceTranscribeId>.srt`, runs translator, writes
+    `translations/<id>.srt`, appends sidecar.
+    """
+    folder = _find_folder_for(video_id)
+    if folder is None:
+        raise HTTPException(status_code=404, detail=f"video not found: {video_id}")
+
+    cfg = load_config()
+    library_runs.migrate_legacy_folder(folder)
+
+    transcript_path = _find_transcript_path(folder, req.sourceTranscribeId)
+    if transcript_path is None:
+        return {
+            "ok": False,
+            "error": f"transcript not found: {req.sourceTranscribeId}",
+        }
+
+    provider_name = req.translatorProvider or cfg.translator_provider
+    translator_model = _resolve_translator_model(provider_name, req, cfg)
+
+    cancel_event = jobs.claim_slot()
+    q: queue.Queue = queue.Queue()
+    SENTINEL = object()
+
+    def runner() -> None:
+        try:
+            from core.subtitles import read_srt, write_srt
+
+            translator = _build_translator(provider_name, req, cfg)
+            segments = read_srt(str(transcript_path))
+            if not segments:
+                raise ValueError("source transcript has no segments")
+
+            if cancel_event.is_set():
+                raise PipelineCancelled("cancelled")
+
+            start = time.monotonic()
+            q.put({"status": "translating", "progress": None})
+
+            def tx_progress(p: float) -> None:
+                if cancel_event.is_set():
+                    raise PipelineCancelled("cancelled")
+                q.put({"status": "translating", "progress": p})
+
+            translator.translate_segments(segments, req.targetLang, progress=tx_progress)
+            if cancel_event.is_set():
+                raise PipelineCancelled("cancelled")
+            duration_ms = int((time.monotonic() - start) * 1000)
+
+            tr_id = library_runs.translate_id(
+                req.sourceTranscribeId, provider_name, translator_model, req.targetLang
+            )
+            translations_dir = folder / "translations"
+            translations_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{tr_id}.srt"
+            srt_path = translations_dir / filename
+            write_srt(
+                [
+                    {
+                        "id": s.id,
+                        "start": s.start,
+                        "end": s.end,
+                        "translated": s.translated or "",
+                    }
+                    for s in segments
+                ],
+                str(srt_path),
+                field="translated",
+            )
+            library_runs.append_translation(
+                folder,
+                {
+                    "id": tr_id,
+                    "sourceTranscribeId": req.sourceTranscribeId,
+                    "translator": provider_name,
+                    "translatorModel": translator_model,
+                    "targetLang": req.targetLang,
+                    "filename": filename,
+                    "createdAt": library_runs._now_iso(),
+                    "durationMs": duration_ms,
+                    "segmentCount": len(segments),
+                },
+            )
+
+            q.put({
+                "status": "done",
+                "videoId": video_id,
+                "translateId": tr_id,
+                "sourceTranscribeId": req.sourceTranscribeId,
+                "filename": filename,
+                "url": f"/api/library/{video_id}/file/translations/{filename}",
+                "durationMs": duration_ms,
+                "segmentCount": len(segments),
+                "previewSegments": [
+                    {
+                        "id": s.id,
+                        "start": s.start,
+                        "end": s.end,
+                        "text": s.text,
+                        "translated": s.translated,
+                    }
+                    for s in segments[:5]
                 ],
             })
         except PipelineCancelled:
