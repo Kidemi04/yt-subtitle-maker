@@ -240,6 +240,7 @@ export interface AppConfig {
   defaultSourceLang: string;
   defaultTargetLang: string;
   ytCaptionsFirst: boolean;
+  vadEnabled: boolean;
   enableTranslation: boolean;
   autoTranslateTitle: boolean;
   translatorProvider: TranslatorProvider;

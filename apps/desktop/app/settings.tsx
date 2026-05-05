@@ -548,6 +548,18 @@ export default function Settings() {
               aria-label="YT captions first"
             />
           </XStack>
+
+          <XStack alignItems="center" justifyContent="space-between">
+            <Field
+              label="Voice-Activity Detection (VAD) by default"
+              helper="Skips silent regions before Whisper — faster on long videos. Per-job override stays on the Generate screen."
+            />
+            <Toggle
+              value={draft.vadEnabled}
+              onValueChange={(v) => update("vadEnabled", v)}
+              aria-label="VAD default"
+            />
+          </XStack>
         </YStack>
       </GlassCard>
 
@@ -580,6 +592,30 @@ export default function Settings() {
                 width="100%"
               />
             </YStack>
+          </XStack>
+
+          <XStack alignItems="center" justifyContent="space-between">
+            <Field
+              label="Enable translation by default"
+              helper="Pre-checks the Translation toggle on the Generate screen for new jobs."
+            />
+            <Toggle
+              value={draft.enableTranslation}
+              onValueChange={(v) => update("enableTranslation", v)}
+              aria-label="Enable translation default"
+            />
+          </XStack>
+
+          <XStack alignItems="center" justifyContent="space-between">
+            <Field
+              label="Auto-translate the video title"
+              helper="Also translates the YouTube title into the target language and stores it in the sidecar (titleTranslated)."
+            />
+            <Toggle
+              value={draft.autoTranslateTitle}
+              onValueChange={(v) => update("autoTranslateTitle", v)}
+              aria-label="Auto-translate title"
+            />
           </XStack>
 
           {/* Provider-specific */}
