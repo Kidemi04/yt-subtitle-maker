@@ -257,6 +257,23 @@ export interface AppConfig {
   logsVerbosity: "error" | "warning" | "info" | "debug";
   /** JS runtime override for yt-dlp. Empty = auto-detect node/deno on PATH. */
   jsRuntimePath: string;
+
+  // mpv subtitle style — empty / 0 / -1 means "use mpv's built-in default".
+  /** Font family name; empty = mpv default sans. */
+  subFont: string;
+  /** Font size in pixels; 0 = mpv default (~55). */
+  subFontSize: number;
+  /** Text fill color, "#RRGGBB"; empty = white default. */
+  subColor: string;
+  /** Outline color, "#RRGGBB"; empty = black default. */
+  subBorderColor: string;
+  /** Outline width in pixels; -1 = mpv default (3); 0 = no outline. */
+  subBorderSize: number;
+  /** Box behind text, "#RRGGBBAA" with alpha; empty = transparent. */
+  subBackColor: string;
+  subBold: boolean;
+  /** Distance from bottom edge in pixels; 0 = mpv default. */
+  subMarginY: number;
 }
 
 export interface BackendCapabilities {

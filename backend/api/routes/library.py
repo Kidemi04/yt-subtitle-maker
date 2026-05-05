@@ -373,6 +373,33 @@ def _pick_local_media(folder: Path) -> Path | None:
     )
 
 
+def _subtitle_style_flags(cfg) -> list[str]:
+    """Translate the user's subtitle-style config into mpv CLI flags.
+
+    Each flag is only emitted when the corresponding config field is set to
+    a non-default value, so a fresh install keeps mpv's built-in look.
+    See AppConfig.sub_* + mpv's --sub-* documentation.
+    """
+    flags: list[str] = []
+    if cfg.sub_font:
+        flags.append(f"--sub-font={cfg.sub_font}")
+    if cfg.sub_font_size and cfg.sub_font_size > 0:
+        flags.append(f"--sub-font-size={cfg.sub_font_size}")
+    if cfg.sub_color:
+        flags.append(f"--sub-color={cfg.sub_color}")
+    if cfg.sub_border_color:
+        flags.append(f"--sub-border-color={cfg.sub_border_color}")
+    if cfg.sub_border_size is not None and cfg.sub_border_size >= 0:
+        flags.append(f"--sub-border-size={cfg.sub_border_size}")
+    if cfg.sub_back_color:
+        flags.append(f"--sub-back-color={cfg.sub_back_color}")
+    if cfg.sub_bold:
+        flags.append("--sub-bold=yes")
+    if cfg.sub_margin_y and cfg.sub_margin_y > 0:
+        flags.append(f"--sub-margin-y={cfg.sub_margin_y}")
+    return flags
+
+
 def _resolve_ytdlp_for_mpv() -> str | None:
     """Find a yt-dlp executable mpv can shell out to.
 
@@ -484,6 +511,10 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
         cmd.append(f"--sub-files-append={sub.name}")
         cmd.append(f"--sub-file-paths={sub.parent}")
         cmd.append("--sub-auto=exact")  # actually load the sub we attached
+
+        # Subtitle style overrides — only emit the flags the user has set,
+        # so an unmodified config keeps mpv's built-in defaults.
+        cmd.extend(_subtitle_style_flags(cfg))
 
     # When we're streaming from YouTube, wire mpv to the same yt-dlp + JS
     # runtime our backend uses. Without this, mpv finds no `yt-dlp.exe` on

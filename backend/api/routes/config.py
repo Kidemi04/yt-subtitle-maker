@@ -42,6 +42,14 @@ _CAMEL_TO_SNAKE = {
     "whisperCacheDir": "whisper_cache_dir",
     "logsVerbosity": "logs_verbosity",
     "jsRuntimePath": "js_runtime_path",
+    "subFont": "sub_font",
+    "subFontSize": "sub_font_size",
+    "subColor": "sub_color",
+    "subBorderColor": "sub_border_color",
+    "subBorderSize": "sub_border_size",
+    "subBackColor": "sub_back_color",
+    "subBold": "sub_bold",
+    "subMarginY": "sub_margin_y",
 }
 _SNAKE_TO_CAMEL = {v: k for k, v in _CAMEL_TO_SNAKE.items()}
 

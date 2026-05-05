@@ -71,6 +71,19 @@ class AppConfig:
     # "name:path" spec.
     js_runtime_path: str = ""
 
+    # mpv subtitle style — only applied when non-default. Empty string / 0
+    # means "let mpv use its built-in default for that flag", so changing
+    # nothing here keeps behaviour identical to a fresh mpv install.
+    # Reference: mpv --sub-* options.
+    sub_font: str = ""           # e.g. "Noto Sans CJK SC", "Inter", "Arial"
+    sub_font_size: int = 0       # 0 = mpv default (55)
+    sub_color: str = ""          # "#RRGGBB" — text fill
+    sub_border_color: str = ""   # "#RRGGBB" — outline
+    sub_border_size: float = -1  # <0 = mpv default (3); 0 = no outline
+    sub_back_color: str = ""     # "#RRGGBBAA" — opaque box behind text; "" = none
+    sub_bold: bool = False
+    sub_margin_y: int = 0        # 0 = mpv default; bottom margin in pixels
+
 
 def load_config() -> AppConfig:
     p = config_path()
