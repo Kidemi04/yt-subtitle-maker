@@ -49,7 +49,21 @@ export function TextInput({ style, ...rest }: TextInputProps) {
         outlineStyle: "solid",
         outlineOffset: 0,
       }}
-      style={style}
+      // Tamagui Input under `unstyled` does NOT propagate the `color` prop
+      // to the underlying web <input> reliably — RN-Web renders a real
+      // <input> whose `color` falls back to the browser default (black on
+      // dark surfaces, invisible). Forcing it via inline style hits the
+      // <input> element's `style.color` directly and survives `unstyled`.
+      // caretColor is web-only — RN style types don't list it but RN-Web
+      // forwards the property to the DOM. Cast through unknown to bypass
+      // the type without losing the rest of the inline style.
+      style={
+        {
+          color: "#f5f5f7",
+          caretColor: "#fb923c",
+          ...((style as object) ?? {}),
+        } as unknown as TextInputProps["style"]
+      }
       {...rest}
     />
   );
