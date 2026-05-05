@@ -44,6 +44,11 @@ class PlayMpvRequest(BaseModel):
     # and falls back to the original if no translation exists. "original"
     # forces the source-language transcript. "none" disables subtitle overlay.
     subtitlePreference: Literal["translated", "original", "none"] | None = None
+    # Multi-SRT runs: pass an exact run id to overlay that specific SRT.
+    # `transcribeId` and `translateId` are mutually exclusive; if either is
+    # set it takes precedence over `subtitlePreference`.
+    transcribeId: str | None = None
+    translateId: str | None = None
 
 
 class DeleteSrtRequest(BaseModel):
@@ -277,6 +282,38 @@ _VIDEO_EXTS = (".mp4", ".webm", ".mkv")
 _AUDIO_EXTS = (".wav", ".m4a", ".mp3")
 
 
+def _pick_subtitle_by_run_id(
+    folder: Path, *, transcribe_id: str | None, translate_id: str | None
+) -> Path | None:
+    """Resolve an exact SRT path for a given run id by consulting the sidecar.
+
+    For a run that hasn't been migrated yet, the filename in the sidecar may
+    point at the folder root (legacy) — we honor either location.
+    """
+    sidecar = library_runs.read_sidecar(folder)
+    if transcribe_id is not None:
+        for t in sidecar.get("transcribes", []):
+            if t.get("id") == transcribe_id:
+                p = folder / "transcripts" / t["filename"]
+                if p.is_file():
+                    return p
+                p = folder / t["filename"]
+                if p.is_file():
+                    return p
+        return None
+    if translate_id is not None:
+        for tr in sidecar.get("translations", []):
+            if tr.get("id") == translate_id:
+                p = folder / "translations" / tr["filename"]
+                if p.is_file():
+                    return p
+                p = folder / tr["filename"]
+                if p.is_file():
+                    return p
+        return None
+    return None
+
+
 def _pick_subtitle(
     folder: Path, preference: str | None = "translated"
 ) -> Path | None:
@@ -285,20 +322,39 @@ def _pick_subtitle(
     "translated" → translated SRT first, original as fallback (default).
     "original"   → original (source-language) SRT only, no fallback.
     "none"       → return None (caller skips the --sub-files-append flag).
+
+    Reads sidecar first (new layout). Falls back to scanning legacy *.srt
+    files at the folder root for unmigrated folders.
     """
     if preference == "none":
         return None
-    srts = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() == ".srt"]
-    translated = next(
-        (f for f in srts if not f.name.endswith("_original.srt")), None,
-    )
-    original = next(
-        (f for f in srts if f.name.endswith("_original.srt")), None,
-    )
+
+    sidecar = library_runs.read_sidecar(folder)
+
+    def _resolve(filename: str, subdir: str) -> Path | None:
+        p = folder / subdir / filename
+        if p.is_file():
+            return p
+        p = folder / filename
+        return p if p.is_file() else None
+
+    translations = sidecar.get("translations", [])
+    transcribes = sidecar.get("transcribes", [])
+
+    translated_path: Path | None = None
+    if translations:
+        # Latest translation (last appended).
+        latest = translations[-1]
+        translated_path = _resolve(latest["filename"], "translations")
+
+    original_path: Path | None = None
+    if transcribes:
+        latest = transcribes[-1]
+        original_path = _resolve(latest["filename"], "transcripts")
+
     if preference == "original":
-        return original
-    # Default: translated preferred, original as fallback.
-    return translated or original
+        return original_path
+    return translated_path or original_path
 
 
 def _pick_local_media(folder: Path) -> Path | None:
@@ -376,7 +432,28 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
             "error": "mpv not found. Install mpv or set its path in Settings → Advanced.",
         }
 
-    sub = _pick_subtitle(folder, req.subtitlePreference)
+    if req.transcribeId is not None and req.translateId is not None:
+        return {
+            "ok": False,
+            "error": "transcribeId and translateId are mutually exclusive",
+        }
+
+    if req.transcribeId or req.translateId:
+        sub = _pick_subtitle_by_run_id(
+            folder,
+            transcribe_id=req.transcribeId,
+            translate_id=req.translateId,
+        )
+        if sub is None:
+            return {
+                "ok": False,
+                "error": (
+                    f"run not found: "
+                    f"{'transcribe ' + req.transcribeId if req.transcribeId else 'translate ' + req.translateId}"
+                ),
+            }
+    else:
+        sub = _pick_subtitle(folder, req.subtitlePreference)
 
     # Prefer streaming the actual YouTube video (gives the user real picture).
     # Fall back to a local media file if one exists (works offline).
@@ -398,9 +475,10 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
         # Two-arg form (`--option value`) instead of `--option=value` so paths
         # with `=`, spaces, or non-ASCII chars in the folder name don't trip
         # mpv's option parser. Pass the basename + sub-file-paths so mpv
-        # resolves it in the video's folder regardless of cwd quirks.
+        # resolves it inside the SRT's parent dir (which may be transcripts/
+        # or translations/ under the new multi-SRT layout).
         cmd.extend(["--sub-files-append", sub.name])
-        cmd.extend(["--sub-file-paths", str(folder)])
+        cmd.extend(["--sub-file-paths", str(sub.parent)])
         cmd.append("--sub-auto=exact")  # actually load the sub we attached
 
     # When we're streaming from YouTube, wire mpv to the same yt-dlp + JS
