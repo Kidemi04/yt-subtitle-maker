@@ -82,6 +82,36 @@ export type ProcessEvent =
       audioPath?: string;
       durationMs: number;
       sttSourceUsed: "yt_captions" | "whisper";
+      transcribeId?: string;
+      translateId?: string | null;
+      previewSegments: TranscriptionSegment[];
+    }
+  | { status: "error"; error: string; recoverable: boolean };
+
+/**
+ * Streaming events for the per-video re-transcribe / re-translate endpoints
+ * (POST /api/library/{id}/transcribe, /api/library/{id}/translate).
+ *
+ * Shape is a subset of ProcessEvent: starting/downloading aren't emitted
+ * (audio is reused), and `done` carries the new run id + relative URL.
+ */
+export type LibraryRunEvent =
+  | {
+      status: "transcribing";
+      progress?: number;
+      engine: string;
+    }
+  | { status: "translating"; progress?: number }
+  | {
+      status: "done";
+      videoId: string;
+      transcribeId?: string;
+      translateId?: string;
+      sourceTranscribeId?: string;
+      filename: string;
+      url: string;
+      durationMs: number;
+      segmentCount: number;
       previewSegments: TranscriptionSegment[];
     }
   | { status: "error"; error: string; recoverable: boolean };
@@ -90,22 +120,26 @@ export interface HistoryItem {
   videoId: string;
   url: string;
   titleOriginal: string;
-  titleTranslated?: string;
-  targetLang?: string;
+  titleTranslated?: string | null;
+  targetLang?: string | null;
   sttEngineUsed: string;
-  subtitlePath?: string;
-  audioPath?: string;
-  videoPath?: string;
+  subtitlePath?: string | null;
+  audioPath?: string | null;
+  videoPath?: string | null;
   thumbnailUrl?: string;
   createdAt: string;
   processingDurationMs: number;
+  /** Number of transcribe runs in this video's folder (V2 multi-SRT). */
+  transcribesCount: number;
+  /** Number of translation runs in this video's folder (V2 multi-SRT). */
+  translationsCount: number;
 }
 
 /**
- * LibraryItem — backend ships `files` as a 4-slot object, NOT an array.
- * Each slot is either a download URL (string) or null when absent.
- *
- * Shape mirrors backend/api/routes/library.py::_scan_folder.
+ * LibraryItem — V2 summary shape. The list endpoint returns counts
+ * (transcribesCount, translationsCount) rather than a fixed 4-slot files
+ * object; consumers that need the per-run breakdown call
+ * GET /api/library/{videoId} for a `VideoDetail`.
  */
 export interface LibraryItem {
   videoId: string;
@@ -114,17 +148,84 @@ export interface LibraryItem {
   titleTranslated?: string | null;
   thumbnailUrl?: string;
   createdAt: string;
-  files: LibraryFiles;
-}
-
-export interface LibraryFiles {
-  originalSrt: string | null;
-  translatedSrt: string | null;
+  transcribesCount: number;
+  translationsCount: number;
   audio: string | null;
-  video: string | null;
+  hasVideo: boolean;
 }
 
-export type LibraryFileKind = keyof LibraryFiles;
+/** A single STT run recorded in a video's _history.json sidecar. */
+export interface TranscribeRun {
+  id: string;
+  /** SttEngine | "yt_captions". */
+  engine: string;
+  /** Whisper model name; null for yt_captions. */
+  model: string | null;
+  device: WhisperDevice | null;
+  vadEnabled: boolean | null;
+  language: string;
+  filename: string;
+  createdAt: string;
+  durationMs: number;
+  segmentCount: number;
+  /** Download URL for the SRT file (null only if the file is missing). */
+  url: string | null;
+}
+
+/** A single translator run, derived from a specific source transcript. */
+export interface TranslateRun {
+  id: string;
+  sourceTranscribeId: string;
+  translator: TranslatorProvider | string;
+  translatorModel: string;
+  targetLang: string;
+  filename: string;
+  createdAt: string;
+  durationMs: number;
+  segmentCount: number;
+  url: string | null;
+}
+
+/**
+ * VideoDetail — full per-video record returned by GET /api/library/{videoId}.
+ * Lists every transcribe + translation run (with download URLs) plus the
+ * top-level metadata stored in the sidecar.
+ */
+export interface VideoDetail {
+  videoId: string;
+  url: string;
+  titleOriginal: string;
+  titleTranslated: string | null;
+  thumbnailUrl: string | null;
+  channel: string | null;
+  durationSeconds: number | null;
+  createdAt: string;
+  updatedAt: string;
+  audio: string | null;
+  hasVideo: boolean;
+  transcribes: TranscribeRun[];
+  translations: TranslateRun[];
+}
+
+/** Body for POST /api/library/{videoId}/transcribe. */
+export interface LibraryTranscribeRequest {
+  /** "openai-whisper" | "yt_captions" (frontend resolves "auto" upstream). */
+  sttEngine: string;
+  whisperModel?: string | null;
+  whisperDevice?: WhisperDevice | null;
+  vadEnabled?: boolean;
+  sourceLang: string;
+}
+
+/** Body for POST /api/library/{videoId}/translate. */
+export interface LibraryTranslateRequest {
+  sourceTranscribeId: string;
+  targetLang: string;
+  translatorProvider?: TranslatorProvider;
+  translatorModel?: string;
+  translatorBaseUrl?: string;
+  translatorApiKey?: string;
+}
 
 export interface AppConfig {
   backendUrl: string;

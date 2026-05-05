@@ -54,46 +54,20 @@ interface PresentFile {
   url: string;
 }
 
+/**
+ * V2 transitional helper: the list endpoint no longer returns per-file URLs
+ * (those move to GET /api/library/{id} → VideoDetail). For the existing
+ * LibraryDetail modal we surface only what the summary shape carries today
+ * — audio + an SRT count line. Phase 9 swaps this out for VideoDetailModal.
+ */
 function presentFiles(item: LibraryItem): PresentFile[] {
   const out: PresentFile[] = [];
-  const f = item.files ?? {
-    originalSrt: null,
-    translatedSrt: null,
-    audio: null,
-    video: null,
-  };
-  const tail = (u: string | null) =>
-    (u?.split("/").pop() ?? u ?? "").trim();
-  if (f.video) {
-    out.push({
-      kind: "video",
-      label: "video",
-      filename: tail(f.video),
-      url: absolutize(f.video) ?? f.video,
-    });
-  }
-  if (f.audio) {
+  if (item.audio) {
     out.push({
       kind: "audio",
       label: "audio",
-      filename: tail(f.audio),
-      url: absolutize(f.audio) ?? f.audio,
-    });
-  }
-  if (f.originalSrt) {
-    out.push({
-      kind: "srt",
-      label: "original SRT",
-      filename: tail(f.originalSrt),
-      url: absolutize(f.originalSrt) ?? f.originalSrt,
-    });
-  }
-  if (f.translatedSrt) {
-    out.push({
-      kind: "srt",
-      label: "translated SRT",
-      filename: tail(f.translatedSrt),
-      url: absolutize(f.translatedSrt) ?? f.translatedSrt,
+      filename: (item.audio.split("/").pop() ?? "").trim(),
+      url: absolutize(item.audio) ?? item.audio,
     });
   }
   return out;
@@ -101,9 +75,10 @@ function presentFiles(item: LibraryItem): PresentFile[] {
 
 function fileKinds(item: LibraryItem): Set<"video" | "audio" | "srt"> {
   const out = new Set<"video" | "audio" | "srt">();
-  if (item.files?.video) out.add("video");
-  if (item.files?.audio) out.add("audio");
-  if (item.files?.originalSrt || item.files?.translatedSrt) out.add("srt");
+  if (item.hasVideo) out.add("video");
+  if (item.audio) out.add("audio");
+  if ((item.transcribesCount ?? 0) + (item.translationsCount ?? 0) > 0)
+    out.add("srt");
   return out;
 }
 

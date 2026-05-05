@@ -5,9 +5,13 @@ import type {
   HistoryItem,
   InstallEvent,
   LibraryItem,
+  LibraryRunEvent,
+  LibraryTranscribeRequest,
+  LibraryTranslateRequest,
   ProcessEvent,
   ProcessRequest,
   TranslatorProvider,
+  VideoDetail,
   VideoMetadata,
   WhisperModel,
 } from "./types";
@@ -148,6 +152,14 @@ export class ApiClient {
     return res.json();
   }
 
+  async fetchVideoDetail(videoId: string): Promise<VideoDetail> {
+    const res = await fetch(`${this.baseUrl}/api/library/${videoId}`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) throw new Error(`/api/library/${videoId} ${res.status}`);
+    return res.json();
+  }
+
   async deleteLibraryItem(videoId: string): Promise<void> {
     const res = await fetch(`${this.baseUrl}/api/library/delete`, {
       method: "POST",
@@ -155,6 +167,25 @@ export class ApiClient {
       body: JSON.stringify({ videoId }),
     });
     if (!res.ok) throw new Error(`/api/library/delete ${res.status}`);
+  }
+
+  /** Delete a single transcript or translation run from a video's folder. */
+  async deleteSrt(
+    videoId: string,
+    kind: "transcribe" | "translate",
+    id: string,
+  ): Promise<{ ok: boolean; deleted: string[] }> {
+    const res = await fetch(
+      `${this.baseUrl}/api/library/${videoId}/delete-srt`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({ id, kind }),
+      },
+    );
+    if (!res.ok)
+      throw new Error(`/api/library/${videoId}/delete-srt ${res.status}`);
+    return res.json();
   }
 
   async openLibraryFolder(videoId: string): Promise<void> {
@@ -168,7 +199,11 @@ export class ApiClient {
 
   async playMpv(
     videoId: string,
-    opts?: { subtitlePreference?: "translated" | "original" | "none" },
+    opts?: {
+      subtitlePreference?: "translated" | "original" | "none";
+      transcribeId?: string;
+      translateId?: string;
+    },
   ): Promise<{ ok: boolean; error?: string; media?: string; subtitle?: string | null }> {
     const res = await fetch(`${this.baseUrl}/api/library/play-mpv`, {
       method: "POST",
@@ -176,10 +211,38 @@ export class ApiClient {
       body: JSON.stringify({
         videoId,
         subtitlePreference: opts?.subtitlePreference,
+        transcribeId: opts?.transcribeId,
+        translateId: opts?.translateId,
       }),
     });
     if (!res.ok) throw new Error(`/api/library/play-mpv ${res.status}`);
     return res.json();
+  }
+
+  /** Re-run STT on a library video's existing audio. NDJSON stream. */
+  async *streamTranscribe(
+    videoId: string,
+    req: LibraryTranscribeRequest,
+    signal?: AbortSignal,
+  ): AsyncIterable<LibraryRunEvent> {
+    yield* this.streamNdjson<LibraryRunEvent>(
+      `/api/library/${videoId}/transcribe`,
+      req,
+      signal,
+    );
+  }
+
+  /** Re-translate an existing transcript into another language. NDJSON stream. */
+  async *streamTranslate(
+    videoId: string,
+    req: LibraryTranslateRequest,
+    signal?: AbortSignal,
+  ): AsyncIterable<LibraryRunEvent> {
+    yield* this.streamNdjson<LibraryRunEvent>(
+      `/api/library/${videoId}/translate`,
+      req,
+      signal,
+    );
   }
 
   // ─── History ──────────────────────────────────────────────────────────
