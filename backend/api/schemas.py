@@ -61,8 +61,12 @@ class ProcessRequest(BaseModel):
 
 class TranslatorTestRequest(BaseModel):
     provider: TranslatorProvider
+    # All credential fields default to None so the backend resolves missing
+    # values from the saved config. Lets the Generate page test the chosen
+    # provider with just `{provider}` instead of forcing the user to repeat
+    # baseUrl/model/apiKey already saved in Settings.
     baseUrl: str | None = None
-    model: str
+    model: str | None = None
     apiKey: str | None = None
 
 
