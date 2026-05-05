@@ -348,10 +348,7 @@ function HistoryRow({
           icon={<Info size={14} color="$textSecondary" />}
           aria-label="Open detail"
           size={32}
-          onPress={(e?: { stopPropagation?: () => void }) => {
-            e?.stopPropagation?.();
-            onOpenDetail();
-          }}
+          onPress={onOpenDetail}
         />
         <IconButton
           icon={<PlayCircle size={14} color="$accent" />}

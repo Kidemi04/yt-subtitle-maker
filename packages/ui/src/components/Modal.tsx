@@ -60,14 +60,23 @@ export function Modal({
             }}
           />
 
+          {/* IMPORTANT: do NOT pass `unstyled` here. Tamagui v1's Dialog.Content
+              `unstyled` strips the default `position: fixed` + center transform
+              and even inline `style` overrides don't reliably reapply them, so
+              the content renders as a zero-sized block somewhere in the portal
+              and the user only sees the Overlay's backdrop-blur over the page
+              behind. (Symptom: "video info appears blurry, every click closes
+              it" — every pointer-down is then treated as "outside content".)
+              Letting Tamagui apply its default Content styles is the stable fix;
+              we override visuals via props. */}
           <Dialog.Content
             key="content"
-            unstyled
             animation="quick"
             enterStyle={{ opacity: 0, scale: 0.96 }}
             exitStyle={{ opacity: 0, scale: 0.96 }}
             width={width}
             maxWidth="90vw"
+            maxHeight="85vh"
             padding="$lg"
             borderRadius="$xl"
             // Spec: "glassMid + extra opacity" — pure glassMid
@@ -78,11 +87,20 @@ export function Modal({
             backgroundColor="rgba(36,36,40,0.96)"
             borderWidth={1}
             borderColor="$borderStrong"
+            // overflow: auto scrolls the inner card when the run list grows.
             style={{
+              overflow: "auto",
               backdropFilter: glassRecipes.glassHigh.backdropFilter,
               WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
               boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
             }}
+            // Block "click outside content" auto-close. Without this,
+            // any pointer-down that the Dialog can't trace back to its
+            // own content closes the modal — fragile in the presence of
+            // portals / nested modals / stale layout. Users still close
+            // via the X button or ESC.
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
           >
           {/* Tamagui Dialog requires a Dialog.Title for a11y. When no title is
               provided, render a visually-hidden one so screen readers still
