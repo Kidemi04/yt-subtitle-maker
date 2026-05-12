@@ -3,7 +3,7 @@
   "version": "2.0.0-alpha",
   "private": true,
   "scripts": {
-    "dev": "pnpm -F desktop tauri:dev",
+    "dev": "bash scripts/dev.sh",
     "web": "pnpm -F desktop web",
     "build": "pnpm -F desktop build"
   },

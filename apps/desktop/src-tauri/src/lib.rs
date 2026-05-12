@@ -17,11 +17,27 @@ impl Drop for BackendChild {
 /// Holds the spawned Python backend so it can be killed when the app exits.
 struct BackendProcess(Mutex<Option<BackendChild>>);
 
-/// Spawn the FastAPI backend on 127.0.0.1:8000.
+/// Start the FastAPI backend on 127.0.0.1:8000 unless one is already running.
+///
+/// * `Ok(Some(child))` — we spawned it and own its lifecycle.
+/// * `Ok(None)` — something is already listening on :8000 (e.g. a backend
+///   started in its own terminal by `pnpm dev`'s split-window launcher, or a
+///   leftover process); leave it alone.
+/// * `Err(_)` — a real failure (e.g. the dev venv is missing).
 ///
 /// Debug build  → `<repo>/backend/.venv/bin/python -m uvicorn api.main:app --reload`, cwd `<repo>/backend`.
 /// Release build → the bundled PyInstaller binary under `Resources/backend-dist/`, cwd `~/.yt_subtitle_tool/`.
-fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Child> {
+fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Option<Child>> {
+    // If someone is already serving :8000, attach to it rather than spawning a
+    // duplicate that would just fail to bind the port.
+    if let Ok(addr) = "127.0.0.1:8000".parse::<std::net::SocketAddr>() {
+        if std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(300)).is_ok()
+        {
+            eprintln!("[backend] already listening on 127.0.0.1:8000 — not spawning another");
+            return Ok(None);
+        }
+    }
+
     #[cfg(debug_assertions)]
     {
         // CARGO_MANIFEST_DIR is `<repo>/apps/desktop/src-tauri`, baked in at compile time.
@@ -51,6 +67,7 @@ fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Child> {
             ])
             .current_dir(&backend_dir)
             .spawn()
+            .map(Some)
     }
 
     #[cfg(not(debug_assertions))]
@@ -74,7 +91,7 @@ fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Child> {
             exe.display(),
             workdir.display()
         );
-        Command::new(exe).current_dir(&workdir).spawn()
+        Command::new(exe).current_dir(&workdir).spawn().map(Some)
     }
 }
 
@@ -83,9 +100,10 @@ pub fn run() {
         .manage(BackendProcess(Mutex::new(None)))
         .setup(|app| {
             match spawn_backend(app.handle()) {
-                Ok(child) => {
+                Ok(Some(child)) => {
                     *app.state::<BackendProcess>().0.lock().unwrap() = Some(BackendChild(child));
                 }
+                Ok(None) => { /* an external backend is already running — nothing to manage */ }
                 Err(e) => eprintln!("[backend] failed to start: {e}"),
             }
             Ok(())
