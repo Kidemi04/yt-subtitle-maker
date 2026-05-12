@@ -10,13 +10,23 @@ import {
   Caption,
 } from "@yt-subtitle-maker/ui";
 import { SettingsProvider, useSettings } from "../src/components/settings/SettingsContext";
-import { Section } from "../src/components/settings/shared";
+import { Section, type TabId } from "../src/components/settings/shared";
+import { SettingsRail } from "../src/components/settings/SettingsRail";
 import { GeneralTab } from "../src/components/settings/GeneralTab";
 import { YouTubeTab } from "../src/components/settings/YouTubeTab";
 import { TranscriptionTab } from "../src/components/settings/TranscriptionTab";
 import { TranslationTab } from "../src/components/settings/TranslationTab";
 import { SubtitlesTab } from "../src/components/settings/SubtitlesTab";
 import { AdvancedTab } from "../src/components/settings/AdvancedTab";
+
+const TAB_COMPONENTS: Record<TabId, React.ComponentType> = {
+  general: GeneralTab,
+  youtube: YouTubeTab,
+  transcription: TranscriptionTab,
+  translation: TranslationTab,
+  subtitles: SubtitlesTab,
+  advanced: AdvancedTab,
+};
 
 export default function Settings() {
   return (
@@ -30,6 +40,7 @@ function SettingsShell() {
   const {
     draft, loading, error,
     saving, dirty, onSave, onDiscard,
+    activeTab,
   } = useSettings();
 
   if (loading || !draft) {
@@ -45,6 +56,8 @@ function SettingsShell() {
     );
   }
 
+  const ActiveTab = TAB_COMPONENTS[activeTab];
+
   return (
     <YStack gap="$lg" paddingBottom={120}>
       <Section
@@ -52,12 +65,12 @@ function SettingsShell() {
         subtitle="Backend, cookies, transcription, translation, subtitles, advanced."
       />
 
-      <GeneralTab />
-      <YouTubeTab />
-      <TranscriptionTab />
-      <TranslationTab />
-      <SubtitlesTab />
-      <AdvancedTab />
+      <XStack gap="$lg" alignItems="flex-start">
+        <SettingsRail />
+        <YStack flex={1} gap="$lg">
+          <ActiveTab />
+        </YStack>
+      </XStack>
 
       {/* Sticky footer (position: sticky lives in inline style — Tamagui's
           position prop doesn't accept it on web targets). The left-aligned
