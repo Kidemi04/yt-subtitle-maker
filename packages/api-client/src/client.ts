@@ -278,6 +278,15 @@ export class ApiClient {
     return res.json();
   }
 
+  async resetConfig(): Promise<AppConfig> {
+    const res = await fetch(`${this.baseUrl}/api/config/reset`, {
+      method: "POST",
+      headers: this.headers(),
+    });
+    if (!res.ok) throw new Error(`POST /api/config/reset ${res.status}`);
+    return res.json();
+  }
+
   // ─── Dependencies (Whisper model) ──────────────────────────────────────
   async fetchDependencies(): Promise<DependencyStatus> {
     const res = await fetch(`${this.baseUrl}/api/dependencies`, {

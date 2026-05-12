@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body
 
-from core.config import load_config, save_config
+from core.config import AppConfig, load_config, save_config
 
 router = APIRouter(prefix="/api", tags=["config"])
 
@@ -84,4 +84,11 @@ def update_config(payload: dict[str, Any] = Body(...)) -> dict:  # noqa: B008
         if snake_key and hasattr(cfg, snake_key):
             setattr(cfg, snake_key, value)
     save_config(cfg)
+    return _mask_secrets(_to_camel(asdict(load_config())))
+
+
+@router.post("/config/reset")
+def reset_config() -> dict:
+    """Reset every setting to AppConfig() defaults, persist, return masked config."""
+    save_config(AppConfig())
     return _mask_secrets(_to_camel(asdict(load_config())))

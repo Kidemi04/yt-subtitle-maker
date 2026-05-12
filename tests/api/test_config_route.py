@@ -52,3 +52,24 @@ def test_config_get_masks_secret_keys(tmp_path, monkeypatch):
     cfg_path = tmp_path / ".yt_subtitle_tool" / "config.json"
     stored = _json.loads(cfg_path.read_text(encoding="utf-8"))
     assert stored["gemini_api_key"] == "AIza-real-secret-key"
+
+
+def test_config_reset_restores_defaults(tmp_path, monkeypatch):
+    # Point config at a temp dir so we don't clobber the real one.
+    import core.config as cfgmod
+    monkeypatch.setattr(cfgmod, "config_dir", lambda: tmp_path)
+
+    # Make the saved config non-default.
+    client.post("/api/config", json={"defaultTargetLang": "fr", "geminiApiKey": "sekret"})
+    assert client.get("/api/config").json()["defaultTargetLang"] == "fr"
+
+    # Reset.
+    body = client.post("/api/config/reset").json()
+
+    from dataclasses import asdict
+    defaults = asdict(cfgmod.AppConfig())
+    assert body["defaultTargetLang"] == defaults["default_target_lang"]
+    # Secrets are masked in the response, but a default key is empty → not masked.
+    assert body["geminiApiKey"] == ""
+    # And it's persisted.
+    assert client.get("/api/config").json()["defaultTargetLang"] == defaults["default_target_lang"]
