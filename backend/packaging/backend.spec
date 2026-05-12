@@ -12,7 +12,7 @@ BACKEND_ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))   # the backend/ di
 ENTRY = os.path.join(BACKEND_ROOT, "packaging", "run_backend.py")
 
 datas, binaries, hiddenimports = [], [], []
-for pkg in ("whisper", "torch", "yt_dlp", "uvicorn", "openai", "google"):
+for pkg in ("whisper", "torch", "yt_dlp", "uvicorn", "openai", "google", "google.genai"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b

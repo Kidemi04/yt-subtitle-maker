@@ -3,14 +3,24 @@ use std::sync::Mutex;
 
 use tauri::{Manager, RunEvent};
 
+/// Wraps the backend child so it's killed if this is dropped (panic / unwind),
+/// in addition to the explicit kill on `RunEvent::Exit`.
+struct BackendChild(Child);
+
+impl Drop for BackendChild {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 /// Holds the spawned Python backend so it can be killed when the app exits.
-struct BackendProcess(Mutex<Option<Child>>);
+struct BackendProcess(Mutex<Option<BackendChild>>);
 
 /// Spawn the FastAPI backend on 127.0.0.1:8000.
 ///
 /// Debug build  → `<repo>/backend/.venv/bin/python -m uvicorn api.main:app --reload`, cwd `<repo>/backend`.
-/// Release build → the bundled PyInstaller binary under `Resources/backend-dist/` (wired in a later task).
-#[allow(unused_variables)]
+/// Release build → the bundled PyInstaller binary under `Resources/backend-dist/`, cwd `~/.yt_subtitle_tool/`.
 fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Child> {
     #[cfg(debug_assertions)]
     {
@@ -32,6 +42,7 @@ fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Child> {
                 "backend venv missing",
             ));
         }
+        let _ = app;
         eprintln!("[backend] starting (dev): {} -m uvicorn …", python.display());
         Command::new(python)
             .args([
@@ -47,10 +58,23 @@ fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Child> {
         let resource_dir = app.path().resource_dir().map_err(|e| {
             std::io::Error::new(std::io::ErrorKind::NotFound, e.to_string())
         })?;
-        let bin_dir = resource_dir.join("backend-dist");
-        let exe = bin_dir.join("yt-subtitle-backend");
-        eprintln!("[backend] starting (release): {}", exe.display());
-        Command::new(exe).current_dir(&bin_dir).spawn()
+        let exe = resource_dir.join("backend-dist").join("yt-subtitle-backend");
+        // Run with cwd at a user-writable location, NOT inside the .app bundle —
+        // the backend writes output/ and downloads/ relative to its cwd, and the
+        // bundle is read-only when installed under /Applications. Use the same
+        // directory the backend already stores config.json in (see backend/core/config.py).
+        let workdir = app
+            .path()
+            .home_dir()
+            .map(|h| h.join(".yt_subtitle_tool"))
+            .unwrap_or_else(|_| std::env::temp_dir());
+        let _ = std::fs::create_dir_all(&workdir);
+        eprintln!(
+            "[backend] starting (release): {} (cwd {})",
+            exe.display(),
+            workdir.display()
+        );
+        Command::new(exe).current_dir(&workdir).spawn()
     }
 }
 
@@ -60,7 +84,7 @@ pub fn run() {
         .setup(|app| {
             match spawn_backend(app.handle()) {
                 Ok(child) => {
-                    *app.state::<BackendProcess>().0.lock().unwrap() = Some(child);
+                    *app.state::<BackendProcess>().0.lock().unwrap() = Some(BackendChild(child));
                 }
                 Err(e) => eprintln!("[backend] failed to start: {e}"),
             }
@@ -70,11 +94,13 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             if let RunEvent::Exit = event {
+                // Take the guard out and drop it — `BackendChild::drop` kills + waits.
+                // Keep this explicit path; don't rely on Drop alone.
                 if let Some(mut child) =
                     app_handle.state::<BackendProcess>().0.lock().unwrap().take()
                 {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    let _ = child.0.kill();
+                    let _ = child.0.wait();
                 }
             }
         });

@@ -7,7 +7,7 @@
     "dev": "expo start --web --port 8081",
     "web": "expo start --web --port 8081",
     "build": "expo export --platform web --output-dir dist",
-    "build:backend": "rm -rf src-tauri/backend-dist src-tauri/.pyinstaller-work && ../../backend/.venv/bin/pyinstaller --noconfirm --distpath src-tauri --workpath src-tauri/.pyinstaller-work ../../backend/packaging/backend.spec && touch src-tauri/backend-dist/.gitkeep",
+    "build:backend": "rm -rf src-tauri/backend-dist src-tauri/.pyinstaller-work && mkdir -p src-tauri/backend-dist && touch src-tauri/backend-dist/.gitkeep && ../../backend/.venv/bin/pyinstaller --noconfirm --distpath src-tauri --workpath src-tauri/.pyinstaller-work ../../backend/packaging/backend.spec && touch src-tauri/backend-dist/.gitkeep",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "pnpm build:backend && tauri build",
