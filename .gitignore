@@ -22,8 +22,10 @@ node_modules/
 .expo/
 .expo-shared/
 
-# Tauri (future)
+# Tauri
 src-tauri/target/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/schemas/
 
 # Editor
 .vscode/
