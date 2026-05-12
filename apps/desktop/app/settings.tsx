@@ -29,6 +29,7 @@ import {
   ApiClient,
   type AppConfig,
   type TranslatorProvider,
+  type DependencyStatus,
 } from "@yt-subtitle-maker/api-client";
 
 type ConnState = "untested" | "ok" | "warning" | "error";
@@ -59,14 +60,9 @@ const STT_ENGINE_LABELS: Record<string, string> = {
   yt_captions: "YouTube captions only",
 };
 
-const WHISPER_MODELS = [
-  { label: "tiny", value: "tiny" },
-  { label: "base", value: "base" },
-  { label: "small", value: "small" },
-  { label: "medium", value: "medium" },
-  { label: "turbo ⭐", value: "turbo" },
-  { label: "large-v3", value: "large-v3" },
-];
+// base id list — keep this in sync with the backend's MODELS_URLS keys.
+const WHISPER_MODEL_IDS = ["tiny", "base", "small", "medium", "turbo", "large-v3"];
+
 
 const DEVICES = [
   { label: "Auto", value: "auto" },
@@ -145,6 +141,7 @@ export default function Settings() {
   const [modelsBusy, setModelsBusy] = React.useState<
     "gemini" | "local_openai" | "openai" | undefined
   >(undefined);
+  const [deps, setDeps] = React.useState<DependencyStatus | undefined>();
 
   React.useEffect(() => {
     let cancelled = false;
@@ -173,6 +170,10 @@ export default function Settings() {
         if (cancelled) return;
         if (res.ok) setGeminiModels(res.models);
       })
+      .catch(() => undefined);
+    apiClient
+      .fetchDependencies()
+      .then((d) => !cancelled && setDeps(d))
       .catch(() => undefined);
     return () => {
       cancelled = true;
@@ -237,6 +238,19 @@ export default function Settings() {
       .filter((id, i) => ids.indexOf(id) === i) // dedupe
       .map((id) => ({ label: STT_ENGINE_LABELS[id] ?? id, value: id }));
   }, [installedEngines]);
+
+  const whisperModelOptions = React.useMemo(() => {
+    const downloaded = deps?.models ?? {};
+    const ids = WHISPER_MODEL_IDS.includes(draft?.defaultWhisperModel ?? "")
+      ? WHISPER_MODEL_IDS
+      : [draft?.defaultWhisperModel ?? "", ...WHISPER_MODEL_IDS].filter(Boolean);
+    return ids.map((id) => {
+      const star = id === "turbo" ? " ⭐" : "";
+      let suffix = "";
+      if (deps) suffix = downloaded[id as keyof typeof downloaded] ? "  ✓ downloaded" : "  · not downloaded";
+      return { label: `${id}${star}${suffix}`, value: id };
+    });
+  }, [deps, draft?.defaultWhisperModel]);
 
   const dirty =
     !!draft && !!config && JSON.stringify(draft) !== JSON.stringify(config);
@@ -515,7 +529,7 @@ export default function Settings() {
               <Dropdown
                 value={draft.defaultWhisperModel}
                 onValueChange={(v) => update("defaultWhisperModel", v)}
-                options={WHISPER_MODELS}
+                options={whisperModelOptions}
                 width="100%"
               />
             </YStack>
