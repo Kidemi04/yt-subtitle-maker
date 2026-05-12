@@ -3,6 +3,20 @@
 // only `react`, the singleton apiClient, the api-client types, and `./constants`
 // — NOT `./SettingsContext` (the context wraps this hook; importing it back
 // would reintroduce a require-cycle).
+//
+// Autosave contract (Phase 4b):
+//   • `update(key, value)` writes into `draft` immediately (optimistic UI) and
+//     adds `key` to `pendingKeys`, then debounces a POST /api/config by 400 ms.
+//   • Rapid edits to the same field → one POST with the latest value (timer
+//     resets, draft already holds the latest, pendingKeys is a Set).
+//   • Mid-flight edit → new keys stay in pendingKeys; the `finally` block
+//     schedules a follow-up POST after the in-flight one lands.
+//   • Unmount mid-debounce → `flush()` dispatches any pending save synchronously
+//     (best-effort; the request can't be awaited in a cleanup).
+//   • Failed POST → values are kept, failed keys re-queued, `saveStatus` set to
+//     `"error"`; the user can retry via `retrySave()` or by editing again.
+//   • Secret keys (Gemini/OpenAI/LM-Studio) whose draft value is the MASK
+//     sentinel ("***") are never POSTed — the backend keeps the saved value.
 import * as React from "react";
 import { apiClient } from "../../state/client";
 import type { AppConfig } from "@yt-subtitle-maker/api-client";
