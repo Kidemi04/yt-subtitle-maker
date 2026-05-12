@@ -18,6 +18,7 @@ import { TranscriptionTab } from "../src/components/settings/TranscriptionTab";
 import { TranslationTab } from "../src/components/settings/TranslationTab";
 import { SubtitlesTab } from "../src/components/settings/SubtitlesTab";
 import { AdvancedTab } from "../src/components/settings/AdvancedTab";
+import { SettingsSearch } from "../src/components/settings/SettingsSearch";
 
 const TAB_COMPONENTS: Record<TabId, React.ComponentType> = {
   general: GeneralTab,
@@ -40,7 +41,7 @@ function SettingsShell() {
   const {
     draft, loading, error,
     saving, dirty, onSave, onDiscard,
-    activeTab,
+    activeTab, searchQuery,
   } = useSettings();
 
   if (loading || !draft) {
@@ -68,7 +69,8 @@ function SettingsShell() {
       <XStack gap="$lg" alignItems="flex-start">
         <SettingsRail />
         <YStack flex={1} gap="$lg">
-          <ActiveTab />
+          <SettingsSearch />
+          {searchQuery.trim().length >= 2 ? null : <ActiveTab />}
         </YStack>
       </XStack>
 
