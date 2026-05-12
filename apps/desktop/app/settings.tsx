@@ -988,20 +988,27 @@ export default function Settings() {
           </XStack>
           <XStack>
             <ButtonGhost
-              onPress={() => {
+              onPress={async () => {
                 if (
                   typeof window !== "undefined" &&
-                  window.confirm(
-                    "Reset every setting on this page to defaults? This cannot be undone.",
+                  !window.confirm(
+                    "Reset every setting to its default? This overwrites your saved config and can't be undone.",
                   )
                 ) {
-                  // Backend's default config — we re-fetch and overwrite draft.
-                  apiClient.fetchConfig().then(setDraft);
+                  return;
+                }
+                try {
+                  const next = await apiClient.resetConfig();
+                  setConfig(next);
+                  setDraft(next);
+                  apiClient.setBaseUrl(next.backendUrl);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : String(err));
                 }
               }}
             >
               <BodySm fontWeight="500" color="$error">
-                Reset to defaults
+                Reset all to defaults
               </BodySm>
             </ButtonGhost>
           </XStack>
