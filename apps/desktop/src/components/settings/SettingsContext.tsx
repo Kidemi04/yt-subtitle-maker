@@ -14,6 +14,7 @@ export interface SettingsContextValue {
   // data
   config: AppConfig | undefined;
   draft: AppConfig | undefined;
+  defaults: AppConfig | undefined;
   loading: boolean;
   saving: boolean;
   error: string | undefined;
@@ -203,6 +204,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [deps, draft?.defaultWhisperModel]);
 
   const dirty = !!draft && !!config && JSON.stringify(draft) !== JSON.stringify(config);
+  const defaults = config?._defaults;
 
   const update = <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
@@ -285,7 +287,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value: SettingsContextValue = {
-    config, draft, loading, saving, error, setError, dirty,
+    config, draft, defaults, loading, saving, error, setError, dirty,
     showApiKey, setShowApiKey, replacingKey, setReplacingKey,
     translatorStatus,
     cookieStatus, cookieError, cookieSource, cookiesAttached,

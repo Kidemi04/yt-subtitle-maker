@@ -275,6 +275,8 @@ export interface AppConfig {
   subBold: boolean;
   /** Distance from bottom edge in pixels; 0 = mpv default. */
   subMarginY: number;
+  /** Effective default config (AppConfig() defaults, path fields resolved). Present on GET/POST /api/config responses. */
+  _defaults?: AppConfig;
 }
 
 export interface BackendCapabilities {

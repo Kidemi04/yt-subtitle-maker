@@ -10,7 +10,7 @@ import { SubtitlePreview } from "./SubtitlePreview";
 import { SubtitlePresets, type StyleFields } from "./SubtitlePresets";
 
 export function SubtitlesTab() {
-  const { draft, update } = useSettings();
+  const { draft, update, defaults } = useSettings();
   if (!draft) return null;
 
   const applyPreset = (v: StyleFields) => {
@@ -41,7 +41,7 @@ export function SubtitlesTab() {
           <TextInput
             value={draft.mpvPath}
             onChangeText={(v: string) => update("mpvPath", v)}
-            placeholder=""
+            placeholder={defaults?.mpvPath || ""}
           />
         </SettingRow>
         <SettingRow
