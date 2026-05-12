@@ -3,6 +3,7 @@ import { XStack, YStack } from "tamagui";
 import { GlassCard, TextInput, Toggle } from "@yt-subtitle-maker/ui";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
+import { NumberStepper } from "./NumberStepper";
 
 export function SubtitlesTab() {
   const { draft, update } = useSettings();
@@ -43,13 +44,14 @@ export function SubtitlesTab() {
               label="Font size"
               helper="Pixels. 0 = default (≈55)."
             >
-              <TextInput
-                value={draft.subFontSize ? String(draft.subFontSize) : ""}
-                onChangeText={(v: string) =>
-                  update("subFontSize", parseInt(v, 10) || 0)
-                }
+              <NumberStepper
+                value={draft.subFontSize}
+                onValueChange={(n) => update("subFontSize", n)}
+                min={0}
+                defaultSentinel={0}
+                stepperBase={55}
                 placeholder="0"
-                keyboardType="numeric"
+                ariaLabel="Subtitle font size"
               />
             </SettingRow>
           </YStack>
@@ -59,13 +61,14 @@ export function SubtitlesTab() {
               label="Bottom margin"
               helper="Distance from bottom edge (px)."
             >
-              <TextInput
-                value={draft.subMarginY ? String(draft.subMarginY) : ""}
-                onChangeText={(v: string) =>
-                  update("subMarginY", parseInt(v, 10) || 0)
-                }
+              <NumberStepper
+                value={draft.subMarginY}
+                onValueChange={(n) => update("subMarginY", n)}
+                min={0}
+                defaultSentinel={0}
+                stepperBase={18}
                 placeholder="0"
-                keyboardType="numeric"
+                ariaLabel="Subtitle bottom margin"
               />
             </SettingRow>
           </YStack>
@@ -105,20 +108,14 @@ export function SubtitlesTab() {
               label="Outline width"
               helper="Pixels. 0 = no outline; blank = mpv default (≈3)."
             >
-              <TextInput
-                value={
-                  draft.subBorderSize >= 0 ? String(draft.subBorderSize) : ""
-                }
-                onChangeText={(v: string) => {
-                  if (v.trim() === "") {
-                    update("subBorderSize", -1);
-                    return;
-                  }
-                  const parsed = Number(v);
-                  update("subBorderSize", Number.isFinite(parsed) ? parsed : -1);
-                }}
+              <NumberStepper
+                value={draft.subBorderSize}
+                onValueChange={(n) => update("subBorderSize", n)}
+                min={0}
+                defaultSentinel={-1}
+                stepperBase={3}
                 placeholder="(mpv default)"
-                keyboardType="numeric"
+                ariaLabel="Subtitle outline width"
               />
             </SettingRow>
           </YStack>
