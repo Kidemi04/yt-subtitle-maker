@@ -1,12 +1,9 @@
 import * as React from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { apiClient } from "../../state/client";
-import {
-  type AppConfig,
-  type TranslatorProvider,
-  type DependencyStatus,
-} from "@yt-subtitle-maker/api-client";
+import { type AppConfig, type DependencyStatus } from "@yt-subtitle-maker/api-client";
 import { STT_ENGINE_LABELS, TABS, WHISPER_MODEL_IDS, type TabId } from "./constants";
+import { useSettingsDraft, type SaveStatus } from "./useSettingsDraft";
 
 export type ConnState = "untested" | "ok" | "warning" | "error";
 
@@ -16,10 +13,11 @@ export interface SettingsContextValue {
   draft: AppConfig | undefined;
   defaults: AppConfig | undefined;
   loading: boolean;
-  saving: boolean;
   error: string | undefined;
   setError: (e: string | undefined) => void;
-  dirty: boolean;
+  // autosave status
+  saveStatus: SaveStatus;
+  failedFields: Set<keyof AppConfig>;
   // secret-field UI
   showApiKey: boolean;
   setShowApiKey: React.Dispatch<React.SetStateAction<boolean>>;
@@ -45,8 +43,11 @@ export interface SettingsContextValue {
   whisperModelOptions: { label: string; value: string }[];
   // mutations / actions
   update: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
-  onSave: () => Promise<void>;
-  onDiscard: () => void;
+  retrySave: () => void;
+  tabDiffersFromDefaults: (t: TabId) => boolean;
+  revertField: (id: string) => void;
+  resetTab: (t: TabId) => void;
+  flush: () => void;
   testTranslator: () => Promise<void>;
   testCookies: () => Promise<void>;
   refreshLocalOpenaiModels: () => Promise<void>;
@@ -75,11 +76,26 @@ export function useSettings(): SettingsContextValue {
 const TAB_IDS = TABS.map((t) => t.id);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [config, setConfig] = React.useState<AppConfig | undefined>();
-  const [draft, setDraft] = React.useState<AppConfig | undefined>();
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | undefined>();
+  const ds = useSettingsDraft();
+  const {
+    config,
+    draft,
+    defaults,
+    loading,
+    error,
+    setError,
+    saveStatus,
+    failedFields,
+    update,
+    retrySave,
+    tabDiffersFromDefaults,
+    revertField,
+    resetTab,
+    flush,
+    setConfig,
+    setDraft,
+  } = ds;
+
   const [showApiKey, setShowApiKey] = React.useState(false);
   const [replacingKey, setReplacingKey] = React.useState<
     Record<"gemini" | "openai" | "localOpenai", boolean>
@@ -112,15 +128,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     let cancelled = false;
-    apiClient
-      .fetchConfig()
-      .then((c) => {
-        if (cancelled) return;
-        setConfig(c);
-        setDraft(c);
-      })
-      .catch((err) => !cancelled && setError(err.message))
-      .finally(() => !cancelled && setLoading(false));
     apiClient
       .fetchVersion()
       .then((v) => {
@@ -198,41 +205,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return ids.map((id) => {
       const star = id === "turbo" ? " ⭐" : "";
       let suffix = "";
-      if (deps) suffix = downloaded[id as keyof typeof downloaded] ? "  ✓ downloaded" : "  · not downloaded";
+      if (deps)
+        suffix = downloaded[id as keyof typeof downloaded] ? "  ✓ downloaded" : "  · not downloaded";
       return { label: `${id}${star}${suffix}`, value: id };
     });
   }, [deps, draft?.defaultWhisperModel]);
-
-  const dirty = !!draft && !!config && JSON.stringify(draft) !== JSON.stringify(config);
-  const defaults = config?._defaults;
-
-  const update = <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
-    setDraft((d) => (d ? { ...d, [key]: value } : d));
-  };
-
-  const onSave = async () => {
-    if (!draft) return;
-    setSaving(true);
-    try {
-      const next = await apiClient.updateConfig(draft);
-      setConfig(next);
-      setDraft(next);
-      setReplacingKey({ gemini: false, openai: false, localOpenai: false });
-      apiClient.setBaseUrl(next.backendUrl);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const onDiscard = () => {
-    if (config) {
-      setDraft(config);
-      apiClient.setBaseUrl(config.backendUrl);
-    }
-    setReplacingKey({ gemini: false, openai: false, localOpenai: false });
-  };
 
   const testTranslator = async () => {
     if (!draft) return;
@@ -287,16 +264,50 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value: SettingsContextValue = {
-    config, draft, defaults, loading, saving, error, setError, dirty,
-    showApiKey, setShowApiKey, replacingKey, setReplacingKey,
+    config,
+    draft,
+    defaults,
+    loading,
+    error,
+    setError,
+    saveStatus,
+    failedFields,
+    showApiKey,
+    setShowApiKey,
+    replacingKey,
+    setReplacingKey,
     translatorStatus,
-    cookieStatus, cookieError, cookieSource, cookiesAttached,
-    installedEngines, jsRuntime, deps, geminiModels, localOpenaiModels, openaiModels, modelsBusy,
-    sttEngineOptions, whisperModelOptions,
-    update, onSave, onDiscard, testTranslator, testCookies,
-    refreshLocalOpenaiModels, refreshOpenaiModels,
-    setConfig, setDraft,
-    activeTab, setActiveTab, searchQuery, setSearchQuery, highlightedSettingId, setHighlightedSettingId,
+    cookieStatus,
+    cookieError,
+    cookieSource,
+    cookiesAttached,
+    installedEngines,
+    jsRuntime,
+    deps,
+    geminiModels,
+    localOpenaiModels,
+    openaiModels,
+    modelsBusy,
+    sttEngineOptions,
+    whisperModelOptions,
+    update,
+    retrySave,
+    tabDiffersFromDefaults,
+    revertField,
+    resetTab,
+    flush,
+    testTranslator,
+    testCookies,
+    refreshLocalOpenaiModels,
+    refreshOpenaiModels,
+    setConfig,
+    setDraft,
+    activeTab,
+    setActiveTab,
+    searchQuery,
+    setSearchQuery,
+    highlightedSettingId,
+    setHighlightedSettingId,
   };
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

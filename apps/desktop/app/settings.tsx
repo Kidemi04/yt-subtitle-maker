@@ -1,11 +1,8 @@
 import * as React from "react";
-import { Stack, XStack, YStack } from "tamagui";
+import { XStack, YStack } from "tamagui";
 import {
   GlassCard,
-  ButtonPrimary,
-  ButtonGhost,
   BadgePill,
-  BadgeAccent,
   BodySm,
   Caption,
 } from "@yt-subtitle-maker/ui";
@@ -41,7 +38,7 @@ export default function Settings() {
 function SettingsShell() {
   const {
     draft, loading, error,
-    saving, dirty, onSave, onDiscard,
+    saveStatus,
     activeTab, searchQuery,
   } = useSettings();
 
@@ -76,8 +73,9 @@ function SettingsShell() {
       </XStack>
 
       {/* Sticky footer (position: sticky lives in inline style — Tamagui's
-          position prop doesn't accept it on web targets). The left-aligned
-          status sentence anchors the bar so it doesn't read as floating. */}
+          position prop doesn't accept it on web targets). Phase 4b stopgap:
+          a single small status pill driven by `saveStatus`, no buttons — the
+          real footer (✓ saved pill + "Reset this tab") lands in Task 4. */}
       <XStack
         marginTop="$lg"
         padding="$md"
@@ -88,21 +86,15 @@ function SettingsShell() {
         gap="$sm"
         style={{ position: "sticky", bottom: 0, zIndex: 50 }}
       >
-        <Caption color="$textMuted">
-          Click Save settings to apply changes.
-        </Caption>
-        <Stack flex={1} />
-        {dirty ? (
-          <BadgeAccent>unsaved changes</BadgeAccent>
+        {saveStatus === "saving" ? (
+          <BadgePill>saving…</BadgePill>
+        ) : saveStatus === "saved" ? (
+          <BadgePill tone="success">✓ saved</BadgePill>
+        ) : saveStatus === "error" ? (
+          <BadgePill tone="error">couldn't save</BadgePill>
         ) : (
-          <BadgePill tone="success">all saved</BadgePill>
+          <Caption color="$textMuted">Changes save automatically.</Caption>
         )}
-        <ButtonGhost onPress={onDiscard} disabled={!dirty || saving}>
-          Discard
-        </ButtonGhost>
-        <ButtonPrimary onPress={onSave} disabled={!dirty || saving}>
-          {saving ? "Saving…" : "Save settings"}
-        </ButtonPrimary>
       </XStack>
     </YStack>
   );
