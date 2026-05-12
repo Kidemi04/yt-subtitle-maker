@@ -377,11 +377,14 @@ export default function Settings() {
             </XStack>
           </YStack>
           <YStack gap="$xs">
-            <Field label="Download folder" />
+            <Field
+              label="Download folder"
+              helper="Where downloaded audio is kept. Leave blank to use the default location."
+            />
             <TextInput
               value={draft.downloadDir}
               onChangeText={(v: string) => update("downloadDir", v)}
-              placeholder="C:\\Users\\you\\Downloads"
+              placeholder=""
             />
           </YStack>
         </YStack>
