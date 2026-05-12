@@ -1,4 +1,5 @@
 import * as React from "react";
+import { router, useLocalSearchParams } from "expo-router";
 import { apiClient } from "../../state/client";
 import {
   ApiClient,
@@ -6,7 +7,7 @@ import {
   type TranslatorProvider,
   type DependencyStatus,
 } from "@yt-subtitle-maker/api-client";
-import { STT_ENGINE_LABELS, WHISPER_MODEL_IDS, type TabId } from "./shared";
+import { STT_ENGINE_LABELS, TABS, WHISPER_MODEL_IDS, type TabId } from "./shared";
 
 export type ConnState = "untested" | "ok" | "warning" | "error";
 
@@ -74,6 +75,8 @@ export function useSettings(): SettingsContextValue {
   return ctx;
 }
 
+const TAB_IDS = TABS.map((t) => t.id);
+
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = React.useState<AppConfig | undefined>();
   const [draft, setDraft] = React.useState<AppConfig | undefined>();
@@ -99,7 +102,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     "gemini" | "local_openai" | "openai" | undefined
   >(undefined);
   const [deps, setDeps] = React.useState<DependencyStatus | undefined>();
-  const [activeTab, setActiveTab] = React.useState<TabId>("general");
+
+  const params = useLocalSearchParams<{ tab?: string | string[] }>();
+  const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const activeTab: TabId =
+    tabParam && (TAB_IDS as string[]).includes(tabParam) ? (tabParam as TabId) : "general";
+
+  const setActiveTab = React.useCallback((t: TabId) => {
+    router.setParams({ tab: t });
+  }, []);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [highlightedSettingId, setHighlightedSettingId] = React.useState<string | null>(null);
 
