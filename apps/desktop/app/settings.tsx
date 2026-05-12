@@ -49,13 +49,15 @@ const VERBOSITY = [
   { label: "Debug", value: "debug" },
 ];
 
-const STT_ENGINES = [
-  { label: "Auto (try YT, fall back)", value: "auto" },
-  { label: "openai-whisper", value: "openai-whisper" },
-  { label: "faster-whisper ⭐", value: "faster-whisper" },
-  { label: "WhisperX", value: "whisperx" },
-  { label: "insanely-fast-whisper", value: "insanely-fast-whisper" },
-];
+// Human labels for STT engine ids the backend may report as installed.
+// Only ids that actually exist in core/stt/__init__.py's registry will ever
+// appear (plus the synthetic "auto" mode). Adding a real engine later = add
+// its label here; it shows up automatically once /api/version lists it.
+const STT_ENGINE_LABELS: Record<string, string> = {
+  auto: "Auto — use YouTube's captions if present, else Whisper",
+  "openai-whisper": "openai-whisper (the reference engine)",
+  yt_captions: "YouTube captions only",
+};
 
 const WHISPER_MODELS = [
   { label: "tiny", value: "tiny" },
@@ -228,11 +230,12 @@ export default function Settings() {
   };
 
   const sttEngineOptions = React.useMemo(() => {
-    const installed = installedEngines;
-    if (!installed) return STT_ENGINES; // not loaded yet — show all to avoid flash
-    return STT_ENGINES.filter(
-      (opt) => opt.value === "auto" || installed.includes(opt.value),
-    );
+    // "auto" is always offered; the rest is exactly what the backend reports
+    // as installed — never a hardcoded/aspirational engine.
+    const ids = ["auto", ...(installedEngines ?? [])];
+    return ids
+      .filter((id, i) => ids.indexOf(id) === i) // dedupe
+      .map((id) => ({ label: STT_ENGINE_LABELS[id] ?? id, value: id }));
   }, [installedEngines]);
 
   const dirty =
