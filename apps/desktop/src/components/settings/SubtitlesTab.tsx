@@ -5,6 +5,7 @@ import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
 import { NumberStepper } from "./NumberStepper";
 import { ColorField } from "./ColorField";
+import { FontPicker } from "./FontPicker";
 
 export function SubtitlesTab() {
   const { draft, update } = useSettings();
@@ -32,11 +33,7 @@ export function SubtitlesTab() {
           label="Font family"
           helper={'e.g. "Noto Sans CJK SC", "Inter", "Arial". Must be installed on the OS — mpv does not download fonts.'}
         >
-          <TextInput
-            value={draft.subFont}
-            onChangeText={(v: string) => update("subFont", v)}
-            placeholder="(mpv default sans)"
-          />
+          <FontPicker value={draft.subFont} onChangeText={(v) => update("subFont", v)} />
         </SettingRow>
         <XStack gap="$md">
           <YStack flex={1}>
