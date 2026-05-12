@@ -39,3 +39,8 @@ downloads/
 models/
 *.log
 .env
+
+# All-in-one launcher (PyInstaller output bundled into the Tauri app)
+apps/desktop/src-tauri/backend-dist/*
+!apps/desktop/src-tauri/backend-dist/.gitkeep
+apps/desktop/src-tauri/.pyinstaller-work/
