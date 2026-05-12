@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Body
 
 from core.config import AppConfig, load_config, save_config
+from core.dependency_manager import get_whisper_cache_dir
 
 router = APIRouter(prefix="/api", tags=["config"])
 
@@ -79,9 +80,11 @@ def _effective_defaults() -> dict:
     d["output_dir"] = str(cwd / "output")
     d["download_dir"] = str(cwd / "downloads")
     if not d["whisper_cache_dir"]:
-        # openai-whisper's download_root default (the pipeline passes no cache_dir,
-        # so whisper.load_model(download_root=None) falls back to ~/.cache/whisper).
-        d["whisper_cache_dir"] = str(Path.home() / ".cache" / "whisper")
+        # The app's own model-storage directory: <project_root>/models in dev,
+        # <Resources>/models in the packaged app. This is where the Init screen
+        # (POST /api/dependencies/install) downloads Whisper weights via
+        # core.dependency_manager.download_whisper_model().
+        d["whisper_cache_dir"] = get_whisper_cache_dir()
     d["mpv_path"] = shutil.which("mpv") or ""
     # js_runtime_path stays "" — /api/version already reports the auto-detected runtime.
     return d

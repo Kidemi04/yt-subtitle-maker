@@ -90,6 +90,7 @@ def test_config_response_includes_effective_defaults(tmp_path, monkeypatch):
     # path fields are RESOLVED, not blank:
     assert d["outputDir"] and d["outputDir"].endswith("output")
     assert d["downloadDir"] and d["downloadDir"].endswith("downloads")
+    assert d["whisperCacheDir"] and d["whisperCacheDir"].endswith("models")
     # The POSTs carry _defaults too, and _defaults is always the factory
     # defaults — never the (now-dirty) live config:
     dirty = client.post("/api/config", json={"defaultTargetLang": "fr"}).json()
