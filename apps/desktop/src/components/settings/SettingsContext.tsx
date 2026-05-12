@@ -6,7 +6,7 @@ import {
   type TranslatorProvider,
   type DependencyStatus,
 } from "@yt-subtitle-maker/api-client";
-import { STT_ENGINE_LABELS, TABS, WHISPER_MODEL_IDS, type TabId } from "./shared";
+import { STT_ENGINE_LABELS, TABS, WHISPER_MODEL_IDS, type TabId } from "./constants";
 
 export type ConnState = "untested" | "ok" | "warning" | "error";
 

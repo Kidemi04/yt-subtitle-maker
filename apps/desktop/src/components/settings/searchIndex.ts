@@ -1,4 +1,4 @@
-import type { TabId } from "./shared";
+import type { TabId } from "./constants";
 
 export interface SearchEntry {
   id: string;

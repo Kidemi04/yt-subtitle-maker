@@ -11,7 +11,8 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { type AppConfig } from "@yt-subtitle-maker/api-client";
 import { useSettings } from "./SettingsContext";
-import { COOKIE_BROWSERS, Section, SettingRow } from "./shared";
+import { Section, SettingRow } from "./shared";
+import { COOKIE_BROWSERS } from "./constants";
 
 export function YouTubeTab() {
   const {

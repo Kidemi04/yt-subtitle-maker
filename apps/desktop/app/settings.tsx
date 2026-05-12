@@ -10,7 +10,8 @@ import {
   Caption,
 } from "@yt-subtitle-maker/ui";
 import { SettingsProvider, useSettings } from "../src/components/settings/SettingsContext";
-import { Section, type TabId } from "../src/components/settings/shared";
+import { Section } from "../src/components/settings/shared";
+import { type TabId } from "../src/components/settings/constants";
 import { SettingsRail } from "../src/components/settings/SettingsRail";
 import { GeneralTab } from "../src/components/settings/GeneralTab";
 import { YouTubeTab } from "../src/components/settings/YouTubeTab";

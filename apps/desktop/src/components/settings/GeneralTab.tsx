@@ -2,7 +2,8 @@ import * as React from "react";
 import { YStack } from "tamagui";
 import { GlassCard, Dropdown, TextInput } from "@yt-subtitle-maker/ui";
 import { useSettings } from "./SettingsContext";
-import { Section, SettingRow, VERBOSITY } from "./shared";
+import { Section, SettingRow } from "./shared";
+import { VERBOSITY } from "./constants";
 
 export function GeneralTab() {
   const { draft, update, defaults } = useSettings();

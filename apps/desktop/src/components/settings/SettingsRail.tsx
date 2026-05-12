@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Stack, YStack, XStack, Text } from "tamagui";
 import { useSettings } from "./SettingsContext";
-import { TABS } from "./shared";
+import { TABS } from "./constants";
 
 /**
  * SettingsRail — narrow left column of six clickable sub-tab buttons.

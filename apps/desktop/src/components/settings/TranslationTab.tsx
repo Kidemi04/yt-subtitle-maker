@@ -20,7 +20,8 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { type TranslatorProvider } from "@yt-subtitle-maker/api-client";
 import { useSettings } from "./SettingsContext";
-import { Section, SettingRow, buildModelOptions, isMasked, LANGS } from "./shared";
+import { Section, SettingRow } from "./shared";
+import { buildModelOptions, isMasked, LANGS } from "./constants";
 
 export function TranslationTab() {
   const {

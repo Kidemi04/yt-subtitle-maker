@@ -2,7 +2,8 @@ import * as React from "react";
 import { XStack, YStack } from "tamagui";
 import { GlassCard, Dropdown, Toggle } from "@yt-subtitle-maker/ui";
 import { useSettings } from "./SettingsContext";
-import { Section, SettingRow, DEVICES, LANGS } from "./shared";
+import { Section, SettingRow } from "./shared";
+import { DEVICES, LANGS } from "./constants";
 
 export function TranscriptionTab() {
   const { draft, update, sttEngineOptions, whisperModelOptions } = useSettings();

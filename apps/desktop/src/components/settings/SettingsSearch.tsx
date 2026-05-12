@@ -2,7 +2,7 @@ import * as React from "react";
 import { Stack, XStack, YStack } from "tamagui";
 import { TextInput, GlassCard, BodySm, Caption } from "@yt-subtitle-maker/ui";
 import { useSettings } from "./SettingsContext";
-import { TABS } from "./shared";
+import { TABS } from "./constants";
 import { SETTINGS_INDEX, type SearchEntry } from "./searchIndex";
 
 /**
