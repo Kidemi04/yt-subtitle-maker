@@ -2,7 +2,6 @@ import * as React from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { apiClient } from "../../state/client";
 import {
-  ApiClient,
   type AppConfig,
   type TranslatorProvider,
   type DependencyStatus,
@@ -28,8 +27,6 @@ export interface SettingsContextValue {
     React.SetStateAction<Record<"gemini" | "openai" | "localOpenai", boolean>>
   >;
   // connection test statuses
-  backendStatus: ConnState;
-  setBackendStatus: (s: ConnState) => void;
   translatorStatus: ConnState;
   cookieStatus: ConnState;
   cookieError: string | undefined;
@@ -49,7 +46,6 @@ export interface SettingsContextValue {
   update: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
   onSave: () => Promise<void>;
   onDiscard: () => void;
-  testBackend: () => Promise<void>;
   testTranslator: () => Promise<void>;
   testCookies: () => Promise<void>;
   refreshLocalOpenaiModels: () => Promise<void>;
@@ -87,7 +83,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [replacingKey, setReplacingKey] = React.useState<
     Record<"gemini" | "openai" | "localOpenai", boolean>
   >({ gemini: false, openai: false, localOpenai: false });
-  const [backendStatus, setBackendStatus] = React.useState<ConnState>("untested");
   const [translatorStatus, setTranslatorStatus] = React.useState<ConnState>("untested");
   const [cookieStatus, setCookieStatus] = React.useState<ConnState>("untested");
   const [cookieError, setCookieError] = React.useState<string | undefined>();
@@ -234,18 +229,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setReplacingKey({ gemini: false, openai: false, localOpenai: false });
   };
 
-  const testBackend = async () => {
-    if (!draft) return;
-    setBackendStatus("untested");
-    try {
-      const tmp = new ApiClient(draft.backendUrl);
-      await tmp.fetchVersion();
-      setBackendStatus("ok");
-    } catch {
-      setBackendStatus("error");
-    }
-  };
-
   const testTranslator = async () => {
     if (!draft) return;
     setTranslatorStatus("untested");
@@ -301,11 +284,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const value: SettingsContextValue = {
     config, draft, loading, saving, error, setError, dirty,
     showApiKey, setShowApiKey, replacingKey, setReplacingKey,
-    backendStatus, setBackendStatus, translatorStatus,
+    translatorStatus,
     cookieStatus, cookieError, cookieSource, cookiesAttached,
     installedEngines, jsRuntime, deps, geminiModels, localOpenaiModels, openaiModels, modelsBusy,
     sttEngineOptions, whisperModelOptions,
-    update, onSave, onDiscard, testBackend, testTranslator, testCookies,
+    update, onSave, onDiscard, testTranslator, testCookies,
     refreshLocalOpenaiModels, refreshOpenaiModels,
     setConfig, setDraft,
     activeTab, setActiveTab, searchQuery, setSearchQuery, highlightedSettingId, setHighlightedSettingId,

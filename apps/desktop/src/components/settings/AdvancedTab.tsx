@@ -1,23 +1,43 @@
 import * as React from "react";
 import { XStack, YStack } from "tamagui";
-import { GlassCard, TextInput, ButtonSecondary, ButtonGhost, StatusDot, BodySm } from "@yt-subtitle-maker/ui";
+import { GlassCard, ButtonGhost, BodySm } from "@yt-subtitle-maker/ui";
+import { ApiClient } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "../../state/client";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
+import { ArmedField } from "./ArmedField";
 
 export function AdvancedTab() {
-  const { draft, update, setConfig, setDraft, setError, backendStatus, testBackend } = useSettings();
+  const { draft, update, setConfig, setDraft, setError } = useSettings();
   if (!draft) return null;
   return (
     <GlassCard variant="mid">
       <YStack gap="$md">
         <Section title="Advanced" />
-        <SettingRow id="advanced.backend-url" label="Backend URL" helper="Default 127.0.0.1:8000. Change for V2 ngrok tunneling.">
-          <XStack gap="$sm" alignItems="center">
-            <TextInput flex={1} value={draft.backendUrl} onChangeText={(v: string) => update("backendUrl", v)} />
-            <ButtonSecondary onPress={testBackend}>Test</ButtonSecondary>
-            <StatusDot status={backendStatus} size={8} />
-          </XStack>
+        <SettingRow id="advanced.backend-url" label="Backend URL" helper="The address the app talks to. Edit → it pings GET /api/version before applying. Default is 127.0.0.1:8000.">
+          <ArmedField
+            value={draft.backendUrl}
+            placeholder="127.0.0.1:8000"
+            validate={async (v) => {
+              try {
+                await new ApiClient(v).fetchVersion();
+                return { ok: true };
+              } catch (err) {
+                return { ok: false, reason: `Couldn't reach a backend at "${v}": ${err instanceof Error ? err.message : String(err)}` };
+              }
+            }}
+            onApply={(v) => {
+              update("backendUrl", v);
+              apiClient.setBaseUrl(v);
+            }}
+            secondaryAction={{
+              label: "Reset to 127.0.0.1:8000",
+              onPress: () => {
+                update("backendUrl", "127.0.0.1:8000");
+                apiClient.setBaseUrl("127.0.0.1:8000");
+              },
+            }}
+          />
         </SettingRow>
         <SettingRow id="advanced.reset-all" label="Reset all to defaults" helper="Danger zone — overwrites your saved config with the shipped defaults.">
           <XStack>
