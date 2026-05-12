@@ -53,10 +53,10 @@ export interface SettingsContextValue {
   // setters exposed for inline handlers (e.g. "Reset all to defaults")
   setConfig: React.Dispatch<React.SetStateAction<AppConfig | undefined>>;
   setDraft: React.Dispatch<React.SetStateAction<AppConfig | undefined>>;
-  // navigation (Task 3 wires the UI; declared here so the shape is stable)
+  // navigation
   activeTab: TabId;
   setActiveTab: (t: TabId) => void;
-  // search / highlight (Task 5 wires the UI)
+  // search / highlight
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   highlightedSettingId: string | null;
@@ -225,7 +225,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const onDiscard = () => {
-    if (config) setDraft(config);
+    if (config) {
+      setDraft(config);
+      apiClient.setBaseUrl(config.backendUrl);
+    }
     setReplacingKey({ gemini: false, openai: false, localOpenai: false });
   };
 

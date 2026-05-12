@@ -6,7 +6,8 @@ import { TABS } from "./shared";
 /**
  * SettingsRail — narrow left column of six clickable sub-tab buttons.
  * The active item gets a background tint + border; clicking any item calls
- * setActiveTab from the SettingsContext (Task 4 will make it hash-aware).
+ * setActiveTab from the SettingsContext, which reflects into the URL via
+ * router.setParams so the active tab survives navigation.
  */
 export function SettingsRail() {
   const { activeTab, setActiveTab } = useSettings();
