@@ -4,6 +4,7 @@ import { GlassCard, TextInput, Toggle } from "@yt-subtitle-maker/ui";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
 import { NumberStepper } from "./NumberStepper";
+import { ColorField } from "./ColorField";
 
 export function SubtitlesTab() {
   const { draft, update } = useSettings();
@@ -78,12 +79,13 @@ export function SubtitlesTab() {
             <SettingRow
               id="subtitles.color"
               label="Text color"
-              helper="Hex like #ffffff."
+              helper="Pick a color or type a #hex."
             >
-              <TextInput
+              <ColorField
                 value={draft.subColor}
-                onChangeText={(v: string) => update("subColor", v)}
-                placeholder="#ffffff"
+                onChangeText={(v) => update("subColor", v)}
+                fallback="#ffffff"
+                ariaLabel="Subtitle text color"
               />
             </SettingRow>
           </YStack>
@@ -91,12 +93,13 @@ export function SubtitlesTab() {
             <SettingRow
               id="subtitles.border-color"
               label="Outline color"
-              helper="Hex like #000000."
+              helper="Pick a color or type a #hex."
             >
-              <TextInput
+              <ColorField
                 value={draft.subBorderColor}
-                onChangeText={(v: string) => update("subBorderColor", v)}
-                placeholder="#000000"
+                onChangeText={(v) => update("subBorderColor", v)}
+                fallback="#000000"
+                ariaLabel="Subtitle outline color"
               />
             </SettingRow>
           </YStack>
@@ -125,10 +128,12 @@ export function SubtitlesTab() {
               label="Background"
               helper="Box behind text. Hex with alpha #RRGGBBAA. Blank = transparent."
             >
-              <TextInput
+              <ColorField
                 value={draft.subBackColor}
-                onChangeText={(v: string) => update("subBackColor", v)}
-                placeholder="(transparent)"
+                onChangeText={(v) => update("subBackColor", v)}
+                allowAlpha
+                fallback="#000000"
+                ariaLabel="Subtitle background"
               />
             </SettingRow>
           </YStack>
