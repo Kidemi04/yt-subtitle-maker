@@ -7,10 +7,23 @@ import { NumberStepper } from "./NumberStepper";
 import { ColorField } from "./ColorField";
 import { FontPicker } from "./FontPicker";
 import { SubtitlePreview } from "./SubtitlePreview";
+import { SubtitlePresets, type StyleFields } from "./SubtitlePresets";
 
 export function SubtitlesTab() {
   const { draft, update } = useSettings();
   if (!draft) return null;
+
+  const applyPreset = (v: StyleFields) => {
+    update("subFont", v.subFont);
+    update("subFontSize", v.subFontSize);
+    update("subBorderSize", v.subBorderSize);
+    update("subMarginY", v.subMarginY);
+    update("subColor", v.subColor);
+    update("subBorderColor", v.subBorderColor);
+    update("subBackColor", v.subBackColor);
+    update("subBold", v.subBold);
+  };
+
   return (
     <GlassCard variant="mid">
       <YStack gap="$md">
@@ -19,6 +32,7 @@ export function SubtitlesTab() {
           subtitle="How burned-in subtitles look when you Play with mpv. Leave a field blank to use mpv's default."
         />
         <SubtitlePreview cfg={draft} />
+        <SubtitlePresets apply={applyPreset} />
         <SettingRow
           id="subtitles.mpv-path"
           label="MPV executable path"
