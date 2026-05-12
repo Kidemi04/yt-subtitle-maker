@@ -73,3 +73,29 @@ def test_config_reset_restores_defaults(tmp_path, monkeypatch):
     assert body["geminiApiKey"] == ""
     # And it's persisted.
     assert client.get("/api/config").json()["defaultTargetLang"] == defaults["default_target_lang"]
+
+
+def test_config_response_includes_effective_defaults(tmp_path, monkeypatch):
+    import core.config as cfgmod
+    monkeypatch.setattr(cfgmod, "config_dir", lambda: tmp_path)
+
+    body = client.get("/api/config").json()
+    assert "_defaults" in body
+    d = body["_defaults"]
+    # camelCase keys, same shape as the config:
+    assert d["defaultWhisperModel"] == "turbo"
+    assert d["backendUrl"] == "http://127.0.0.1:8000"
+    assert d["geminiApiKey"] == ""          # default secret is empty => not masked
+    assert d["subFontSize"] == 0
+    # path fields are RESOLVED, not blank:
+    assert d["outputDir"] and d["outputDir"].endswith("output")
+    assert d["downloadDir"] and d["downloadDir"].endswith("downloads")
+    # The POSTs carry _defaults too, and _defaults is always the factory
+    # defaults — never the (now-dirty) live config:
+    dirty = client.post("/api/config", json={"defaultTargetLang": "fr"}).json()
+    assert "_defaults" in dirty
+    assert dirty["defaultTargetLang"] == "fr"                 # live config changed
+    assert dirty["_defaults"]["defaultTargetLang"] == "zh-CN" # _defaults did not
+    reset = client.post("/api/config/reset").json()
+    assert "_defaults" in reset
+    assert reset["defaultTargetLang"] == "zh-CN"
