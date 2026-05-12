@@ -2,7 +2,7 @@
   "name": "desktop",
   "version": "0.1.0",
   "private": true,
-  "main": "expo-router/entry",
+  "main": "index.js",
   "scripts": {
     "dev": "expo start --web --port 8081",
     "web": "expo start --web --port 8081",
