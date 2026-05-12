@@ -8,7 +8,7 @@ import { Section, SettingRow } from "./shared";
 import { ArmedField } from "./ArmedField";
 
 export function AdvancedTab() {
-  const { draft, update, setConfig, setDraft, setError } = useSettings();
+  const { draft, update, flush, setConfig, setDraft, setError } = useSettings();
   if (!draft) return null;
   return (
     <GlassCard variant="mid">
@@ -29,12 +29,14 @@ export function AdvancedTab() {
             onApply={(v) => {
               update("backendUrl", v);
               apiClient.setBaseUrl(v);
+              flush();
             }}
             secondaryAction={{
               label: "Reset to 127.0.0.1:8000",
               onPress: () => {
                 update("backendUrl", "127.0.0.1:8000");
                 apiClient.setBaseUrl("127.0.0.1:8000");
+                flush();
               },
             }}
           />
