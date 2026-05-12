@@ -6,6 +6,7 @@ import { Section, SettingRow } from "./shared";
 import { NumberStepper } from "./NumberStepper";
 import { ColorField } from "./ColorField";
 import { FontPicker } from "./FontPicker";
+import { SubtitlePreview } from "./SubtitlePreview";
 
 export function SubtitlesTab() {
   const { draft, update } = useSettings();
@@ -17,6 +18,7 @@ export function SubtitlesTab() {
           title="Subtitles"
           subtitle="How burned-in subtitles look when you Play with mpv. Leave a field blank to use mpv's default."
         />
+        <SubtitlePreview cfg={draft} />
         <SettingRow
           id="subtitles.mpv-path"
           label="MPV executable path"
