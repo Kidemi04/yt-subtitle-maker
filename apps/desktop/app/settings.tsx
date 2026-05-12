@@ -34,6 +34,9 @@ import {
 
 type ConnState = "untested" | "ok" | "warning" | "error";
 
+const MASK = "***";
+const isMasked = (v: string | undefined): boolean => v === MASK;
+
 const COOKIE_BROWSERS = [
   { label: "None", value: "" },
   { label: "Firefox (recommended)", value: "firefox" },
@@ -121,6 +124,9 @@ export default function Settings() {
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>();
   const [showApiKey, setShowApiKey] = React.useState(false);
+  const [replacingKey, setReplacingKey] = React.useState<
+    Record<"gemini" | "openai" | "localOpenai", boolean>
+  >({ gemini: false, openai: false, localOpenai: false });
   const [backendStatus, setBackendStatus] = React.useState<ConnState>("untested");
   const [translatorStatus, setTranslatorStatus] = React.useState<ConnState>("untested");
   const [cookieStatus, setCookieStatus] = React.useState<ConnState>("untested");
@@ -266,6 +272,7 @@ export default function Settings() {
       const next = await apiClient.updateConfig(draft);
       setConfig(next);
       setDraft(next);
+      setReplacingKey({ gemini: false, openai: false, localOpenai: false });
       apiClient.setBaseUrl(next.backendUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -276,6 +283,7 @@ export default function Settings() {
 
   const onDiscard = () => {
     if (config) setDraft(config);
+    setReplacingKey({ gemini: false, openai: false, localOpenai: false });
   };
 
   const testBackend = async () => {
@@ -643,33 +651,58 @@ export default function Settings() {
             <YStack gap="$sm">
               <YStack gap="$xs">
                 <Field label="Gemini API key" />
-                <XStack gap="$sm" alignItems="center">
-                  <XStack flex={1} alignItems="center" position="relative">
-                    <TextInput
+                {isMasked(draft.geminiApiKey) && !replacingKey.gemini ? (
+                  <XStack gap="$sm" alignItems="center">
+                    <Stack
                       flex={1}
-                      value={draft.geminiApiKey}
-                      onChangeText={(v: string) => update("geminiApiKey", v)}
-                      secureTextEntry={!showApiKey}
-                      placeholder="AIza..."
-                    />
-                    <Stack position="absolute" right={8}>
-                      <IconButton
-                        icon={
-                          showApiKey ? (
-                            <EyeOff size={14} color="$textSecondary" />
-                          ) : (
-                            <Eye size={14} color="$textSecondary" />
-                          )
-                        }
-                        aria-label="Toggle API key visibility"
-                        size={32}
-                        onPress={() => setShowApiKey((v) => !v)}
-                      />
+                      padding="$sm"
+                      borderRadius="$md"
+                      backgroundColor="$surfaceGlass"
+                      borderWidth={1}
+                      borderColor="$borderSubtle"
+                    >
+                      <BodySm color="$textSecondary">•••• key on file</BodySm>
                     </Stack>
+                    <ButtonGhost
+                      onPress={() => {
+                        update("geminiApiKey", "");
+                        setReplacingKey((r) => ({ ...r, gemini: true }));
+                      }}
+                    >
+                      Replace
+                    </ButtonGhost>
+                    <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
+                    <StatusDot status={translatorStatus} size={8} />
                   </XStack>
-                  <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
-                  <StatusDot status={translatorStatus} size={8} />
-                </XStack>
+                ) : (
+                  <XStack gap="$sm" alignItems="center">
+                    <XStack flex={1} alignItems="center" position="relative">
+                      <TextInput
+                        flex={1}
+                        value={draft.geminiApiKey}
+                        onChangeText={(v: string) => update("geminiApiKey", v)}
+                        secureTextEntry={!showApiKey}
+                        placeholder="AIza..."
+                      />
+                      <Stack position="absolute" right={8}>
+                        <IconButton
+                          icon={
+                            showApiKey ? (
+                              <EyeOff size={14} color="$textSecondary" />
+                            ) : (
+                              <Eye size={14} color="$textSecondary" />
+                            )
+                          }
+                          aria-label="Toggle API key visibility"
+                          size={32}
+                          onPress={() => setShowApiKey((v) => !v)}
+                        />
+                      </Stack>
+                    </XStack>
+                    <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
+                    <StatusDot status={translatorStatus} size={8} />
+                  </XStack>
+                )}
               </YStack>
               <YStack gap="$xs">
                 <Field label="Gemini model" />
@@ -736,11 +769,34 @@ export default function Settings() {
                   label="API key (optional)"
                   helper="Most local servers don't need one. Leave blank or 'lm-studio'."
                 />
-                <TextInput
-                  value={draft.localOpenaiApiKey}
-                  onChangeText={(v: string) => update("localOpenaiApiKey", v)}
-                  placeholder="lm-studio"
-                />
+                {isMasked(draft.localOpenaiApiKey) && !replacingKey.localOpenai ? (
+                  <XStack gap="$sm" alignItems="center">
+                    <Stack
+                      flex={1}
+                      padding="$sm"
+                      borderRadius="$md"
+                      backgroundColor="$surfaceGlass"
+                      borderWidth={1}
+                      borderColor="$borderSubtle"
+                    >
+                      <BodySm color="$textSecondary">•••• key on file</BodySm>
+                    </Stack>
+                    <ButtonGhost
+                      onPress={() => {
+                        update("localOpenaiApiKey", "");
+                        setReplacingKey((r) => ({ ...r, localOpenai: true }));
+                      }}
+                    >
+                      Replace
+                    </ButtonGhost>
+                  </XStack>
+                ) : (
+                  <TextInput
+                    value={draft.localOpenaiApiKey}
+                    onChangeText={(v: string) => update("localOpenaiApiKey", v)}
+                    placeholder="lm-studio"
+                  />
+                )}
               </YStack>
               <XStack gap="$sm" alignItems="center">
                 <ButtonSecondary onPress={testTranslator}>
@@ -788,16 +844,41 @@ export default function Settings() {
               </YStack>
               <YStack gap="$xs">
                 <Field label="API key" />
-                <XStack gap="$sm" alignItems="center">
-                  <TextInput
-                    flex={1}
-                    value={draft.openaiApiKey}
-                    onChangeText={(v: string) => update("openaiApiKey", v)}
-                    secureTextEntry={!showApiKey}
-                  />
-                  <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
-                  <StatusDot status={translatorStatus} size={8} />
-                </XStack>
+                {isMasked(draft.openaiApiKey) && !replacingKey.openai ? (
+                  <XStack gap="$sm" alignItems="center">
+                    <Stack
+                      flex={1}
+                      padding="$sm"
+                      borderRadius="$md"
+                      backgroundColor="$surfaceGlass"
+                      borderWidth={1}
+                      borderColor="$borderSubtle"
+                    >
+                      <BodySm color="$textSecondary">•••• key on file</BodySm>
+                    </Stack>
+                    <ButtonGhost
+                      onPress={() => {
+                        update("openaiApiKey", "");
+                        setReplacingKey((r) => ({ ...r, openai: true }));
+                      }}
+                    >
+                      Replace
+                    </ButtonGhost>
+                    <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
+                    <StatusDot status={translatorStatus} size={8} />
+                  </XStack>
+                ) : (
+                  <XStack gap="$sm" alignItems="center">
+                    <TextInput
+                      flex={1}
+                      value={draft.openaiApiKey}
+                      onChangeText={(v: string) => update("openaiApiKey", v)}
+                      secureTextEntry={!showApiKey}
+                    />
+                    <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
+                    <StatusDot status={translatorStatus} size={8} />
+                  </XStack>
+                )}
               </YStack>
               <YStack gap="$xs">
                 <Field
