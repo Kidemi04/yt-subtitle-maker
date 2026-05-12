@@ -18,346 +18,46 @@ import {
   StatusDot,
   BadgePill,
   BadgeAccent,
-  DisplaySm,
-  TitleSm,
-  BodyMd,
   BodySm,
   Caption,
 } from "@yt-subtitle-maker/ui";
 import { apiClient } from "../src/state/client";
 import {
-  ApiClient,
   type AppConfig,
   type TranslatorProvider,
-  type DependencyStatus,
 } from "@yt-subtitle-maker/api-client";
-
-type ConnState = "untested" | "ok" | "warning" | "error";
-
-const MASK = "***";
-const isMasked = (v: string | undefined): boolean => v === MASK;
-
-const COOKIE_BROWSERS = [
-  { label: "None", value: "" },
-  { label: "Firefox (recommended)", value: "firefox" },
-  { label: "Chrome (may fail)", value: "chrome" },
-  { label: "Edge (may fail)", value: "edge" },
-  { label: "Brave (may fail)", value: "brave" },
-  { label: "Opera (may fail)", value: "opera" },
-];
-
-const VERBOSITY = [
-  { label: "Error", value: "error" },
-  { label: "Warning", value: "warning" },
-  { label: "Info", value: "info" },
-  { label: "Debug", value: "debug" },
-];
-
-// Human labels for STT engine ids the backend may report as installed.
-// Only ids that actually exist in core/stt/__init__.py's registry will ever
-// appear (plus the synthetic "auto" mode). Adding a real engine later = add
-// its label here; it shows up automatically once /api/version lists it.
-const STT_ENGINE_LABELS: Record<string, string> = {
-  auto: "Auto — use YouTube's captions if present, else Whisper",
-  "openai-whisper": "openai-whisper (the reference engine)",
-  yt_captions: "YouTube captions only",
-};
-
-// base id list — keep this in sync with the backend's MODELS_URLS keys.
-const WHISPER_MODEL_IDS = ["tiny", "base", "small", "medium", "turbo", "large-v3"];
-
-
-const DEVICES = [
-  { label: "Auto", value: "auto" },
-  { label: "CPU", value: "cpu" },
-  { label: "GPU", value: "gpu" },
-];
-
-const LANGS = [
-  { label: "English", value: "en" },
-  { label: "中文", value: "zh" },
-  { label: "日本語", value: "ja" },
-  { label: "한국어", value: "ko" },
-  { label: "Español", value: "es" },
-  { label: "Français", value: "fr" },
-  { label: "Deutsch", value: "de" },
-  { label: "Português", value: "pt" },
-  { label: "Tiếng Việt", value: "vi" },
-];
-
-/** Section header — DisplaySm title plus optional BodySm subtitle. */
-function Section({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <YStack gap={2}>
-      <DisplaySm>{title}</DisplaySm>
-      {subtitle ? <BodySm color="$textSecondary">{subtitle}</BodySm> : null}
-    </YStack>
-  );
-}
-
-/** Field label — TitleSm primary line + optional Caption helper. */
-function Field({
-  label,
-  helper,
-}: {
-  label: string;
-  helper?: string;
-}) {
-  return (
-    <YStack gap={2} marginBottom="$xxs">
-      <TitleSm>{label}</TitleSm>
-      {helper ? <Caption>{helper}</Caption> : null}
-    </YStack>
-  );
-}
+import { SettingsProvider, useSettings } from "../src/components/settings/SettingsContext";
+import {
+  Section,
+  Field,
+  buildModelOptions,
+  COOKIE_BROWSERS,
+  VERBOSITY,
+  DEVICES,
+  LANGS,
+  isMasked,
+} from "../src/components/settings/shared";
 
 export default function Settings() {
-  const [config, setConfig] = React.useState<AppConfig | undefined>();
-  const [draft, setDraft] = React.useState<AppConfig | undefined>();
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | undefined>();
-  const [showApiKey, setShowApiKey] = React.useState(false);
-  const [replacingKey, setReplacingKey] = React.useState<
-    Record<"gemini" | "openai" | "localOpenai", boolean>
-  >({ gemini: false, openai: false, localOpenai: false });
-  const [backendStatus, setBackendStatus] = React.useState<ConnState>("untested");
-  const [translatorStatus, setTranslatorStatus] = React.useState<ConnState>("untested");
-  const [cookieStatus, setCookieStatus] = React.useState<ConnState>("untested");
-  const [cookieError, setCookieError] = React.useState<string | undefined>();
-  const [installedEngines, setInstalledEngines] = React.useState<
-    string[] | undefined
-  >(undefined);
-  const [jsRuntime, setJsRuntime] = React.useState<string | null | undefined>(
-    undefined,
+  return (
+    <SettingsProvider>
+      <SettingsShell />
+    </SettingsProvider>
   );
+}
 
-  // Translator model dropdown sources. Gemini's list is fetched once
-  // (returns the hardcoded KNOWN_MODELS); LM Studio + OpenAI come from
-  // the configured server's actual /v1/models endpoint.
-  const [geminiModels, setGeminiModels] = React.useState<string[]>([]);
-  const [localOpenaiModels, setLocalOpenaiModels] = React.useState<string[]>([]);
-  const [openaiModels, setOpenaiModels] = React.useState<string[]>([]);
-  const [modelsBusy, setModelsBusy] = React.useState<
-    "gemini" | "local_openai" | "openai" | undefined
-  >(undefined);
-  const [deps, setDeps] = React.useState<DependencyStatus | undefined>();
-
-  React.useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .fetchConfig()
-      .then((c) => {
-        if (cancelled) return;
-        setConfig(c);
-        setDraft(c);
-      })
-      .catch((err) => !cancelled && setError(err.message))
-      .finally(() => !cancelled && setLoading(false));
-    apiClient
-      .fetchVersion()
-      .then((v) => {
-        if (cancelled) return;
-        setInstalledEngines(v.installedSttEngines ?? []);
-        setJsRuntime(v.jsRuntime ?? null);
-      })
-      .catch(() => undefined);
-    // Gemini list is static (KNOWN_MODELS in the backend) — fetch once on
-    // mount; doesn't depend on credentials.
-    apiClient
-      .listTranslatorModels({ provider: "gemini" })
-      .then((res) => {
-        if (cancelled) return;
-        if (res.ok) setGeminiModels(res.models);
-      })
-      .catch(() => undefined);
-    apiClient
-      .fetchDependencies()
-      .then((d) => !cancelled && setDeps(d))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const refreshLocalOpenaiModels = async () => {
-    if (!draft) return;
-    setModelsBusy("local_openai");
-    try {
-      const res = await apiClient.listTranslatorModels({
-        provider: "local_openai",
-        baseUrl: draft.localOpenaiBaseUrl,
-        apiKey: draft.localOpenaiApiKey,
-      });
-      if (res.ok) setLocalOpenaiModels(res.models);
-    } catch {
-      /* surface via translator status */
-    } finally {
-      setModelsBusy(undefined);
-    }
-  };
-
-  const refreshOpenaiModels = async () => {
-    if (!draft) return;
-    setModelsBusy("openai");
-    try {
-      const res = await apiClient.listTranslatorModels({
-        provider: "openai",
-        baseUrl: draft.openaiBaseUrl,
-        apiKey: draft.openaiApiKey,
-      });
-      if (res.ok) setOpenaiModels(res.models);
-    } catch {
-      /* surface via translator status */
-    } finally {
-      setModelsBusy(undefined);
-    }
-  };
-
-  // Build dropdown option lists. If the saved value isn't in the fetched
-  // list (e.g. user edited config.json by hand, or we haven't fetched yet),
-  // include it as a "current" option so the dropdown can render the value
-  // without showing a stale placeholder.
-  const buildModelOptions = (
-    fetched: string[],
-    current: string | undefined,
-  ): { label: string; value: string }[] => {
-    const set = new Set(fetched);
-    const out = fetched.map((m) => ({ label: m, value: m }));
-    if (current && !set.has(current)) {
-      out.unshift({ label: `${current} (current)`, value: current });
-    }
-    return out;
-  };
-
-  const sttEngineOptions = React.useMemo(() => {
-    // "auto" is always offered; the rest is exactly what the backend reports
-    // as installed — never a hardcoded/aspirational engine.
-    const ids = ["auto", ...(installedEngines ?? [])];
-    return ids
-      .filter((id, i) => ids.indexOf(id) === i) // dedupe
-      .map((id) => ({ label: STT_ENGINE_LABELS[id] ?? id, value: id }));
-  }, [installedEngines]);
-
-  const whisperModelOptions = React.useMemo(() => {
-    const downloaded = deps?.models ?? {};
-    const ids = WHISPER_MODEL_IDS.includes(draft?.defaultWhisperModel ?? "")
-      ? WHISPER_MODEL_IDS
-      : [draft?.defaultWhisperModel ?? "", ...WHISPER_MODEL_IDS].filter(Boolean);
-    return ids.map((id) => {
-      const star = id === "turbo" ? " ⭐" : "";
-      let suffix = "";
-      if (deps) suffix = downloaded[id as keyof typeof downloaded] ? "  ✓ downloaded" : "  · not downloaded";
-      return { label: `${id}${star}${suffix}`, value: id };
-    });
-  }, [deps, draft?.defaultWhisperModel]);
-
-  const dirty =
-    !!draft && !!config && JSON.stringify(draft) !== JSON.stringify(config);
-
-  const update = <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
-    setDraft((d) => (d ? { ...d, [key]: value } : d));
-  };
-
-  const onSave = async () => {
-    if (!draft) return;
-    setSaving(true);
-    try {
-      const next = await apiClient.updateConfig(draft);
-      setConfig(next);
-      setDraft(next);
-      setReplacingKey({ gemini: false, openai: false, localOpenai: false });
-      apiClient.setBaseUrl(next.backendUrl);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const onDiscard = () => {
-    if (config) setDraft(config);
-    setReplacingKey({ gemini: false, openai: false, localOpenai: false });
-  };
-
-  const testBackend = async () => {
-    if (!draft) return;
-    setBackendStatus("untested");
-    try {
-      const tmp = new ApiClient(draft.backendUrl);
-      await tmp.fetchVersion();
-      setBackendStatus("ok");
-    } catch {
-      setBackendStatus("error");
-    }
-  };
-
-  const testTranslator = async () => {
-    if (!draft) return;
-    setTranslatorStatus("untested");
-    try {
-      const provider = draft.translatorProvider;
-      const baseUrl =
-        provider === "local_openai"
-          ? draft.localOpenaiBaseUrl
-          : provider === "openai"
-          ? draft.openaiBaseUrl
-          : undefined;
-      const apiKey =
-        provider === "local_openai"
-          ? draft.localOpenaiApiKey
-          : provider === "openai"
-          ? draft.openaiApiKey
-          : draft.geminiApiKey;
-      const model =
-        provider === "local_openai"
-          ? draft.localOpenaiModel
-          : provider === "openai"
-          ? draft.openaiModel
-          : draft.geminiModel;
-      const res = await apiClient.testTranslator({
-        provider,
-        baseUrl,
-        apiKey,
-        model,
-      });
-      setTranslatorStatus(res.ok ? "ok" : "error");
-    } catch {
-      setTranslatorStatus("error");
-    }
-  };
-
-  const [cookieSource, setCookieSource] = React.useState<string | undefined>();
-  const [cookiesAttached, setCookiesAttached] = React.useState<boolean | undefined>();
-
-  const testCookies = async () => {
-    if (!draft) return;
-    setCookieStatus("untested");
-    setCookieError(undefined);
-    setCookieSource(undefined);
-    setCookiesAttached(undefined);
-    try {
-      // Pass DRAFT values so the user can verify changes BEFORE saving.
-      const res = await apiClient.testCookies({
-        cookieBrowser: draft.cookieBrowser,
-        cookieProfile: draft.cookieProfile,
-        cookiesTxtPath: draft.cookiesTxtPath,
-      });
-      setCookieStatus(res.ok ? "ok" : "error");
-      setCookieError(res.error);
-      setCookieSource(res.cookieSource);
-      setCookiesAttached(res.cookiesAttached);
-    } catch (err) {
-      setCookieStatus("error");
-      setCookieError(err instanceof Error ? err.message : String(err));
-    }
-  };
+function SettingsShell() {
+  const {
+    config, draft, loading, saving, error, dirty, setError,
+    update, onSave, onDiscard,
+    showApiKey, setShowApiKey, replacingKey, setReplacingKey,
+    backendStatus, testBackend, translatorStatus, testTranslator,
+    cookieStatus, cookieError, cookieSource, cookiesAttached, testCookies,
+    jsRuntime, deps, geminiModels, localOpenaiModels, openaiModels, modelsBusy,
+    sttEngineOptions, whisperModelOptions,
+    refreshLocalOpenaiModels, refreshOpenaiModels,
+    setConfig, setDraft,
+  } = useSettings();
 
   if (loading || !draft) {
     return (
