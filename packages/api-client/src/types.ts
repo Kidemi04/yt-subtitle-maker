@@ -7,6 +7,25 @@
 
 export type TranslatorProvider = "gemini" | "local_openai" | "openai";
 
+/** A named translation-provider profile stored in custom_translators. */
+export interface TranslatorProfile {
+  id: string;
+  name: string;
+  baseUrl: string;
+  /** Masked to "***" on GET when non-empty; send "***" back to keep the saved key. */
+  apiKey: string;
+  model: string;
+}
+
+/** Structured result from POST /api/translator/test (Phase 4d). */
+export interface TranslatorTestResult {
+  ok: boolean;
+  sample?: { src: string; dst: string };
+  latencyMs?: number;
+  model?: string | null;
+  error?: string;
+}
+
 export interface VideoMetadata {
   ok: boolean;
   videoId?: string;
@@ -252,6 +271,10 @@ export interface AppConfig {
   openaiBaseUrl: string;
   openaiApiKey: string;
   openaiModel: string;
+  /** Named custom translation-provider profiles (Phase 4d). */
+  customTranslators?: TranslatorProfile[];
+  /** Active translator: "gemini" | "local_openai" | "custom:<id>" (Phase 4d). */
+  activeTranslator?: string;
   mpvPath: string;
   whisperCacheDir: string;
   ffmpegResample16k: boolean;

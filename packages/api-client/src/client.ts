@@ -12,7 +12,9 @@ import type {
   ProcessEvent,
   ProcessRequest,
   SystemReport,
+  TranslatorProfile,
   TranslatorProvider,
+  TranslatorTestResult,
   VideoDetail,
   VideoMetadata,
   WhisperModel,
@@ -111,12 +113,33 @@ export class ApiClient {
   }
 
   // ─── Translation helpers ───────────────────────────────────────────────
-  async testTranslator(input: {
-    provider: TranslatorProvider;
-    baseUrl?: string;
-    apiKey?: string;
-    model?: string;
-  }): Promise<{ ok: boolean; latencyMs?: number; error?: string }> {
+  /**
+   * Test a translator. Two call forms:
+   *
+   * **Ad-hoc spec** (test before saving):
+   *   `{ provider, baseUrl?, apiKey?, model?, targetLang? }`
+   *
+   * **Saved-profile** (uses persisted credentials server-side):
+   *   `{ profileId, useSavedKey: true, targetLang? }`
+   *
+   * Both return a `TranslatorTestResult` with a real one-line translation
+   * round-trip or a structured error.
+   */
+  async testTranslator(
+    input:
+      | {
+          provider: TranslatorProvider;
+          baseUrl?: string;
+          apiKey?: string;
+          model?: string;
+          targetLang?: string;
+        }
+      | {
+          profileId: string;
+          useSavedKey: true;
+          targetLang?: string;
+        },
+  ): Promise<TranslatorTestResult> {
     const res = await fetch(`${this.baseUrl}/api/translator/test`, {
       method: "POST",
       headers: this.headers(),
@@ -126,11 +149,11 @@ export class ApiClient {
     return res.json();
   }
 
-  async listTranslatorModels(input: {
-    provider: TranslatorProvider;
-    baseUrl?: string;
-    apiKey?: string;
-  }): Promise<{ ok: boolean; models: string[]; error?: string }> {
+  async listTranslatorModels(
+    input:
+      | { provider: TranslatorProvider; baseUrl?: string; apiKey?: string }
+      | { profileId: string; useSavedKey: true },
+  ): Promise<{ ok: boolean; models: string[]; error?: string }> {
     const res = await fetch(`${this.baseUrl}/api/translator/list-models`, {
       method: "POST",
       headers: this.headers(),
