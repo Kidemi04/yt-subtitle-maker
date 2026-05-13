@@ -73,7 +73,10 @@ class LibraryTranslateRequest(BaseModel):
     """Body for POST /api/library/{videoId}/translate."""
     sourceTranscribeId: str
     targetLang: str
-    translatorProvider: Literal["gemini", "local_openai", "openai"] | None = None
+    # Same shape as api.schemas.ProcessRequest.translatorProvider — see that
+    # field. Accepts legacy 'gemini' / 'local_openai' / 'openai' AND the
+    # Phase 4d 'custom:<id>' named-profile form.
+    translatorProvider: str | None = None
     translatorModel: str | None = None
     translatorBaseUrl: str | None = None
     translatorApiKey: str | None = None

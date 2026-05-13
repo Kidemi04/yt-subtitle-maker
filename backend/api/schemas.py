@@ -38,10 +38,15 @@ class ProcessRequest(BaseModel):
     enableTranslation: bool
     targetLang: str | None = None
 
-    # Default is None so the pipeline falls through to `cfg.translator_provider`.
-    # Hard-coding "gemini" here would override the user's Settings choice
-    # because pipeline.py uses `request.get(...) or cfg.<field>`.
-    translatorProvider: TranslatorProvider | None = None
+    # Per-job translator override. Accepts the legacy 3-slot identifiers
+    # ('gemini' / 'local_openai' / 'openai') AND the Phase 4d named-profile
+    # form 'custom:<id>' for user-saved profiles in `customTranslators`.
+    # Pipeline `_make_translator` dispatches both shapes. Default is None so
+    # the pipeline falls through to `cfg.active_translator` /
+    # `cfg.translator_provider` — hard-coding a value here would override the
+    # user's Settings choice because pipeline.py uses
+    # `request.get(...) or cfg.<field>`.
+    translatorProvider: str | None = None
     translatorBaseUrl: str | None = None
     translatorModel: str | None = None
     translatorApiKey: str | None = None
