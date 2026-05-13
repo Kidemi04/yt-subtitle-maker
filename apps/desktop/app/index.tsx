@@ -43,6 +43,7 @@ import { apiClient } from "../src/state/client";
 import { useSettings } from "../src/components/settings/SettingsContext";
 import { engineVerdict } from "../src/components/settings/engineVerdict";
 import { NewTranscribeModal } from "../src/components/NewTranscribeModal";
+import { LanguagePicker } from "../src/components/settings/LanguagePicker";
 import { useRouter } from "expo-router";
 import type {
   SttSource,
@@ -165,21 +166,6 @@ function Waveform({ active }: { active: boolean }) {
     </XStack>
   );
 }
-
-/* ───────────── language constants (subset) ───────────── */
-
-const LANGUAGE_OPTIONS = [
-  { label: "English", value: "en" },
-  { label: "中文 (Chinese)", value: "zh" },
-  { label: "日本語 (Japanese)", value: "ja" },
-  { label: "한국어 (Korean)", value: "ko" },
-  { label: "Español", value: "es" },
-  { label: "Français", value: "fr" },
-  { label: "Deutsch", value: "de" },
-  { label: "Português", value: "pt" },
-  { label: "Русский", value: "ru" },
-  { label: "Tiếng Việt", value: "vi" },
-];
 
 const WHISPER_MODELS: { label: string; value: WhisperModel }[] = [
   { label: "tiny · 75 MB", value: "tiny" },
@@ -644,20 +630,18 @@ export default function Generate() {
                 <XStack gap="$md">
                   <YStack flex={1} gap="$xs">
                     <CaptionUpper>Source language</CaptionUpper>
-                    <Dropdown
+                    <LanguagePicker
                       value={sourceLang}
                       onValueChange={setSourceLang}
-                      options={LANGUAGE_OPTIONS}
                       width="100%"
                       aria-label="Source language"
                     />
                   </YStack>
                   <YStack flex={1} gap="$xs">
                     <CaptionUpper>Target language</CaptionUpper>
-                    <Dropdown
+                    <LanguagePicker
                       value={targetLang}
                       onValueChange={setTargetLang}
-                      options={LANGUAGE_OPTIONS}
                       width="100%"
                       disabled={!enableTranslation || downloadOnly}
                       aria-label="Target language"
