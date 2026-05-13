@@ -28,6 +28,7 @@ import {
   Caption,
   CaptionUpper,
 } from "@yt-subtitle-maker/ui";
+import { LanguagePicker } from "./settings/LanguagePicker";
 import type {
   WhisperDevice,
   WhisperModel,
@@ -49,19 +50,6 @@ const DEVICES: { label: string; value: WhisperDevice }[] = [
   { label: "Auto", value: "auto" },
   { label: "CPU", value: "cpu" },
   { label: "GPU (CUDA)", value: "gpu" },
-];
-
-const LANGUAGES = [
-  { label: "English", value: "en" },
-  { label: "中文 (Chinese)", value: "zh" },
-  { label: "日本語 (Japanese)", value: "ja" },
-  { label: "한국어 (Korean)", value: "ko" },
-  { label: "Español", value: "es" },
-  { label: "Français", value: "fr" },
-  { label: "Deutsch", value: "de" },
-  { label: "Português", value: "pt" },
-  { label: "Русский", value: "ru" },
-  { label: "Tiếng Việt", value: "vi" },
 ];
 
 export function NewTranscribeModal({
@@ -264,10 +252,9 @@ export function NewTranscribeModal({
 
         <YStack gap="$xs">
           <CaptionUpper>Source language</CaptionUpper>
-          <Dropdown
+          <LanguagePicker
             value={sourceLang}
             onValueChange={setSourceLang}
-            options={LANGUAGES}
             aria-label="Source language"
             disabled={phase === "transcribing"}
           />
