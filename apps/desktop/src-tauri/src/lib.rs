@@ -97,6 +97,7 @@ fn spawn_backend(app: &tauri::AppHandle) -> std::io::Result<Option<Child>> {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(BackendProcess(Mutex::new(None)))
         .setup(|app| {
             match spawn_backend(app.handle()) {

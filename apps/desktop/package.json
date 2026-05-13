@@ -20,6 +20,7 @@
     "@tamagui/animations-css": "1.115.5",
     "@tamagui/lucide-icons": "1.115.5",
     "@tamagui/shorthands": "1.115.5",
+    "@tauri-apps/plugin-dialog": "^2",
     "@yt-subtitle-maker/api-client": "workspace:*",
     "@yt-subtitle-maker/ui": "workspace:*",
     "zustand": "^4.5.5",
