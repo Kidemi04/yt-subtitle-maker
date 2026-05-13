@@ -21,11 +21,9 @@ import {
   ButtonSecondary,
   ButtonGhost,
   IconButton,
-  BadgeAccent,
   BadgePill,
   ProgressBar,
   StepPill,
-  RadioCard,
   Toggle,
   Dropdown,
   SegmentedControl,
@@ -43,6 +41,7 @@ import {
 import { useGenerate } from "../src/state/generate";
 import { apiClient } from "../src/state/client";
 import { useSettings } from "../src/components/settings/SettingsContext";
+import { engineVerdict } from "../src/components/settings/engineVerdict";
 import { NewTranscribeModal } from "../src/components/NewTranscribeModal";
 import { useRouter } from "expo-router";
 import type {
@@ -220,7 +219,16 @@ export default function Generate() {
   // Translation-may-fail banner — reads last test result from SettingsContext
   // (persisted in-memory across route navigations; SettingsProvider lives in
   // the root layout so it is always mounted).
-  const { lastTestResult, activeTranslator, customTranslators } = useSettings();
+  const {
+    lastTestResult,
+    activeTranslator,
+    customTranslators,
+    // engines + system feed the engine label + verdict pill + per-model
+    // size/downloaded indicators on the Advanced section, mirroring what
+    // Settings → Transcription shows via <EnginePicker>.
+    engines,
+    system,
+  } = useSettings();
 
   // Derive the profile id used as key into lastTestResult.
   // activeTranslator is stored as "gemini" | "local_openai" | "custom:<id>".
@@ -313,10 +321,33 @@ export default function Generate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Whisper model options enriched to match Settings → Transcription →
+  // EnginePicker's per-model rows: each label shows the size in GB/MB and a
+  // "✓ downloaded" indicator. Sourced from the live `engines` descriptor
+  // when available, with a graceful fallback to the static WHISPER_MODELS
+  // list (only the installed subset) if engines hasn't loaded yet.
+  const whisperEngine = React.useMemo(
+    () => engines?.find((e) => e.id === "openai-whisper"),
+    [engines],
+  );
   const whisperModelOptions = React.useMemo(() => {
+    if (whisperEngine) {
+      return whisperEngine.models.map((m) => {
+        const gb = m.sizeMb >= 1024 ? (m.sizeMb / 1024).toFixed(1) + " GB" : m.sizeMb + " MB";
+        const downloaded = m.downloaded ? " · ✓" : "";
+        return { label: `${m.name} · ${gb}${downloaded}`, value: m.name as WhisperModel };
+      });
+    }
     if (!installedWhisperModels) return WHISPER_MODELS;
     return WHISPER_MODELS.filter((opt) => installedWhisperModels.has(opt.value));
-  }, [installedWhisperModels]);
+  }, [whisperEngine, installedWhisperModels]);
+
+  // Verdict pill — mirrors Settings → Transcription. "✓ works (Apple MPS)"
+  // / "⚠ runs but no acceleration here (…)" / etc.
+  const whisperVerdict = React.useMemo(() => {
+    if (!whisperEngine || !system) return null;
+    return engineVerdict(whisperEngine, system);
+  }, [whisperEngine, system]);
 
   // Translator provider — initialized from Settings' `activeTranslator`
   // (the named-profile model from Phase 4d). Per-job override stays in this
@@ -584,47 +615,29 @@ export default function Generate() {
 
             {configureOpen ? (
               <YStack gap="$lg">
-                {/* Subtitle source radio group */}
+                {/* Subtitle source — mirrors Settings → Transcription →
+                    SourceModeControl: a SegmentedControl over the three
+                    modes that map onto defaultSttEngine + ytCaptionsFirst.
+                    Helper text explains the Auto fall-through. */}
                 <YStack gap="$sm">
                   <CaptionUpper>Subtitle source</CaptionUpper>
-                  <YStack gap="$xs">
-                    <RadioCard
-                      selected={sttSource === "auto"}
-                      onPress={() => setSttSource("auto")}
-                    >
-                      <YStack gap={2} flex={1}>
-                        <XStack alignItems="center" gap="$xs">
-                          <TitleSm>Auto</TitleSm>
-                          <BadgeAccent>recommended</BadgeAccent>
-                        </XStack>
-                        <BodySm color="$textSecondary">
-                          Try YouTube auto-captions first, fall back to Whisper.
-                        </BodySm>
-                      </YStack>
-                    </RadioCard>
-                    <RadioCard
-                      selected={sttSource === "yt_captions"}
-                      onPress={() => setSttSource("yt_captions")}
-                    >
-                      <YStack gap={2}>
-                        <TitleSm>YouTube auto-captions only</TitleSm>
-                        <BodySm color="$textSecondary">
-                          Free + instant, but unavailable on many videos.
-                        </BodySm>
-                      </YStack>
-                    </RadioCard>
-                    <RadioCard
-                      selected={sttSource === "whisper"}
-                      onPress={() => setSttSource("whisper")}
-                    >
-                      <YStack gap={2}>
-                        <TitleSm>Whisper only</TitleSm>
-                        <BodySm color="$textSecondary">
-                          Skip YT captions, run Whisper directly on the audio.
-                        </BodySm>
-                      </YStack>
-                    </RadioCard>
-                  </YStack>
+                  <SegmentedControl
+                    value={sttSource}
+                    onValueChange={(v) => setSttSource(v as SttSource)}
+                    options={[
+                      { label: "Auto", value: "auto" },
+                      { label: "YouTube captions only", value: "yt_captions" },
+                      { label: "Whisper only", value: "whisper" },
+                    ]}
+                    aria-label="Subtitle source"
+                  />
+                  <Caption color="$textMuted">
+                    {sttSource === "auto"
+                      ? "Try YouTube auto-captions first, fall back to Whisper."
+                      : sttSource === "yt_captions"
+                      ? "Free + instant, but unavailable on many videos."
+                      : "Skip YT captions, run Whisper directly on the audio."}
+                  </Caption>
                 </YStack>
 
                 {/* Languages */}
@@ -769,6 +782,30 @@ export default function Generate() {
                   </XStack>
                   {advancedOpen ? (
                     <YStack gap="$md">
+                      {/* Engine header — mirrors Settings → Transcription
+                          EnginePicker: engine name + machine-compat
+                          verdict pill (works / runs-no-accel / wont-help)
+                          using the same engineVerdict() helper. Hidden if
+                          engines/system haven't loaded yet. */}
+                      {whisperEngine && whisperVerdict ? (
+                        <XStack alignItems="center" gap="$sm" flexWrap="wrap">
+                          <TitleSm>{whisperEngine.label}</TitleSm>
+                          <BadgePill
+                            tone={
+                              whisperVerdict.level === "works"
+                                ? "success"
+                                : whisperVerdict.level === "runs-no-accel"
+                                ? "warning"
+                                : whisperVerdict.level === "wont-help"
+                                ? "error"
+                                : "neutral"
+                            }
+                          >
+                            {whisperVerdict.line}
+                          </BadgePill>
+                        </XStack>
+                      ) : null}
+
                       <XStack gap="$md" flexWrap="wrap">
                         <YStack flex={1} minWidth={180} gap="$xs">
                           <CaptionUpper>Whisper model</CaptionUpper>
@@ -780,9 +817,19 @@ export default function Generate() {
                             options={whisperModelOptions}
                             width="100%"
                           />
-                          {installedWhisperModels &&
-                          installedWhisperModels.size <
-                            WHISPER_MODELS.length ? (
+                          {/* Footnote — different copy based on which data
+                              source is feeding the dropdown. With live
+                              engines data we show sizes for every model;
+                              with the static fallback we filter to installed
+                              only and prompt the user to install more. */}
+                          {whisperEngine ? (
+                            <Caption color="$textMuted">
+                              Sizes from the live engine catalog. Download more
+                              models in Settings.
+                            </Caption>
+                          ) : installedWhisperModels &&
+                            installedWhisperModels.size <
+                              WHISPER_MODELS.length ? (
                             <Caption>
                               Only installed models shown · install more in
                               first-run setup
