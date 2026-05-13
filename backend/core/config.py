@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -47,6 +47,14 @@ class AppConfig:
     default_target_lang: str = "zh-CN"
     translator_provider: Literal["gemini", "local_openai", "openai"] = "gemini"
 
+    # Named provider profiles (Phase 4d).
+    # Each entry: { id, name, base_url, api_key, model }.
+    # Built-in profiles ("gemini", "local_openai") are stored separately below;
+    # custom entries (including migrated legacy openai_*) live here.
+    custom_translators: list = field(default_factory=list)
+    # "gemini" | "local_openai" | "custom:<id>"
+    active_translator: str = "gemini"
+
     # Gemini
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash-lite"
@@ -85,12 +93,64 @@ class AppConfig:
     sub_margin_y: int = 0        # 0 = mpv default; bottom margin in pixels
 
 
+_DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
+
+
+def _migrate_config(data: dict) -> dict:
+    """Idempotent migration of legacy config keys to the Phase-4d shape.
+
+    Runs on the raw dict before AppConfig is constructed.  Safe to call
+    on already-migrated configs — produces the identical output.
+
+    Migrations performed:
+    1. If `openai_api_key` or `openai_model` are non-default AND there is no
+       existing custom_translators entry with id='openai-legacy', append one.
+    2. If `translator_provider == 'openai'` and `active_translator` is not
+       already set in the raw dict, set it to 'custom:openai-legacy'.
+    3. If `translator_provider` is 'gemini' or 'local_openai' and
+       `active_translator` is not already in the raw dict, copy it across.
+    """
+    data = dict(data)  # shallow copy — don't mutate the caller's dict
+
+    existing_ids = {e.get("id") for e in data.get("custom_translators", [])}
+
+    # Migration 1: promote legacy openai_* block
+    openai_key = data.get("openai_api_key", "")
+    openai_model = data.get("openai_model", "")
+    openai_url = data.get("openai_base_url", _DEFAULT_OPENAI_URL)
+    is_non_default = bool(openai_key) or (openai_model and openai_model != "gpt-4o-mini")
+
+    if is_non_default and "openai-legacy" not in existing_ids:
+        legacy_entry = {
+            "id": "openai-legacy",
+            "name": "OpenAI",
+            "base_url": openai_url or _DEFAULT_OPENAI_URL,
+            "api_key": openai_key,
+            "model": openai_model or "gpt-4o-mini",
+        }
+        data.setdefault("custom_translators", [])
+        data["custom_translators"] = list(data["custom_translators"]) + [legacy_entry]
+
+    # Migration 2 & 3: map translator_provider → active_translator
+    if "active_translator" not in data:
+        provider = data.get("translator_provider", "gemini")
+        if provider == "openai":
+            data["active_translator"] = "custom:openai-legacy"
+        elif provider in ("gemini", "local_openai"):
+            data["active_translator"] = provider
+        else:
+            data["active_translator"] = "gemini"
+
+    return data
+
+
 def load_config() -> AppConfig:
     p = config_path()
     if not p.exists():
         return AppConfig()
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
+        data = _migrate_config(data)
         # Filter out unknown keys to tolerate older configs
         valid = {k: v for k, v in data.items() if k in AppConfig.__dataclass_fields__}
         return AppConfig(**valid)
