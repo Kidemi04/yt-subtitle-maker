@@ -1,0 +1,100 @@
+"""Tests for get_active_translator — the AppConfig-aware dispatcher."""
+from unittest.mock import MagicMock, patch
+
+from core.config import AppConfig
+from core.translator import get_active_translator
+from core.translator.gemini import GeminiTranslator
+from core.translator.openai_compat import OpenAICompatTranslator
+
+
+def _cfg(**kwargs) -> AppConfig:
+    cfg = AppConfig()
+    for k, v in kwargs.items():
+        setattr(cfg, k, v)
+    return cfg
+
+
+def test_active_gemini():
+    cfg = _cfg(active_translator="gemini", gemini_api_key="gkey", gemini_model="gemini-2.5-flash-lite")
+    provider = get_active_translator(cfg)
+    assert isinstance(provider, GeminiTranslator)
+    assert provider.api_key == "gkey"
+
+
+def test_active_local_openai():
+    cfg = _cfg(
+        active_translator="local_openai",
+        local_openai_base_url="http://127.0.0.1:1234/v1",
+        local_openai_model="gemma-3-27b",
+        local_openai_api_key="",
+    )
+    provider = get_active_translator(cfg)
+    assert isinstance(provider, OpenAICompatTranslator)
+    assert provider.name == "local_openai"
+    assert provider.api_key == "lm-studio"  # default sentinel
+
+
+def test_active_custom_profile():
+    cfg = _cfg(
+        active_translator="custom:deepseek-1",
+        custom_translators=[{
+            "id": "deepseek-1",
+            "name": "DeepSeek",
+            "base_url": "https://api.deepseek.com/v1",
+            "api_key": "ds-key",
+            "model": "deepseek-chat",
+        }],
+    )
+    provider = get_active_translator(cfg)
+    assert isinstance(provider, OpenAICompatTranslator)
+    assert provider.base_url == "https://api.deepseek.com/v1"
+    assert provider.api_key == "ds-key"
+    assert provider.model == "deepseek-chat"
+    assert provider.name == "DeepSeek"
+
+
+def test_stale_custom_id_falls_back_to_gemini():
+    """If active_translator points to a non-existent custom id, fall back to Gemini."""
+    cfg = _cfg(
+        active_translator="custom:nope",
+        custom_translators=[],
+        gemini_api_key="gkey",
+    )
+    provider = get_active_translator(cfg)
+    assert isinstance(provider, GeminiTranslator)
+
+
+def test_pipeline_uses_get_active_translator_when_no_override():
+    """pipeline._make_translator should call get_active_translator when the
+    request dict has no translatorProvider override."""
+    from core.pipeline import _make_translator
+
+    cfg = AppConfig()
+    cfg.active_translator = "gemini"
+    cfg.gemini_api_key = "gkey"
+
+    with patch("core.pipeline.get_active_translator") as mock_gat:
+        mock_gat.return_value = MagicMock()
+        _make_translator({}, cfg)
+        mock_gat.assert_called_once_with(cfg)
+
+
+def test_pipeline_per_job_override_still_wins():
+    """A non-None translatorProvider in the request skips get_active_translator."""
+    from core.pipeline import _make_translator
+
+    cfg = AppConfig()
+    with patch("core.pipeline.get_active_translator") as mock_gat:
+        with patch("core.pipeline.get_translator") as mock_gt:
+            mock_gt.return_value = MagicMock()
+            _make_translator(
+                {
+                    "translatorProvider": "gemini",
+                    "translatorBaseUrl": None,
+                    "translatorModel": "gemini-2.5-flash-lite",
+                    "translatorApiKey": None,
+                },
+                cfg,
+            )
+            mock_gat.assert_not_called()
+            mock_gt.assert_called_once()

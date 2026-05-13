@@ -30,7 +30,7 @@ from core.downloader.youtube import download_audio, safe_folder_name
 from core.stt import get_provider
 from core.stt.base import TranscriptionProvider, TranscriptionResult
 from core.stt.yt_captions import YtCaptionsProvider
-from core.translator import get_translator
+from core.translator import get_active_translator, get_translator
 
 # yt-dlp's `_percent_str` may include ANSI color codes (e.g. "\x1b[0;94m  0.0%\x1b[0m")
 # when its console output is colorized. We strip those before parsing.
@@ -90,28 +90,36 @@ def _select_stt_provider(request: dict, cfg: AppConfig, url: str) -> Transcripti
 
 
 def _make_translator(request: dict, cfg: AppConfig):
-    provider = request.get("translatorProvider") or cfg.translator_provider
-    if provider == "gemini":
-        return get_translator(
-            "gemini",
-            api_key=request.get("translatorApiKey") or cfg.gemini_api_key,
-            model=request.get("translatorModel") or cfg.gemini_model,
-        )
-    if provider == "local_openai":
-        return get_translator(
-            "local_openai",
-            base_url=request.get("translatorBaseUrl") or cfg.local_openai_base_url,
-            model=request.get("translatorModel") or cfg.local_openai_model,
-            api_key=request.get("translatorApiKey") or cfg.local_openai_api_key or "lm-studio",
-        )
-    if provider == "openai":
-        return get_translator(
-            "openai",
-            base_url=request.get("translatorBaseUrl") or cfg.openai_base_url,
-            model=request.get("translatorModel") or cfg.openai_model,
-            api_key=request.get("translatorApiKey") or cfg.openai_api_key,
-        )
-    raise ValueError(f"unknown translator provider: {provider!r}")
+    # Per-job override: the Generate screen can pass a specific provider plus
+    # credentials. When present we honour it verbatim and skip the active-
+    # translator resolution. The override-path dispatch mirrors the original
+    # behaviour for the three built-in providers.
+    override_provider = request.get("translatorProvider")
+    if override_provider:
+        if override_provider == "gemini":
+            return get_translator(
+                "gemini",
+                api_key=request.get("translatorApiKey") or cfg.gemini_api_key,
+                model=request.get("translatorModel") or cfg.gemini_model,
+            )
+        if override_provider == "local_openai":
+            return get_translator(
+                "local_openai",
+                base_url=request.get("translatorBaseUrl") or cfg.local_openai_base_url,
+                model=request.get("translatorModel") or cfg.local_openai_model,
+                api_key=request.get("translatorApiKey") or cfg.local_openai_api_key or "lm-studio",
+            )
+        if override_provider == "openai":
+            return get_translator(
+                "openai",
+                base_url=request.get("translatorBaseUrl") or cfg.openai_base_url,
+                model=request.get("translatorModel") or cfg.openai_model,
+                api_key=request.get("translatorApiKey") or cfg.openai_api_key,
+            )
+        raise ValueError(f"unknown translator provider: {override_provider!r}")
+    # No per-job override → use the active translator from config (respects
+    # gemini / local_openai / custom:<id> profiles).
+    return get_active_translator(cfg)
 
 
 def _seed_metadata(
