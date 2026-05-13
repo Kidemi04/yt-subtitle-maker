@@ -78,11 +78,14 @@ class OpenAICompatTranslator:
     def _translate_batch(
         self, batch: list[TranscriptionSegment], target_lang: str
     ) -> None:
+        if not batch:
+            return
         numbered = "\n".join(f"[{i+1}] {seg.text}" for i, seg in enumerate(batch))
         system = (
             f"You are a subtitle translator. Translate each numbered line into "
             f"{target_lang}. Output ONLY a JSON array of strings, one per input "
-            f"line, in the same order. Do not merge or split lines."
+            f"line, in the same order. Do not merge or split lines. "
+            f"The output array MUST have EXACTLY {len(batch)} elements."
         )
         resp = self._client.chat.completions.create(
             model=self.model,
@@ -96,12 +99,25 @@ class OpenAICompatTranslator:
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         translations = json.loads(text)
-        if len(translations) != len(batch):
+        if len(translations) == len(batch):
+            for seg, t in zip(batch, translations, strict=True):
+                seg.translated = t
+            return
+
+        # Count mismatch recovery. LLMs (esp. fast non-reasoning models like
+        # DeepSeek-V4-Flash) routinely merge or drop a line in long batches
+        # despite the "do not merge" instruction — the contract is best-
+        # effort, not strict. Bisect the batch and retry. Each recursion
+        # halves the size; eventually we either converge or hit a size-1
+        # batch the model still refuses to handle (a genuine provider error
+        # worth surfacing). Worst case: 2N API calls instead of N.
+        if len(batch) == 1:
             raise RuntimeError(
-                f"Translator returned {len(translations)} for {len(batch)} segments"
+                f"Translator returned {len(translations)} for 1 segment"
             )
-        for seg, t in zip(batch, translations, strict=True):
-            seg.translated = t
+        mid = len(batch) // 2
+        self._translate_batch(batch[:mid], target_lang)
+        self._translate_batch(batch[mid:], target_lang)
 
     def translate_title(self, title: str, target_lang: str) -> str:
         resp = self._client.chat.completions.create(

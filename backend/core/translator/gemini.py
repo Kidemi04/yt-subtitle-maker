@@ -69,11 +69,14 @@ class GeminiTranslator:
     def _translate_batch(
         self, batch: list[TranscriptionSegment], target_lang: str
     ) -> None:
+        if not batch:
+            return
         numbered = "\n".join(f"[{i+1}] {seg.text}" for i, seg in enumerate(batch))
         prompt = (
             f"Translate each numbered subtitle line to {target_lang}.\n"
             f"Output ONLY a JSON array of strings, in the same order.\n"
-            f"Preserve sentence boundaries; do NOT merge or split lines.\n\n"
+            f"Preserve sentence boundaries; do NOT merge or split lines.\n"
+            f"The output array MUST have EXACTLY {len(batch)} elements.\n\n"
             f"{numbered}"
         )
         resp = self._client.models.generate_content(
@@ -85,12 +88,22 @@ class GeminiTranslator:
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         translations = json.loads(text)
-        if len(translations) != len(batch):
+        if len(translations) == len(batch):
+            for seg, t in zip(batch, translations, strict=True):
+                seg.translated = t
+            return
+
+        # Count mismatch recovery — same approach as OpenAICompatTranslator.
+        # The model returned the wrong number of items despite the explicit
+        # count in the prompt (this happens; LLM batched-structured outputs
+        # are best-effort). Bisect and retry until we converge or hit size-1.
+        if len(batch) == 1:
             raise RuntimeError(
-                f"Gemini returned {len(translations)} translations for {len(batch)} segments"
+                f"Gemini returned {len(translations)} translations for 1 segment"
             )
-        for seg, t in zip(batch, translations, strict=True):
-            seg.translated = t
+        mid = len(batch) // 2
+        self._translate_batch(batch[:mid], target_lang)
+        self._translate_batch(batch[mid:], target_lang)
 
     def translate_title(self, title: str, target_lang: str) -> str:
         if not self.api_key:
