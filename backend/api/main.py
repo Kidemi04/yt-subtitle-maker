@@ -16,6 +16,7 @@ from api.routes import (
     version,
 )
 from api.routes import engines as engines_route
+from api.routes import fs as fs_route
 from api.routes import system as system_route
 
 app = FastAPI(title="yt-subtitle-maker API", version="2.0.0a1")
@@ -38,6 +39,7 @@ app.include_router(dependencies.router)
 app.include_router(library.router)
 app.include_router(history.router)
 app.include_router(cookies.router)
+app.include_router(fs_route.router)
 
 
 @app.get("/")
