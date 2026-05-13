@@ -1,76 +1,315 @@
 import * as React from "react";
-import { Stack, Text, XStack, YStack } from "tamagui";
-import {
-  Eye,
-  EyeOff,
-  RefreshCcw,
-} from "@tamagui/lucide-icons";
+import { Stack, XStack, YStack } from "tamagui";
+import { Plus } from "@tamagui/lucide-icons";
 import {
   GlassCard,
-  TextInput,
   Dropdown,
-  SegmentedControl,
   Toggle,
-  ButtonSecondary,
-  ButtonGhost,
-  IconButton,
-  StatusDot,
-  BodySm,
+  BadgePill,
   Caption,
 } from "@yt-subtitle-maker/ui";
-import { type TranslatorProvider } from "@yt-subtitle-maker/api-client";
+import type {
+  AppConfig,
+  TranslatorProfile,
+} from "@yt-subtitle-maker/api-client";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
-import { buildModelOptions, isMasked, LANGS } from "./constants";
+import { LANGS, isMasked } from "./constants";
+import { ProviderRow, type ProviderRowSavePayload } from "./ProviderRow";
+import { AddProviderModal } from "./AddProviderModal";
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Given the `activeTranslator` selector string ("gemini" | "local_openai" |
+ * "custom:<id>"), return the short profile id used as a key in
+ * `lastTestResult` and for `isActive` comparisons against custom rows.
+ */
+function activeProfileId(activeTranslator: string | undefined): string {
+  if (!activeTranslator) return "gemini";
+  if (activeTranslator.startsWith("custom:")) return activeTranslator.slice(7);
+  return activeTranslator; // "gemini" | "local_openai"
+}
+
+// ─── Built-in profile shapes (derived from draft) ───────────────────────────
+
+function geminiProfile(draft: AppConfig) {
+  return {
+    profileId: "gemini",
+    name: "Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com",
+    model: draft.geminiModel ?? "",
+    apiKeyMasked: isMasked(draft.geminiApiKey),
+  };
+}
+
+function localOpenaiProfile(draft: AppConfig) {
+  return {
+    profileId: "local_openai",
+    name: "Local AI (LM Studio / Ollama)",
+    baseUrl: draft.localOpenaiBaseUrl ?? "",
+    model: draft.localOpenaiModel ?? "",
+    apiKeyMasked: isMasked(draft.localOpenaiApiKey),
+  };
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export function TranslationTab() {
   const {
     draft,
     update,
-    showApiKey,
-    setShowApiKey,
-    replacingKey,
-    setReplacingKey,
-    translatorStatus,
-    testTranslator,
-    geminiModels,
-    localOpenaiModels,
-    openaiModels,
-    modelsBusy,
-    refreshLocalOpenaiModels,
-    refreshOpenaiModels,
+    customTranslators,
+    activeTranslator,
+    lastTestResult,
+    testProfile,
+    testAdhoc,
+    setActiveTranslator,
+    addCustomTranslator,
+    removeCustomTranslator,
+    updateCustomTranslator,
   } = useSettings();
+
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [addOpen, setAddOpen] = React.useState(false);
+  // Per-profile delete-guard: id of the profile the user tried to delete
+  // while it was active. Cleared on next action.
+  const [deleteGuardId, setDeleteGuardId] = React.useState<string | null>(null);
+
   if (!draft) return null;
+
+  const currentProfileId = activeProfileId(activeTranslator);
+
+  // Safety banner: active profile's last test failed
+  const activeLastTest = lastTestResult[currentProfileId];
+  const showBanner = activeLastTest && !activeLastTest.ok;
+
+  // ── Built-in row handlers ──────────────────────────────────────────────
+
+  const handleSaveGemini = (patch: ProviderRowSavePayload) => {
+    // Only apiKey + model are editable for Gemini built-in; name + baseUrl
+    // are ignored (Gemini has a fixed endpoint).
+    if (patch.apiKey !== "***") {
+      // The user replaced the key (or cleared it).
+      update("geminiApiKey", patch.apiKey);
+    }
+    update("geminiModel", patch.model);
+    setEditingId(null);
+  };
+
+  const handleSaveLocalOpenai = (patch: ProviderRowSavePayload) => {
+    update("localOpenaiBaseUrl", patch.baseUrl);
+    update("localOpenaiModel", patch.model);
+    if (patch.apiKey !== "***") {
+      update("localOpenaiApiKey", patch.apiKey);
+    }
+    setEditingId(null);
+  };
+
+  // ── Custom profile handlers ────────────────────────────────────────────
+
+  const handleSaveCustom =
+    (profileId: string) => (patch: ProviderRowSavePayload) => {
+      // For custom profiles, "***" means "keep saved key" — skip the apiKey
+      // update so the saved value survives the autosave round-trip. (The
+      // backend also re-masks incoming "***" as a defensive measure, but the
+      // cleanest path is to omit it from the patch entirely.)
+      const cleanPatch: Partial<TranslatorProfile> = {
+        name: patch.name,
+        baseUrl: patch.baseUrl,
+        model: patch.model,
+      };
+      if (patch.apiKey !== "***") {
+        cleanPatch.apiKey = patch.apiKey;
+      }
+      updateCustomTranslator(profileId, cleanPatch);
+      setEditingId(null);
+    };
+
+  const handleDuplicate = (profile: TranslatorProfile) => {
+    const newId = "custom-" + Date.now().toString(36);
+    addCustomTranslator({
+      ...profile,
+      id: newId,
+      name: profile.name + " (copy)",
+    });
+  };
+
+  const handleDeleteCustom = (profileId: string) => {
+    if (currentProfileId === profileId) {
+      // Refuse + nudge: render an inline BadgePill above the row.
+      setDeleteGuardId(profileId);
+      return;
+    }
+    setDeleteGuardId(null);
+    removeCustomTranslator(profileId);
+  };
+
+  const profiles = customTranslators ?? [];
+
   return (
     <GlassCard variant="mid">
       <YStack gap="$md">
         <Section title="Translation" />
-        <SettingRow id="translation.provider" label="Provider">
-          <SegmentedControl
-            value={draft.translatorProvider}
-            onValueChange={(v) =>
-              update("translatorProvider", v as TranslatorProvider)
+
+        {/* Safety banner — active profile's last test failed */}
+        {showBanner ? (
+          <BadgePill tone="warning">
+            <Caption>
+              Translation may fail — {currentProfileId}&apos;s last test
+              failed{activeLastTest.error ? `: ${activeLastTest.error}` : ""}
+            </Caption>
+          </BadgePill>
+        ) : null}
+
+        {/* Provider list */}
+        <Section
+          title="Translation provider"
+          subtitle="Choose which service translates your subtitles. Built-in providers can't be deleted."
+        />
+
+        <YStack gap="$sm">
+          {/* Gemini (built-in) */}
+          <ProviderRow
+            {...geminiProfile(draft)}
+            formProvider="gemini"
+            targetLang={draft.defaultTargetLang}
+            isActive={currentProfileId === "gemini"}
+            isBuiltIn
+            isEditing={editingId === "gemini"}
+            lastTest={lastTestResult["gemini"]}
+            onActivate={() => setActiveTranslator("gemini")}
+            onTest={async () => {
+              await testAdhoc({
+                provider: "gemini",
+                apiKey: draft.geminiApiKey,
+                model: draft.geminiModel,
+                targetLang: draft.defaultTargetLang,
+              });
+            }}
+            onEditToggle={() =>
+              setEditingId((v) => (v === "gemini" ? null : "gemini"))
             }
-            options={[
-              { label: "Gemini", value: "gemini" },
-              { label: "Local AI", value: "local_openai" },
-              { label: "OpenAI-compat", value: "openai" },
-            ]}
+            onSave={handleSaveGemini}
+            onCancelEdit={() => setEditingId(null)}
+          />
+
+          {/* Local AI (built-in) */}
+          <ProviderRow
+            {...localOpenaiProfile(draft)}
+            formProvider="local_openai"
+            targetLang={draft.defaultTargetLang}
+            isActive={currentProfileId === "local_openai"}
+            isBuiltIn
+            isEditing={editingId === "local_openai"}
+            lastTest={lastTestResult["local_openai"]}
+            onActivate={() => setActiveTranslator("local_openai")}
+            onTest={async () => {
+              await testAdhoc({
+                provider: "local_openai",
+                baseUrl: draft.localOpenaiBaseUrl,
+                apiKey: draft.localOpenaiApiKey,
+                model: draft.localOpenaiModel,
+                targetLang: draft.defaultTargetLang,
+              });
+            }}
+            onEditToggle={() =>
+              setEditingId((v) =>
+                v === "local_openai" ? null : "local_openai",
+              )
+            }
+            onSave={handleSaveLocalOpenai}
+            onCancelEdit={() => setEditingId(null)}
+          />
+
+          {/* Custom profiles */}
+          {profiles.map((profile) => (
+            <YStack key={profile.id} gap="$xs">
+              {deleteGuardId === profile.id ? (
+                <BadgePill tone="warning">
+                  <Caption>
+                    This is the active translator. Make another provider
+                    active first, then delete this one.
+                  </Caption>
+                </BadgePill>
+              ) : null}
+              <ProviderRow
+                profileId={profile.id}
+                name={profile.name}
+                baseUrl={profile.baseUrl}
+                model={profile.model}
+                apiKeyMasked={isMasked(profile.apiKey)}
+                formProvider="openai"
+                targetLang={draft.defaultTargetLang}
+                isActive={currentProfileId === profile.id}
+                isBuiltIn={false}
+                isEditing={editingId === profile.id}
+                lastTest={lastTestResult[profile.id]}
+                onActivate={() =>
+                  setActiveTranslator(`custom:${profile.id}`)
+                }
+                onTest={async () => {
+                  await testProfile(profile.id);
+                }}
+                onEditToggle={() =>
+                  setEditingId((v) => (v === profile.id ? null : profile.id))
+                }
+                onDuplicate={() => handleDuplicate(profile)}
+                onDelete={() => handleDeleteCustom(profile.id)}
+                onSave={handleSaveCustom(profile.id)}
+                onCancelEdit={() => {
+                  setEditingId(null);
+                  setDeleteGuardId(null);
+                }}
+              />
+            </YStack>
+          ))}
+
+          {/* + Add provider */}
+          {!addOpen ? (
+            <Stack
+              tag="button"
+              role="button"
+              paddingHorizontal="$md"
+              paddingVertical="$sm"
+              borderRadius="$lg"
+              backgroundColor="transparent"
+              borderWidth={1}
+              borderColor="$borderSubtle"
+              borderStyle="dashed"
+              alignItems="center"
+              justifyContent="center"
+              hoverStyle={{ backgroundColor: "$surfaceGlass" }}
+              cursor="pointer"
+              onPress={() => setAddOpen(true)}
+            >
+              <XStack gap="$xs" alignItems="center">
+                <Plus size={14} color="$textSecondary" />
+                <Caption color="$textSecondary">Add provider</Caption>
+              </XStack>
+            </Stack>
+          ) : null}
+        </YStack>
+
+        {/* Add provider modal (inline) */}
+        <AddProviderModal
+          isOpen={addOpen}
+          onClose={() => setAddOpen(false)}
+          onAdd={(profile) => {
+            addCustomTranslator(profile);
+            setActiveTranslator(`custom:${profile.id}`);
+          }}
+        />
+
+        {/* Unchanged setting rows */}
+        <SettingRow id="translation.target-lang" label="Default target language">
+          <Dropdown
+            value={draft.defaultTargetLang}
+            onValueChange={(v) => update("defaultTargetLang", v)}
+            options={LANGS}
+            width="100%"
           />
         </SettingRow>
-
-        <XStack gap="$md" flexWrap="wrap">
-          <YStack flex={1} minWidth={220}>
-            <SettingRow id="translation.target-lang" label="Default target language">
-              <Dropdown
-                value={draft.defaultTargetLang}
-                onValueChange={(v) => update("defaultTargetLang", v)}
-                options={LANGS}
-                width="100%"
-              />
-            </SettingRow>
-          </YStack>
-        </XStack>
 
         <SettingRow
           layout="row"
@@ -97,269 +336,6 @@ export function TranslationTab() {
             aria-label="Auto-translate title"
           />
         </SettingRow>
-
-        {/* Provider-specific */}
-        {draft.translatorProvider === "gemini" ? (
-          <YStack gap="$sm">
-            <SettingRow id="translation.gemini-api-key" label="Gemini API key">
-              {isMasked(draft.geminiApiKey) && !replacingKey.gemini ? (
-                <XStack gap="$sm" alignItems="center">
-                  <Stack
-                    flex={1}
-                    padding="$sm"
-                    borderRadius="$md"
-                    backgroundColor="$surfaceGlass"
-                    borderWidth={1}
-                    borderColor="$borderSubtle"
-                  >
-                    <BodySm color="$textSecondary">•••• key on file</BodySm>
-                  </Stack>
-                  <ButtonGhost
-                    onPress={() => {
-                      update("geminiApiKey", "");
-                      setReplacingKey((r) => ({ ...r, gemini: true }));
-                    }}
-                  >
-                    Replace
-                  </ButtonGhost>
-                  <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
-                  <StatusDot status={translatorStatus} size={8} />
-                </XStack>
-              ) : (
-                <XStack gap="$sm" alignItems="center">
-                  <XStack flex={1} alignItems="center" position="relative">
-                    <TextInput
-                      flex={1}
-                      value={draft.geminiApiKey}
-                      onChangeText={(v: string) => update("geminiApiKey", v)}
-                      secureTextEntry={!showApiKey}
-                      placeholder="AIza..."
-                    />
-                    <Stack position="absolute" right={8}>
-                      <IconButton
-                        icon={
-                          showApiKey ? (
-                            <EyeOff size={14} color="$textSecondary" />
-                          ) : (
-                            <Eye size={14} color="$textSecondary" />
-                          )
-                        }
-                        aria-label="Toggle API key visibility"
-                        size={32}
-                        onPress={() => setShowApiKey((v) => !v)}
-                      />
-                    </Stack>
-                  </XStack>
-                  <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
-                  <StatusDot status={translatorStatus} size={8} />
-                </XStack>
-              )}
-            </SettingRow>
-            <SettingRow id="translation.gemini-model" label="Gemini model">
-              <Dropdown
-                value={draft.geminiModel}
-                onValueChange={(v) => update("geminiModel", v)}
-                options={buildModelOptions(geminiModels, draft.geminiModel)}
-                width="100%"
-                aria-label="Gemini model"
-              />
-            </SettingRow>
-          </YStack>
-        ) : null}
-
-        {draft.translatorProvider === "local_openai" ? (
-          <YStack gap="$sm">
-            <SettingRow
-              id="translation.local-base-url"
-              label="Base URL"
-              helper="LM Studio default 1234. Ollama is :11434."
-            >
-              <TextInput
-                value={draft.localOpenaiBaseUrl}
-                onChangeText={(v: string) => update("localOpenaiBaseUrl", v)}
-                placeholder="http://127.0.0.1:1234/v1"
-              />
-            </SettingRow>
-            <SettingRow
-              id="translation.local-model"
-              label="Model name"
-              helper={
-                localOpenaiModels.length === 0
-                  ? "Click ↻ to fetch models from your LM Studio server."
-                  : undefined
-              }
-            >
-              <XStack gap="$sm" alignItems="center">
-                <Stack flex={1}>
-                  <Dropdown
-                    value={draft.localOpenaiModel}
-                    onValueChange={(v) => update("localOpenaiModel", v)}
-                    options={buildModelOptions(
-                      localOpenaiModels,
-                      draft.localOpenaiModel,
-                    )}
-                    placeholder="gemma-3-27b-it"
-                    width="100%"
-                    aria-label="Local AI model"
-                    disabled={
-                      localOpenaiModels.length === 0 && !draft.localOpenaiModel
-                    }
-                  />
-                </Stack>
-                <ButtonSecondary
-                  onPress={refreshLocalOpenaiModels}
-                  disabled={modelsBusy === "local_openai"}
-                >
-                  <RefreshCcw size={14} color="$textSecondary" />
-                </ButtonSecondary>
-              </XStack>
-            </SettingRow>
-            <SettingRow
-              id="translation.local-api-key"
-              label="API key (optional)"
-              helper="Most local servers don't need one. Leave blank or 'lm-studio'."
-            >
-              {isMasked(draft.localOpenaiApiKey) && !replacingKey.localOpenai ? (
-                <XStack gap="$sm" alignItems="center">
-                  <Stack
-                    flex={1}
-                    padding="$sm"
-                    borderRadius="$md"
-                    backgroundColor="$surfaceGlass"
-                    borderWidth={1}
-                    borderColor="$borderSubtle"
-                  >
-                    <BodySm color="$textSecondary">•••• key on file</BodySm>
-                  </Stack>
-                  <ButtonGhost
-                    onPress={() => {
-                      update("localOpenaiApiKey", "");
-                      setReplacingKey((r) => ({ ...r, localOpenai: true }));
-                    }}
-                  >
-                    Replace
-                  </ButtonGhost>
-                </XStack>
-              ) : (
-                <TextInput
-                  value={draft.localOpenaiApiKey}
-                  onChangeText={(v: string) => update("localOpenaiApiKey", v)}
-                  placeholder="lm-studio"
-                />
-              )}
-            </SettingRow>
-            <XStack gap="$sm" alignItems="center">
-              <ButtonSecondary onPress={testTranslator}>
-                Test connection
-              </ButtonSecondary>
-              <StatusDot status={translatorStatus} size={8} />
-              <Caption>
-                {translatorStatus === "ok"
-                  ? "Working"
-                  : translatorStatus === "error"
-                  ? "Unreachable"
-                  : "Untested"}
-              </Caption>
-            </XStack>
-            {translatorStatus !== "ok" ? (
-              <Stack
-                padding="$sm"
-                borderRadius="$md"
-                backgroundColor="$surfaceGlass"
-                borderWidth={1}
-                borderColor="$borderSubtle"
-              >
-                <Caption color="$textSecondary">
-                  First time using LM Studio? Download from{" "}
-                  <Text color="$accent">lmstudio.ai</Text>, install a
-                  translation-capable model (gemma-3-27b-it works on RTX
-                  4060 Ti+), then click Local Server → Start.
-                </Caption>
-              </Stack>
-            ) : null}
-          </YStack>
-        ) : null}
-
-        {draft.translatorProvider === "openai" ? (
-          <YStack gap="$sm">
-            <SettingRow
-              id="translation.openai-base-url"
-              label="Base URL"
-              helper="OpenAI api.openai.com/v1, Groq api.groq.com/openai/v1, Together api.together.xyz/v1, etc."
-            >
-              <TextInput
-                value={draft.openaiBaseUrl}
-                onChangeText={(v: string) => update("openaiBaseUrl", v)}
-              />
-            </SettingRow>
-            <SettingRow id="translation.openai-api-key" label="API key">
-              {isMasked(draft.openaiApiKey) && !replacingKey.openai ? (
-                <XStack gap="$sm" alignItems="center">
-                  <Stack
-                    flex={1}
-                    padding="$sm"
-                    borderRadius="$md"
-                    backgroundColor="$surfaceGlass"
-                    borderWidth={1}
-                    borderColor="$borderSubtle"
-                  >
-                    <BodySm color="$textSecondary">•••• key on file</BodySm>
-                  </Stack>
-                  <ButtonGhost
-                    onPress={() => {
-                      update("openaiApiKey", "");
-                      setReplacingKey((r) => ({ ...r, openai: true }));
-                    }}
-                  >
-                    Replace
-                  </ButtonGhost>
-                  <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
-                  <StatusDot status={translatorStatus} size={8} />
-                </XStack>
-              ) : (
-                <XStack gap="$sm" alignItems="center">
-                  <TextInput
-                    flex={1}
-                    value={draft.openaiApiKey}
-                    onChangeText={(v: string) => update("openaiApiKey", v)}
-                    secureTextEntry={!showApiKey}
-                  />
-                  <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
-                  <StatusDot status={translatorStatus} size={8} />
-                </XStack>
-              )}
-            </SettingRow>
-            <SettingRow
-              id="translation.openai-model"
-              label="Model"
-              helper={
-                openaiModels.length === 0
-                  ? "Click ↻ to fetch models from this OpenAI-compat endpoint."
-                  : undefined
-              }
-            >
-              <XStack gap="$sm" alignItems="center">
-                <Stack flex={1}>
-                  <Dropdown
-                    value={draft.openaiModel}
-                    onValueChange={(v) => update("openaiModel", v)}
-                    options={buildModelOptions(openaiModels, draft.openaiModel)}
-                    placeholder="gpt-4o-mini"
-                    width="100%"
-                    aria-label="OpenAI model"
-                    disabled={openaiModels.length === 0 && !draft.openaiModel}
-                  />
-                </Stack>
-                <ButtonSecondary
-                  onPress={refreshOpenaiModels}
-                  disabled={modelsBusy === "openai"}
-                >
-                  <RefreshCcw size={14} color="$textSecondary" />
-                </ButtonSecondary>
-              </XStack>
-            </SettingRow>
-          </YStack>
-        ) : null}
       </YStack>
     </GlassCard>
   );
