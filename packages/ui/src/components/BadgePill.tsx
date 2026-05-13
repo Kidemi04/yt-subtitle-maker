@@ -27,6 +27,12 @@ export type BadgePillTone =
 
 export type BadgePillProps = {
   tone?: BadgePillTone;
+  /**
+   * Typeface family. Defaults to `body` (Inter 11/600). Use `mono` for
+   * technical surfaces: engine names, version strings, file types, tech
+   * credit pills (per handoff Screen 11 + DESIGN.md §Typography mono role).
+   */
+  font?: "body" | "mono";
   children: React.ReactNode;
 } & Omit<StackProps, "children">;
 
@@ -43,6 +49,7 @@ const TONE_MIXES: Record<
 
 export function BadgePill({
   tone = "neutral",
+  font = "body",
   children,
   ...rest
 }: BadgePillProps) {
@@ -82,7 +89,7 @@ export function BadgePill({
       {...rest}
     >
       <Text
-        fontFamily="$body"
+        fontFamily={font === "mono" ? "$mono" : "$body"}
         fontSize={11}
         fontWeight="600"
         color={visual.color}

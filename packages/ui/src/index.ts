@@ -41,6 +41,9 @@ export type { IconButtonProps } from "./components/IconButton";
 export { TextInput } from "./components/TextInput";
 export type { TextInputProps } from "./components/TextInput";
 
+export { MaskedInput } from "./components/MaskedInput";
+export type { MaskedInputProps } from "./components/MaskedInput";
+
 export { Dropdown } from "./components/Dropdown";
 export type { DropdownProps, DropdownOption } from "./components/Dropdown";
 
@@ -79,6 +82,9 @@ export type { SidebarItemProps } from "./components/SidebarItem";
 
 export { Modal } from "./components/Modal";
 export type { ModalProps } from "./components/Modal";
+
+export { ConfirmDialog } from "./components/ConfirmDialog";
+export type { ConfirmDialogProps } from "./components/ConfirmDialog";
 
 export { ActionSheet } from "./components/ActionSheet";
 export type {

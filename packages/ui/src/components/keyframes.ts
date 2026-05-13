@@ -26,6 +26,12 @@ const KEYFRAMES_CSS = `
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
+@keyframes yt-ui-shimmer {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  35%  { opacity: 1; }
+  65%  { opacity: 1; }
+  100% { transform: translateX(200%); opacity: 0; }
+}
 `;
 
 let injected = false;

@@ -1,24 +1,20 @@
 import * as React from "react";
 import { Stack, Text, XStack, YStack } from "tamagui";
-import {
-  Eye,
-  EyeOff,
-  RefreshCcw,
-} from "@tamagui/lucide-icons";
+import { RefreshCcw } from "@tamagui/lucide-icons";
 import {
   GlassCard,
   TextInput,
+  MaskedInput,
   Dropdown,
   Toggle,
   SegmentedControl,
   ButtonPrimary,
   ButtonSecondary,
   ButtonGhost,
-  IconButton,
+  ConfirmDialog,
   StatusDot,
-  BadgePill,
-  BadgeAccent,
-  DisplaySm,
+  DisplayMd,
+  TitleMd,
   TitleSm,
   BodyMd,
   BodySm,
@@ -33,13 +29,16 @@ import {
 
 type ConnState = "untested" | "ok" | "warning" | "error";
 
+// Reliability hints live in advisories below the dropdown, not inside the
+// option labels (operator copy bleeding into the option label collapses
+// hierarchy). PRODUCT.md voice rule.
 const COOKIE_BROWSERS = [
   { label: "None", value: "" },
-  { label: "Firefox (recommended)", value: "firefox" },
-  { label: "Chrome (may fail)", value: "chrome" },
-  { label: "Edge (may fail)", value: "edge" },
-  { label: "Brave (may fail)", value: "brave" },
-  { label: "Opera (may fail)", value: "opera" },
+  { label: "Firefox", value: "firefox" },
+  { label: "Chrome", value: "chrome" },
+  { label: "Edge", value: "edge" },
+  { label: "Brave", value: "brave" },
+  { label: "Opera", value: "opera" },
 ];
 
 const VERBOSITY = [
@@ -49,12 +48,16 @@ const VERBOSITY = [
   { label: "Debug", value: "debug" },
 ];
 
+// Engine labels go through ENGINE_LABELS; "Auto" is the only synthetic option.
+// Reliability and "try YT first" explainer copy lives in the helper Caption
+// beneath the dropdown, never inside the option label (this file's own
+// comment at the COOKIE_BROWSERS const calls out that anti-pattern).
 const STT_ENGINES = [
-  { label: "Auto (try YT, fall back)", value: "auto" },
-  { label: "openai-whisper", value: "openai-whisper" },
-  { label: "faster-whisper ⭐", value: "faster-whisper" },
+  { label: "Auto", value: "auto" },
+  { label: "Whisper", value: "openai-whisper" },
+  { label: "Faster Whisper", value: "faster-whisper" },
   { label: "WhisperX", value: "whisperx" },
-  { label: "insanely-fast-whisper", value: "insanely-fast-whisper" },
+  { label: "Insanely Fast Whisper", value: "insanely-fast-whisper" },
 ];
 
 const WHISPER_MODELS = [
@@ -62,7 +65,7 @@ const WHISPER_MODELS = [
   { label: "base", value: "base" },
   { label: "small", value: "small" },
   { label: "medium", value: "medium" },
-  { label: "turbo ⭐", value: "turbo" },
+  { label: "turbo", value: "turbo" },
   { label: "large-v3", value: "large-v3" },
 ];
 
@@ -84,7 +87,9 @@ const LANGS = [
   { label: "Tiếng Việt", value: "vi" },
 ];
 
-/** Section header — DisplaySm title plus optional BodySm subtitle. */
+/** Section header — TitleMd (Inter 15 600) per Fraunces-Only-For-Moments.
+ *  Six Fraunces headings on one scroll surface dilutes the brand voice; the
+ *  Settings page-title at top owns the only serif moment. */
 function Section({
   title,
   subtitle,
@@ -94,7 +99,7 @@ function Section({
 }) {
   return (
     <YStack gap={2}>
-      <DisplaySm>{title}</DisplaySm>
+      <TitleMd>{title}</TitleMd>
       {subtitle ? <BodySm color="$textSecondary">{subtitle}</BodySm> : null}
     </YStack>
   );
@@ -122,7 +127,7 @@ export default function Settings() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>();
-  const [showApiKey, setShowApiKey] = React.useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = React.useState(false);
   const [backendStatus, setBackendStatus] = React.useState<ConnState>("untested");
   const [translatorStatus, setTranslatorStatus] = React.useState<ConnState>("untested");
   const [cookieStatus, setCookieStatus] = React.useState<ConnState>("untested");
@@ -337,7 +342,7 @@ export default function Settings() {
   if (loading || !draft) {
     return (
       <YStack gap="$lg">
-        <Section title="Settings" />
+        <DisplayMd>Settings</DisplayMd>
         <GlassCard variant="mid">
           <BodySm color="$textSecondary">
             {error ? `Failed to load config: ${error}` : "Loading config…"}
@@ -349,10 +354,14 @@ export default function Settings() {
 
   return (
     <YStack gap="$lg" paddingBottom={120}>
-      <Section
-        title="Settings"
-        subtitle="Backend, cookies, STT engine, translation, and advanced."
-      />
+      {/* Page title — the one earned serif moment on this screen. Section
+          headers below use TitleMd to keep Fraunces from diluting. */}
+      <YStack gap="$xs">
+        <DisplayMd>Settings</DisplayMd>
+        <BodySm color="$textSecondary">
+          Backend, cookies, STT engine, translation, and advanced.
+        </BodySm>
+      </YStack>
 
       {/* GENERAL */}
       <GlassCard variant="mid">
@@ -478,7 +487,7 @@ export default function Settings() {
               borderWidth={1}
             >
               <Caption color="$warning">
-                ⚠ Chromium-based browsers (Chrome 127+) encrypt cookies with
+                Chromium-based browsers (Chrome 127+) encrypt cookies with
                 App-Bound Encryption. Extraction may fail. Use Firefox or
                 cookies.txt fallback.
               </Caption>
@@ -577,7 +586,7 @@ export default function Settings() {
               options={[
                 { label: "Gemini", value: "gemini" },
                 { label: "Local AI", value: "local_openai" },
-                { label: "OpenAI-compat", value: "openai" },
+                { label: "OpenAI-compatible", value: "openai" },
               ]}
             />
           </YStack>
@@ -624,29 +633,12 @@ export default function Settings() {
               <YStack gap="$xs">
                 <Field label="Gemini API key" />
                 <XStack gap="$sm" alignItems="center">
-                  <XStack flex={1} alignItems="center" position="relative">
-                    <TextInput
-                      flex={1}
-                      value={draft.geminiApiKey}
-                      onChangeText={(v: string) => update("geminiApiKey", v)}
-                      secureTextEntry={!showApiKey}
-                      placeholder="AIza..."
-                    />
-                    <Stack position="absolute" right={8}>
-                      <IconButton
-                        icon={
-                          showApiKey ? (
-                            <EyeOff size={14} color="$textSecondary" />
-                          ) : (
-                            <Eye size={14} color="$textSecondary" />
-                          )
-                        }
-                        aria-label="Toggle API key visibility"
-                        size={32}
-                        onPress={() => setShowApiKey((v) => !v)}
-                      />
-                    </Stack>
-                  </XStack>
+                  <MaskedInput
+                    flex={1}
+                    value={draft.geminiApiKey}
+                    onChangeText={(v: string) => update("geminiApiKey", v)}
+                    placeholder="AIza..."
+                  />
                   <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
                   <StatusDot status={translatorStatus} size={8} />
                 </XStack>
@@ -716,7 +708,7 @@ export default function Settings() {
                   label="API key (optional)"
                   helper="Most local servers don't need one. Leave blank or 'lm-studio'."
                 />
-                <TextInput
+                <MaskedInput
                   value={draft.localOpenaiApiKey}
                   onChangeText={(v: string) => update("localOpenaiApiKey", v)}
                   placeholder="lm-studio"
@@ -769,11 +761,11 @@ export default function Settings() {
               <YStack gap="$xs">
                 <Field label="API key" />
                 <XStack gap="$sm" alignItems="center">
-                  <TextInput
+                  <MaskedInput
                     flex={1}
                     value={draft.openaiApiKey}
                     onChangeText={(v: string) => update("openaiApiKey", v)}
-                    secureTextEntry={!showApiKey}
+                    placeholder="sk-..."
                   />
                   <ButtonSecondary onPress={testTranslator}>Test</ButtonSecondary>
                   <StatusDot status={translatorStatus} size={8} />
@@ -941,7 +933,7 @@ export default function Settings() {
               helper={
                 jsRuntime
                   ? `Detected: ${jsRuntime}`
-                  : "⚠ No runtime detected — install Node or Deno, or set the path here. Without one, YouTube extraction degrades."
+                  : "No runtime detected — install Node or Deno, or set the path here. Without one, YouTube extraction degrades."
               }
             />
             <TextInput
@@ -987,19 +979,7 @@ export default function Settings() {
             />
           </XStack>
           <XStack>
-            <ButtonGhost
-              onPress={() => {
-                if (
-                  typeof window !== "undefined" &&
-                  window.confirm(
-                    "Reset every setting on this page to defaults? This cannot be undone.",
-                  )
-                ) {
-                  // Backend's default config — we re-fetch and overwrite draft.
-                  apiClient.fetchConfig().then(setDraft);
-                }
-              }}
-            >
+            <ButtonGhost onPress={() => setResetConfirmOpen(true)}>
               <BodySm fontWeight="500" color="$error">
                 Reset to defaults
               </BodySm>
@@ -1008,35 +988,52 @@ export default function Settings() {
         </YStack>
       </GlassCard>
 
-      {/* Sticky footer (position: sticky lives in inline style — Tamagui's
-          position prop doesn't accept it on web targets). The left-aligned
-          status sentence anchors the bar so it doesn't read as floating. */}
+      {/* Sticky footer — glassHigh so it reads as floating chrome per the
+          Elevation section in DESIGN.md. The Save button's glow encodes
+          the dirty state; no separate "unsaved changes" pill needed. */}
       <XStack
         marginTop="$lg"
         padding="$md"
-        backgroundColor="$bgElevated"
         borderTopWidth={1}
-        borderTopColor="$borderSubtle"
+        borderTopColor="$borderStrong"
         alignItems="center"
         gap="$sm"
-        style={{ position: "sticky", bottom: 0, zIndex: 50 }}
+        style={{
+          position: "sticky",
+          bottom: 0,
+          zIndex: 50,
+          backgroundColor: "rgba(255,255,255,0.08)",
+          backdropFilter: "blur(60px) saturate(200%)",
+          WebkitBackdropFilter: "blur(60px) saturate(200%)",
+          boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
+        }}
       >
-        <Caption color="$textMuted">
-          Click Save settings to apply changes.
-        </Caption>
+        {/* The Save button's glow + enabled state IS the dirty signal —
+            adding a caption would be a third redundant indicator. */}
         <Stack flex={1} />
-        {dirty ? (
-          <BadgeAccent>unsaved changes</BadgeAccent>
-        ) : (
-          <BadgePill tone="success">all saved</BadgePill>
-        )}
         <ButtonGhost onPress={onDiscard} disabled={!dirty || saving}>
           Discard
         </ButtonGhost>
-        <ButtonPrimary onPress={onSave} disabled={!dirty || saving}>
+        <ButtonPrimary
+          onPress={onSave}
+          disabled={!dirty || saving}
+          glow={dirty ? "ready" : "none"}
+        >
           {saving ? "Saving…" : "Save settings"}
         </ButtonPrimary>
       </XStack>
+
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        onOpenChange={setResetConfirmOpen}
+        title="Reset every setting to defaults?"
+        message="This cannot be undone. Your saved API keys, cookie config, and engine choices will be replaced with the backend defaults."
+        confirmLabel="Reset"
+        onConfirm={() => {
+          // Backend's default config — we re-fetch and overwrite draft.
+          apiClient.fetchConfig().then(setDraft);
+        }}
+      />
     </YStack>
   );
 }

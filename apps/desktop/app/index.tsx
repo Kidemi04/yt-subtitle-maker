@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Stack, XStack, YStack } from "tamagui";
+import { useWindowDimensions } from "react-native";
 import {
   Link2,
   ChevronDown,
@@ -12,6 +13,8 @@ import {
   Download,
   RotateCcw,
   Info,
+  MoreHorizontal,
+  AlertTriangle,
 } from "@tamagui/lucide-icons";
 import {
   HeroCard,
@@ -21,6 +24,7 @@ import {
   ButtonSecondary,
   ButtonGhost,
   IconButton,
+  ActionSheet,
   BadgeAccent,
   BadgePill,
   ProgressBar,
@@ -31,6 +35,7 @@ import {
   SegmentedControl,
   Tooltip,
   DisplayMd,
+  DisplaySm,
   TitleLg,
   TitleMd,
   TitleSm,
@@ -42,7 +47,17 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { useGenerate } from "../src/state/generate";
 import { apiClient } from "../src/state/client";
+import { useLogs } from "../src/state/logs";
 import { NewTranscribeModal } from "../src/components/NewTranscribeModal";
+import {
+  WHISPER_MODELS,
+  WHISPER_DEVICES,
+  LANGUAGES,
+  ENGINE_LABELS,
+  TRANSLATOR_LABELS,
+  humanEngine,
+  platformModKey,
+} from "../src/constants";
 import { useRouter } from "expo-router";
 import type {
   SttSource,
@@ -52,12 +67,6 @@ import type {
   TranslatorProvider,
 } from "@yt-subtitle-maker/api-client";
 
-const TRANSLATOR_LABELS: Record<TranslatorProvider, string> = {
-  gemini: "Gemini",
-  local_openai: "Local AI",
-  openai: "OpenAI-compat",
-};
-
 const TRANSLATOR_OPTIONS: { label: string; value: TranslatorProvider }[] = [
   { label: "Gemini", value: "gemini" },
   { label: "Local AI", value: "local_openai" },
@@ -65,6 +74,76 @@ const TRANSLATOR_OPTIONS: { label: string; value: TranslatorProvider }[] = [
 ];
 
 /* ───────────── helpers ───────────── */
+
+type ErrorCategory =
+  | "network"
+  | "youtube"
+  | "cookies"
+  | "engine"
+  | "translator"
+  | "generic";
+
+/**
+ * Categorize a free-form backend error into one of six buckets so the UI
+ * can show a viewer-readable recovery hint instead of dumping a stack
+ * trace. Keyword-based; intentionally lenient because backend wraps
+ * exceptions inconsistently. Order matters — more specific patterns first.
+ */
+function categorizeError(msg: string): { category: ErrorCategory; hint: string } {
+  const m = msg.toLowerCase();
+  if (
+    /econn|fetch failed|failed to fetch|timeout|etimedout|connection refused|network/.test(
+      m,
+    )
+  ) {
+    return {
+      category: "network",
+      hint: "Couldn't reach the backend. Check that it's running on http://127.0.0.1:8000 and that no firewall is blocking it.",
+    };
+  }
+  if (/cookie/.test(m)) {
+    return {
+      category: "cookies",
+      hint: "YouTube wants a logged-in session for this video. Configure cookies in Settings, then retry.",
+    };
+  }
+  if (
+    /video unavailable|private video|sign in to confirm|members-only|geo|429|sign in|age[- ]restricted/.test(
+      m,
+    )
+  ) {
+    return {
+      category: "youtube",
+      hint: "YouTube refused this video. It may be private, age-restricted, region-locked, or rate-limited.",
+    };
+  }
+  if (/cuda|out of memory|outofmemoryerror|gpu/.test(m)) {
+    return {
+      category: "engine",
+      hint: "Your GPU ran out of memory. Pick a smaller Whisper model or switch the device to CPU, then retry.",
+    };
+  }
+  if (/model not found|whisper|stt|insanely[- ]fast|whisperx/.test(m)) {
+    return {
+      category: "engine",
+      hint: "The Whisper engine couldn't process this audio. Try a different engine or smaller model.",
+    };
+  }
+  if (
+    /gemini|rate limit|api key|401|403|quota|translator|openai|local[_ ]openai/.test(
+      m,
+    )
+  ) {
+    return {
+      category: "translator",
+      hint: "The translator rejected the request. Check your API key in Settings or try a different provider.",
+    };
+  }
+  return {
+    category: "generic",
+    hint: "An unexpected error occurred. Open logs for the full trace.",
+  };
+}
 
 function formatDuration(seconds: number | undefined): string {
   if (!seconds) return "—";
@@ -172,36 +251,6 @@ function Waveform({ active }: { active: boolean }) {
   );
 }
 
-/* ───────────── language constants (subset) ───────────── */
-
-const LANGUAGE_OPTIONS = [
-  { label: "English", value: "en" },
-  { label: "中文 (Chinese)", value: "zh" },
-  { label: "日本語 (Japanese)", value: "ja" },
-  { label: "한국어 (Korean)", value: "ko" },
-  { label: "Español", value: "es" },
-  { label: "Français", value: "fr" },
-  { label: "Deutsch", value: "de" },
-  { label: "Português", value: "pt" },
-  { label: "Русский", value: "ru" },
-  { label: "Tiếng Việt", value: "vi" },
-];
-
-const WHISPER_MODELS: { label: string; value: WhisperModel }[] = [
-  { label: "tiny · 75 MB", value: "tiny" },
-  { label: "base · 150 MB", value: "base" },
-  { label: "small · 500 MB", value: "small" },
-  { label: "medium · 1.5 GB", value: "medium" },
-  { label: "turbo · 1.5 GB ⭐", value: "turbo" },
-  { label: "large-v3 · 3 GB", value: "large-v3" },
-];
-
-const DEVICES: { label: string; value: WhisperDevice }[] = [
-  { label: "Auto", value: "auto" },
-  { label: "CPU", value: "cpu" },
-  { label: "GPU (CUDA)", value: "gpu" },
-];
-
 /* ───────────── Generate screen ───────────── */
 
 export default function Generate() {
@@ -220,7 +269,9 @@ export default function Generate() {
     runPipeline,
     cancel,
     reset,
+    dismissError,
   } = useGenerate();
+  const toggleLogsDrawer = useLogs((s) => s.toggleDrawer);
 
   /* form state — defaults match the spec's recommended pick (Auto + faster-whisper + turbo + EN→ZH) */
   const [sttSource, setSttSource] = React.useState<SttSource>("auto");
@@ -228,7 +279,17 @@ export default function Generate() {
   const [enableTranslation, setEnableTranslation] = React.useState(true);
   const [targetLang, setTargetLang] = React.useState("zh");
   const [downloadOnly, setDownloadOnly] = React.useState(false);
-  const [configureOpen, setConfigureOpen] = React.useState(false);
+  // Desktop lands with Configure open so source/target language are visible
+  // without a discoverable-only click; mobile keeps it folded to save space.
+  // 768px matches the handoff's tablet breakpoint (collapsed sidebar threshold).
+  const { width: viewportWidth } = useWindowDimensions();
+  const [configureOpen, setConfigureOpen] = React.useState(
+    () => viewportWidth >= 768,
+  );
+  // Advanced chevron inside Configure. Holds engine internals only (Whisper
+  // model / Device / VAD). Translation lives above the chevron as the user's
+  // primary intent — hiding it behind "advanced" buries the most-likely-
+  // toggled option (reviewer feedback across multiple rounds).
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
   // V1 backend currently only ships `openai-whisper`. The spec lists 4 engines
   // but only this one is installed (faster-whisper / WhisperX / IFW are V1.1+).
@@ -330,6 +391,7 @@ export default function Generate() {
   // Re-transcribe modal — opens for the just-finished video so the user can
   // try a different engine/model on the same audio without re-downloading.
   const [reTranscribeOpen, setReTranscribeOpen] = React.useState(false);
+  const [resultOverflowOpen, setResultOverflowOpen] = React.useState(false);
 
   // Which SRT to overlay when launching mpv. Snaps to a sensible default
   // every time a new result lands: "translated" if the pipeline produced
@@ -402,10 +464,37 @@ export default function Generate() {
     });
   };
 
+  // Cmd+Enter (mac) / Ctrl+Enter (win/linux) triggers Generate when metadata
+  // is loaded and the pipeline isn't running. Power-user shortcut requested
+  // by heuristic #7 (Flexibility & efficiency).
+  const canGenerate =
+    showVideoPreview && !isProcessing && !isDone && metadata?.ok === true;
+  // Platform-aware keycap shown next to the Generate label so the shortcut is
+  // discoverable instead of a hidden gem.
+  const submitHintKey = React.useMemo(
+    () => `${platformModKey()} + ↵`,
+    [],
+  );
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!canGenerate) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        onGenerate();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // onGenerate captures every form-state field via closure; re-binding on
+    // every render is cheap and ensures the latest values are submitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+
   return (
     <YStack gap="$lg">
       {/* HERO: URL input */}
-      <HeroCard variant="mid">
+      <HeroCard variant="mid" shimmer={!showVideoPreview && status !== "loading-meta"}>
         <YStack gap="$md">
           <YStack gap="$xs">
             <DisplayMd>What are we transcribing today?</DisplayMd>
@@ -482,12 +571,11 @@ export default function Generate() {
                 {metadata.channel ?? "Unknown channel"} ·{" "}
                 {formatDuration(metadata.durationSeconds)}
               </BodySm>
-              <XStack gap="$xs" marginTop="$xs" flexWrap="wrap">
-                <BadgePill tone="neutral">{metadata.videoId}</BadgePill>
-                {metadata.titleTranslated ? (
+              {metadata.titleTranslated ? (
+                <XStack gap="$xs" marginTop="$xs" flexWrap="wrap">
                   <BadgePill tone="accent">translated title ready</BadgePill>
-                ) : null}
-              </XStack>
+                </XStack>
+              ) : null}
             </YStack>
           </XStack>
         </GlassCard>
@@ -513,10 +601,10 @@ export default function Generate() {
               </XStack>
               <Caption>
                 {sttSource === "auto"
-                  ? "Auto + faster-whisper"
+                  ? "Auto"
                   : sttSource === "yt_captions"
-                  ? "YouTube captions only"
-                  : sttEngine}
+                  ? "YouTube only"
+                  : "Whisper only"}
                 {" · "}
                 {sourceLang.toUpperCase()}
                 {enableTranslation && !downloadOnly
@@ -577,7 +665,7 @@ export default function Generate() {
                     <Dropdown
                       value={sourceLang}
                       onValueChange={setSourceLang}
-                      options={LANGUAGE_OPTIONS}
+                      options={LANGUAGES}
                       width="100%"
                       aria-label="Source language"
                     />
@@ -587,7 +675,7 @@ export default function Generate() {
                     <Dropdown
                       value={targetLang}
                       onValueChange={setTargetLang}
-                      options={LANGUAGE_OPTIONS}
+                      options={LANGUAGES}
                       width="100%"
                       disabled={!enableTranslation || downloadOnly}
                       aria-label="Target language"
@@ -595,7 +683,10 @@ export default function Generate() {
                   </YStack>
                 </XStack>
 
-                {/* Toggles */}
+                {/* Translation — always visible. It IS the user's primary
+                    intent (they came here for subtitles in their language);
+                    hiding it behind a chevron buries the most-likely-toggled
+                    option. */}
                 <YStack gap="$sm">
                   <XStack alignItems="center" justifyContent="space-between">
                     <YStack gap={2} flex={1}>
@@ -673,7 +764,9 @@ export default function Generate() {
 
                   <XStack alignItems="center" justifyContent="space-between">
                     <YStack gap={2}>
-                      <BodyMd fontWeight="500">Just download, no subtitles</BodyMd>
+                      <BodyMd fontWeight="500">
+                        Just download, no subtitles
+                      </BodyMd>
                       <Caption>Skip transcription entirely.</Caption>
                     </YStack>
                     <Toggle
@@ -684,7 +777,8 @@ export default function Generate() {
                   </XStack>
                 </YStack>
 
-                {/* Advanced */}
+                {/* Advanced — engine internals only (model / device / VAD).
+                    Default closed; this is the genuinely advanced surface. */}
                 <YStack gap="$sm">
                   <XStack
                     alignItems="center"
@@ -728,7 +822,7 @@ export default function Generate() {
                             onValueChange={(v) =>
                               setWhisperDevice(v as WhisperDevice)
                             }
-                            options={DEVICES}
+                            options={WHISPER_DEVICES}
                             width="100%"
                           />
                         </YStack>
@@ -755,20 +849,39 @@ export default function Generate() {
                 </YStack>
               </YStack>
             ) : null}
+
+            {/* Commit slot — docked inside Configure so the CTA reads as the
+                "commit" of this card, not a fifth orphan flow item. Stays
+                visible even when Configure is collapsed so the user can
+                press Generate without expanding. */}
+            {!isProcessing && !isDone ? (
+              <ButtonPrimary
+                onPress={onGenerate}
+                disabled={!metadata?.ok}
+                glow="ready"
+              >
+                <XStack gap="$xs" alignItems="center">
+                  {downloadOnly ? (
+                    <Download size={16} color="$textPrimary" />
+                  ) : (
+                    <Sparkles size={16} color="$textPrimary" />
+                  )}
+                  <TitleMd>
+                    {downloadOnly ? "Download only" : "Generate Subtitles"}
+                  </TitleMd>
+                  {!downloadOnly && metadata?.ok ? (
+                    <Caption
+                      color="rgba(245,245,247,0.55)"
+                      marginLeft="$xs"
+                    >
+                      {submitHintKey}
+                    </Caption>
+                  ) : null}
+                </XStack>
+              </ButtonPrimary>
+            ) : null}
           </YStack>
         </GlassCard>
-      ) : null}
-
-      {/* GENERATE button OR processing card */}
-      {showVideoPreview && !isProcessing && !isDone ? (
-        <ButtonPrimary onPress={onGenerate} disabled={!metadata?.ok}>
-          <XStack gap="$xs" alignItems="center">
-            <Sparkles size={16} color="$textPrimary" />
-            <TitleMd>
-              {downloadOnly ? "Download only" : "Generate Subtitles"}
-            </TitleMd>
-          </XStack>
-        </ButtonPrimary>
       ) : null}
 
       {isProcessing ? (
@@ -786,17 +899,36 @@ export default function Generate() {
 
             <Waveform active />
 
-            <YStack gap="$xs" alignItems="center">
+            <YStack gap={2} alignItems="center">
               <TitleMd>
                 {phaseMessage ??
                   (phase === "download"
                     ? "Downloading audio…"
                     : phase === "transcribe"
-                    ? `Transcribing with ${sttEngine}…`
+                    ? `Transcribing with ${humanEngine(sttEngine)}…`
                     : phase === "translate"
                     ? "Translating segments…"
                     : "Working…")}
               </TitleMd>
+              {(() => {
+                const totalSteps =
+                  enableTranslation && !downloadOnly ? 4 : 3;
+                const step =
+                  phase === "download"
+                    ? 1
+                    : phase === "transcribe"
+                    ? 2
+                    : phase === "translate"
+                    ? 3
+                    : phase === "done"
+                    ? totalSteps
+                    : 0;
+                return step > 0 ? (
+                  <BodySm color="$textSecondary">
+                    Step {step} / {totalSteps}
+                  </BodySm>
+                ) : null;
+              })()}
             </YStack>
 
             <ProgressBar
@@ -850,55 +982,54 @@ export default function Generate() {
         </GlassCard>
       ) : null}
 
-      {/* RESULT */}
+      {/* RESULT
+       *
+       * Distilled layout: the translated title is the earned editorial moment
+       * and leads the card; Done meta is demoted to a quieter line beneath;
+       * the action row carries only Play + sub-picker + ⋯ overflow. Open
+       * folder / Re-transcribe / Download SRT / New transcription live in the
+       * ActionSheet so the success moment stays uncluttered.
+       */}
       {isDone && result ? (
         <GlassCard variant="mid">
           <YStack gap="$md">
+            {/* The earned moment — translated title in Fraunces, original beneath.
+                Falls back to original-only when nothing was translated. */}
+            <YStack gap={4}>
+              {metadata?.titleTranslated ? (
+                <>
+                  <DisplaySm>{metadata.titleTranslated}</DisplaySm>
+                  <BodySm color="$textMuted">{metadata.titleOriginal}</BodySm>
+                </>
+              ) : metadata?.titleOriginal ? (
+                <DisplaySm>{metadata.titleOriginal}</DisplaySm>
+              ) : null}
+            </YStack>
+
+            {/* Done meta — calm, not loud */}
             <XStack gap="$sm" alignItems="center">
               <Stack
-                width={40}
-                height={40}
+                width={28}
+                height={28}
                 borderRadius="$pill"
                 backgroundColor="rgba(93,184,114,0.15)"
                 alignItems="center"
                 justifyContent="center"
               >
-                <CheckCircle2 size={20} color="$success" />
+                <CheckCircle2 size={14} color="$success" />
               </Stack>
-              <YStack gap={2}>
-                <TitleLg>
-                  Done · {Math.round(result.durationMs / 1000)}s
-                </TitleLg>
-                <BodySm color="$textSecondary">
-                  {result.sttSourceUsed === "yt_captions"
-                    ? "YouTube auto-captions"
-                    : `Whisper · ${sttEngine}`}
-                  {" · "}
-                  {sourceLang.toUpperCase()}
-                  {enableTranslation && !downloadOnly
-                    ? ` → ${targetLang.toUpperCase()}`
-                    : ""}
-                </BodySm>
-              </YStack>
+              <BodySm color="$textSecondary">
+                Done · {Math.round(result.durationMs / 1000)}s ·{" "}
+                {result.sttSourceUsed === "yt_captions"
+                  ? "YouTube auto-captions"
+                  : humanEngine(sttEngine)}
+                {" · "}
+                {sourceLang.toUpperCase()}
+                {enableTranslation && !downloadOnly
+                  ? ` → ${targetLang.toUpperCase()}`
+                  : ""}
+              </BodySm>
             </XStack>
-
-            {metadata?.titleTranslated ? (
-              <Stack
-                backgroundColor="$accentSoft"
-                borderColor="$accentDim"
-                borderWidth={1}
-                borderRadius="$md"
-                padding="$md"
-              >
-                <YStack gap="$xs">
-                  <CaptionUpper color="$accent">translated title</CaptionUpper>
-                  <TitleMd>{metadata.titleTranslated}</TitleMd>
-                  <BodySm color="$textSecondary">
-                    {metadata.titleOriginal}
-                  </BodySm>
-                </YStack>
-              </Stack>
-            ) : null}
 
             {result.previewSegments.length > 0 ? (
               <Stack
@@ -909,9 +1040,11 @@ export default function Generate() {
                 gap={2}
               >
                 {result.previewSegments.slice(0, 5).map((seg, i) => (
-                  <YStack
+                  <XStack
                     key={seg.id}
                     paddingVertical="$xs"
+                    gap="$md"
+                    alignItems="flex-start"
                     borderBottomWidth={
                       i === Math.min(result.previewSegments.length, 5) - 1
                         ? 0
@@ -919,24 +1052,67 @@ export default function Generate() {
                     }
                     borderBottomColor="$borderSubtle"
                   >
-                    <Timestamp>
-                      {formatTimestamp(seg.start)} → {formatTimestamp(seg.end)}
-                    </Timestamp>
-                    <BodySm>{seg.text}</BodySm>
-                    {seg.translated ? (
-                      <BodySm color="$accent">{seg.translated}</BodySm>
-                    ) : null}
-                  </YStack>
+                    <Stack width={88} flexShrink={0} paddingTop={2}>
+                      <Timestamp>{formatTimestamp(seg.start)}</Timestamp>
+                    </Stack>
+                    <YStack flex={1}>
+                      <BodySm>{seg.text}</BodySm>
+                      {seg.translated ? (
+                        <BodySm color="$accent">{seg.translated}</BodySm>
+                      ) : null}
+                    </YStack>
+                  </XStack>
                 ))}
               </Stack>
             ) : null}
 
-            {/* Action buttons — Play takes prime real estate, admin actions cluster below. */}
-            <YStack gap="$xs">
-              {/* Subtitle picker for mpv playback. Only show "Translated"
-                  when the pipeline actually produced one. */}
-              <XStack alignItems="center" gap="$sm" flexWrap="wrap">
-                <Caption>Subtitles</Caption>
+            {/* Single action row: Play / Subs / ⋯ */}
+            <YStack gap="$sm">
+              <XStack
+                alignItems="center"
+                gap="$sm"
+                flexWrap="wrap"
+              >
+                <ButtonPrimary
+                  disabled={mpvBusy}
+                  glow="none"
+                  onPress={async () => {
+                    setMpvBusy(true);
+                    setMpvStatus(undefined);
+                    try {
+                      const res = await apiClient.playMpv(result.videoId, {
+                        subtitlePreference: subPreference,
+                      });
+                      if (res.ok) {
+                        setMpvStatus({
+                          kind: "ok",
+                          text: res.subtitle
+                            ? `Launched mpv · subs ${res.subtitle}`
+                            : "Launched mpv",
+                        });
+                      } else {
+                        setMpvStatus({
+                          kind: "error",
+                          text: res.error ?? "mpv launch failed",
+                        });
+                      }
+                    } catch (err) {
+                      setMpvStatus({
+                        kind: "error",
+                        text: err instanceof Error ? err.message : String(err),
+                      });
+                    } finally {
+                      setMpvBusy(false);
+                    }
+                  }}
+                >
+                  <XStack gap="$xs" alignItems="center">
+                    <PlayCircle size={14} color="$textPrimary" />
+                    <TitleMd>
+                      {mpvBusy ? "Opening mpv…" : "Play with MPV"}
+                    </TitleMd>
+                  </XStack>
+                </ButtonPrimary>
                 <SegmentedControl
                   value={subPreference}
                   onValueChange={(v) => setSubPreference(v as SubPreference)}
@@ -945,50 +1121,25 @@ export default function Generate() {
                       ? [{ label: "Translated", value: "translated" as const }]
                       : []),
                     { label: "Original", value: "original" as const },
-                    { label: "None", value: "none" as const },
+                    { label: "Off", value: "none" as const },
                   ]}
                   aria-label="Subtitle preference for mpv"
                 />
+                <Stack flex={1} />
+                <ButtonSecondary onPress={() => setReTranscribeOpen(true)}>
+                  <XStack gap="$xs" alignItems="center">
+                    <RotateCcw size={14} color="$textSecondary" />
+                    <BodySm fontWeight="500" color="$textSecondary">
+                      Re-transcribe with…
+                    </BodySm>
+                  </XStack>
+                </ButtonSecondary>
+                <IconButton
+                  icon={<MoreHorizontal size={16} color="$textSecondary" />}
+                  aria-label="More actions"
+                  onPress={() => setResultOverflowOpen(true)}
+                />
               </XStack>
-              <ButtonPrimary
-                disabled={mpvBusy}
-                onPress={async () => {
-                  setMpvBusy(true);
-                  setMpvStatus(undefined);
-                  try {
-                    const res = await apiClient.playMpv(result.videoId, {
-                      subtitlePreference: subPreference,
-                    });
-                    if (res.ok) {
-                      setMpvStatus({
-                        kind: "ok",
-                        text: res.subtitle
-                          ? `Launched mpv · subs ${res.subtitle}`
-                          : "Launched mpv",
-                      });
-                    } else {
-                      setMpvStatus({
-                        kind: "error",
-                        text: res.error ?? "mpv launch failed",
-                      });
-                    }
-                  } catch (err) {
-                    setMpvStatus({
-                      kind: "error",
-                      text: err instanceof Error ? err.message : String(err),
-                    });
-                  } finally {
-                    setMpvBusy(false);
-                  }
-                }}
-              >
-                <XStack gap="$xs" alignItems="center">
-                  <PlayCircle size={14} color="$textPrimary" />
-                  <TitleMd>
-                    {mpvBusy ? "Opening mpv…" : "Play with MPV"}
-                  </TitleMd>
-                </XStack>
-              </ButtonPrimary>
 
               {mpvStatus ? (
                 <XStack
@@ -1016,71 +1167,105 @@ export default function Generate() {
                   </Caption>
                 </XStack>
               ) : null}
-              <XStack gap="$xs" flexWrap="wrap">
-                <ButtonSecondary
-                  onPress={() =>
-                    apiClient
-                      .openLibraryFolder(result.videoId)
-                      .catch(() => undefined)
-                  }
-                >
-                  <XStack gap="$xs" alignItems="center">
-                    <FolderOpen size={14} color="$textSecondary" />
-                    <BodySm fontWeight="500" color="$textSecondary">
-                      Open folder
-                    </BodySm>
-                  </XStack>
-                </ButtonSecondary>
-                <ButtonSecondary onPress={() => setReTranscribeOpen(true)}>
-                  <XStack gap="$xs" alignItems="center">
-                    <RotateCcw size={14} color="$textSecondary" />
-                    <BodySm fontWeight="500" color="$textSecondary">
-                      Re-transcribe with…
-                    </BodySm>
-                  </XStack>
-                </ButtonSecondary>
-                <ButtonSecondary
-                  onPress={() => {
-                    if (typeof window === "undefined") return;
-                    const baseUrl = "http://127.0.0.1:8000";
-                    // V2 multi-SRT: file is in transcripts/<id>.srt. Fall back
-                    // to the legacy filename for jobs created before the
-                    // pipeline migration.
-                    const path = result.transcribeId
-                      ? `/api/library/${result.videoId}/file/transcripts/${result.transcribeId}.srt`
-                      : `/api/library/${result.videoId}/file/${result.videoId}_original.srt`;
-                    window.open(`${baseUrl}${path}`, "_blank");
-                  }}
-                >
-                  <XStack gap="$xs" alignItems="center">
-                    <Download size={14} color="$textSecondary" />
-                    <BodySm fontWeight="500" color="$textSecondary">
-                      Download SRT
-                    </BodySm>
-                  </XStack>
-                </ButtonSecondary>
-                <ButtonGhost onPress={reset}>
-                  <BodySm fontWeight="500" color="$textSecondary">
-                    New transcription
-                  </BodySm>
-                </ButtonGhost>
-              </XStack>
             </YStack>
           </YStack>
         </GlassCard>
       ) : null}
 
-      {status === "error" && errorMessage ? (
-        <GlassCard variant="mid">
-          <YStack gap="$xs">
-            <CaptionUpper color="$error">error</CaptionUpper>
-            <BodySm>{errorMessage}</BodySm>
-            <XStack>
-              <ButtonSecondary onPress={reset}>Try again</ButtonSecondary>
-            </XStack>
-          </YStack>
-        </GlassCard>
-      ) : null}
+      {status === "error" && errorMessage ? (() => {
+        const { category, hint } = categorizeError(errorMessage);
+        const showConfigureFix =
+          (category === "engine" || category === "translator") &&
+          metadata?.ok === true;
+        const showCookieFix = category === "cookies";
+        return (
+          <GlassCard variant="mid">
+            <YStack gap="$md">
+              <XStack gap="$sm" alignItems="flex-start">
+                <Stack
+                  width={28}
+                  height={28}
+                  borderRadius="$pill"
+                  backgroundColor="rgba(255,90,95,0.15)"
+                  alignItems="center"
+                  justifyContent="center"
+                  flexShrink={0}
+                >
+                  <AlertTriangle size={14} color="$error" />
+                </Stack>
+                <YStack gap={2} flex={1}>
+                  <TitleMd>Something went wrong</TitleMd>
+                  <BodySm color="$textSecondary">{hint}</BodySm>
+                </YStack>
+              </XStack>
+
+              <Stack
+                backgroundColor="rgba(255,90,95,0.06)"
+                borderColor="rgba(255,90,95,0.25)"
+                borderWidth={1}
+                borderRadius="$md"
+                paddingHorizontal="$md"
+                paddingVertical="$sm"
+              >
+                <Caption color="$textMuted">{errorMessage}</Caption>
+              </Stack>
+
+              <XStack gap="$xs" flexWrap="wrap" alignItems="center">
+                <ButtonPrimary
+                  glow="none"
+                  onPress={onGenerate}
+                  disabled={!metadata?.ok}
+                  height={44}
+                >
+                  <XStack gap="$xs" alignItems="center">
+                    <RotateCcw size={14} color="$textPrimary" />
+                    <TitleSm>Try again</TitleSm>
+                  </XStack>
+                </ButtonPrimary>
+
+                {showConfigureFix ? (
+                  <ButtonSecondary
+                    onPress={() => {
+                      dismissError();
+                      setConfigureOpen(true);
+                      // Engine errors live behind the Advanced chevron;
+                      // translator errors live in the always-visible
+                      // Translation block, so no inner expansion needed.
+                      if (category === "engine") setAdvancedOpen(true);
+                    }}
+                  >
+                    <BodySm fontWeight="500" color="$textSecondary">
+                      Configure differently →
+                    </BodySm>
+                  </ButtonSecondary>
+                ) : null}
+
+                {showCookieFix ? (
+                  <ButtonSecondary onPress={() => router.push("/settings")}>
+                    <BodySm fontWeight="500" color="$textSecondary">
+                      Open cookie settings →
+                    </BodySm>
+                  </ButtonSecondary>
+                ) : null}
+
+                <ButtonGhost onPress={toggleLogsDrawer}>
+                  <BodySm fontWeight="500" color="$textSecondary">
+                    Open logs (⌘L)
+                  </BodySm>
+                </ButtonGhost>
+
+                <Stack flex={1} />
+
+                <ButtonGhost onPress={reset}>
+                  <BodySm fontWeight="500" color="$textMuted">
+                    Start over
+                  </BodySm>
+                </ButtonGhost>
+              </XStack>
+            </YStack>
+          </GlassCard>
+        );
+      })() : null}
 
       {result ? (
         <NewTranscribeModal
@@ -1088,6 +1273,39 @@ export default function Generate() {
           onOpenChange={setReTranscribeOpen}
           videoId={result.videoId}
           onComplete={() => undefined}
+        />
+      ) : null}
+
+      {result ? (
+        <ActionSheet
+          open={resultOverflowOpen}
+          onOpenChange={setResultOverflowOpen}
+          actions={[
+            {
+              label: "Open folder",
+              icon: <FolderOpen size={16} color="$textSecondary" />,
+              onPress: () =>
+                apiClient
+                  .openLibraryFolder(result.videoId)
+                  .catch(() => undefined),
+            },
+            {
+              label: "Download SRT",
+              icon: <Download size={16} color="$textSecondary" />,
+              onPress: () => {
+                if (typeof window === "undefined") return;
+                const baseUrl = "http://127.0.0.1:8000";
+                // V2 multi-SRT: file is in transcripts/<id>.srt. Fall back
+                // to the legacy filename for jobs created before the
+                // pipeline migration.
+                const path = result.transcribeId
+                  ? `/api/library/${result.videoId}/file/transcripts/${result.transcribeId}.srt`
+                  : `/api/library/${result.videoId}/file/${result.videoId}_original.srt`;
+                window.open(`${baseUrl}${path}`, "_blank");
+              },
+            },
+            { label: "New transcription", onPress: reset },
+          ]}
         />
       ) : null}
     </YStack>

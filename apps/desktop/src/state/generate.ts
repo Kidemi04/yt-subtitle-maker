@@ -61,6 +61,12 @@ interface GenerateState {
   ) => Promise<void>;
   cancel: () => void;
   reset: () => void;
+  /**
+   * Dismiss the error and return to the meta-loaded stage with URL and
+   * metadata preserved so the user can tweak Configure and retry without
+   * having to paste the URL again.
+   */
+  dismissError: () => void;
 }
 
 const phaseFromEvent = (e: ProcessEvent): ProcessingPhase | undefined => {
@@ -200,6 +206,21 @@ export const useGenerate = create<GenerateState>((set, get) => ({
       phaseProgress: undefined,
       result: undefined,
       errorMessage: undefined,
+      abort: undefined,
+    });
+  },
+
+  dismissError() {
+    const { metadata } = get();
+    set({
+      // Preserve url/metadata so the user can tweak Configure and retry. If
+      // metadata is missing (rare — error during load), fall back to idle.
+      status: metadata?.ok ? "meta-loaded" : "idle",
+      errorMessage: undefined,
+      phase: undefined,
+      phaseMessage: undefined,
+      phaseProgress: undefined,
+      result: undefined,
       abort: undefined,
     });
   },

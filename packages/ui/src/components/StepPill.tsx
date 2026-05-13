@@ -61,17 +61,16 @@ function StatusIcon({ status }: { status: StepPillStatus }) {
     return <Check size={12} color="#5db872" strokeWidth={3} />;
   }
   if (status === "active") {
-    // Soft/dim convention matches the container's $accentSoft/$accentDim
-    // recipe so the dot reads as a brightening of the same surface, not a
-    // foreign solid puck.
+    // Spec (Screen 4): pulsing accent dot. Solid $accent fill on the
+    // $accentSoft pill background; the contrast IS the affordance. A
+    // soft/dim dot blends into the pill and reads as a small container,
+    // not a marker — drift fixed in R2.
     return (
       <Stack
         width={8}
         height={8}
         borderRadius="$pill"
-        backgroundColor="$accentSoft"
-        borderWidth={1}
-        borderColor="$accentDim"
+        backgroundColor="$accent"
         style={{
           animation: "yt-ui-pulse 1s cubic-bezier(0.4, 0, 0.2, 1) infinite",
         }}

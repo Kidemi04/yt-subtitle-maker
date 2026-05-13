@@ -3,8 +3,6 @@ import { Stack, XStack, YStack } from "tamagui";
 import {
   PlayCircle,
   RotateCcw,
-  RefreshCcw,
-  Info,
   MoreHorizontal,
   History as HistoryIconLucide,
 } from "@tamagui/lucide-icons";
@@ -15,6 +13,7 @@ import {
   FilterChip,
   BadgePill,
   ButtonPrimary,
+  ButtonSecondary,
   Dropdown,
   DisplayMd,
   TitleSm,
@@ -27,6 +26,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
 import { useGenerate } from "../src/state/generate";
 import { VideoDetailModal } from "../src/components/VideoDetailModal";
+import { humanEngine } from "../src/constants";
 import type { HistoryItem } from "@yt-subtitle-maker/api-client";
 
 type TimeFilter = "all" | "today" | "week" | "month";
@@ -123,21 +123,17 @@ export default function History() {
 
   return (
     <YStack gap="$lg">
-      <XStack alignItems="center" justifyContent="space-between" gap="$md">
-        <YStack gap="$xs" flex={1}>
-          <DisplayMd>Past sessions</DisplayMd>
-          <BodySm color="$textSecondary">
-            {loading
-              ? "Refreshing…"
-              : `${items.length} session${items.length === 1 ? "" : "s"} · click to reload settings into Generate.`}
-          </BodySm>
-        </YStack>
-        <IconButton
-          icon={<RefreshCcw size={16} color="$textSecondary" />}
-          aria-label="Refresh history"
-          onPress={refresh}
-        />
-      </XStack>
+      {/* Spec Screen 9 header is time-filter chips + sort + ⋯ overflow only.
+          Refresh button removed — useFocusEffect already refetches on every
+          tab return, so the manual button was dead chrome. */}
+      <YStack gap="$xs">
+        <DisplayMd>Past sessions</DisplayMd>
+        <BodySm color="$textSecondary">
+          {loading
+            ? "Refreshing…"
+            : `${items.length} session${items.length === 1 ? "" : "s"} · click a row for details, ⟳ to reload into Generate.`}
+        </BodySm>
+      </YStack>
 
       <GlassCard variant="low">
         <XStack gap="$sm" alignItems="center" flexWrap="wrap">
@@ -165,7 +161,16 @@ export default function History() {
 
       {error ? (
         <GlassCard variant="mid">
-          <BodySm color="$error">Couldn't load history: {error}</BodySm>
+          <YStack gap="$sm">
+            <BodySm color="$error">Couldn't load history: {error}</BodySm>
+            <XStack>
+              <ButtonSecondary onPress={refresh}>
+                <BodySm fontWeight="500" color="$textSecondary">
+                  Try again
+                </BodySm>
+              </ButtonSecondary>
+            </XStack>
+          </YStack>
         </GlassCard>
       ) : null}
 
@@ -341,13 +346,19 @@ function HistoryRow({
             </BodySm>
           ) : null}
           <XStack gap="$xs" marginTop={4} flexWrap="wrap" alignItems="center">
+            {item.targetLang ? (
+              <BadgePill tone="neutral">
+                {item.targetLang.toUpperCase()}
+              </BadgePill>
+            ) : null}
+            <BadgePill tone="neutral" font="mono">
+              {humanEngine(item.sttEngineUsed)}
+            </BadgePill>
             {countsLabel ? (
               <BadgePill tone={trCount > 0 ? "accent" : "neutral"}>
                 {countsLabel}
               </BadgePill>
-            ) : (
-              <BadgePill tone="neutral">{item.sttEngineUsed}</BadgePill>
-            )}
+            ) : null}
             <Caption fontSize={11}>{formatRelative(item.createdAt)}</Caption>
           </XStack>
         </YStack>
@@ -355,13 +366,10 @@ function HistoryRow({
 
       <Timestamp fontSize={12}>{formatElapsed(item.processingDurationMs)}</Timestamp>
 
+      {/* ▶ Play + ⟳ Reload + open folder. Info button removed — row body click
+          already opens the detail modal (the spec collapses non-primary to ⋯
+          but with only 3 actions here, keep them visible). */}
       <XStack gap="$xs">
-        <IconButton
-          icon={<Info size={14} color="$textSecondary" />}
-          aria-label="Open detail"
-          size={32}
-          onPress={onOpenDetail}
-        />
         <IconButton
           icon={<PlayCircle size={14} color="$accent" />}
           aria-label="Play with mpv"

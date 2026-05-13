@@ -23,6 +23,7 @@ import {
 import {
   GlassCard,
   Modal,
+  ConfirmDialog,
   IconButton,
   ButtonSecondary,
   ButtonGhost,
@@ -32,7 +33,6 @@ import {
   BodySm,
   Caption,
   CaptionUpper,
-  Code,
 } from "@yt-subtitle-maker/ui";
 import { useRouter } from "expo-router";
 import type {
@@ -43,6 +43,7 @@ import type {
 import { apiClient } from "../state/client";
 import { NewTranscribeModal } from "./NewTranscribeModal";
 import { NewTranslationModal } from "./NewTranslationModal";
+import { humanEngine, humanTranslator } from "../constants";
 
 export interface VideoDetailModalProps {
   open: boolean;
@@ -77,6 +78,16 @@ export function VideoDetailModal({
     string | undefined
   >(undefined);
 
+  // Single state for any pending destructive confirmation. The native
+  // window.confirm() leaked OS chrome (PRODUCT.md anti-reference #3); we
+  // now use one ConfirmDialog mounted at the bottom of the tree.
+  type PendingDelete =
+    | { kind: "video" }
+    | { kind: "transcript"; id: string }
+    | { kind: "translation"; id: string }
+    | null;
+  const [pendingDelete, setPendingDelete] = React.useState<PendingDelete>(null);
+
   const refreshDetail = React.useCallback(async () => {
     setError(undefined);
     try {
@@ -94,27 +105,6 @@ export function VideoDetailModal({
 
   const onClose = () => onOpenChange(false);
 
-  const onDeleteVideo = async () => {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(
-        `Delete the entire library entry for "${
-          detail?.titleOriginal ?? fallbackTitle ?? videoId
-        }"? This removes the audio and all SRTs.`,
-      )
-    ) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await apiClient.deleteLibraryItem(videoId);
-      onClose();
-      onDeleted?.();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const onOpenFolder = async () => {
     try {
       await apiClient.openLibraryFolder(videoId);
@@ -129,28 +119,55 @@ export function VideoDetailModal({
   const onPlayTranslation = async (id: string) => {
     await apiClient.playMpv(videoId, { translateId: id });
   };
-  const onDeleteTranscript = async (id: string) => {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(
-        "Delete this transcript? Any translations derived from it will also be deleted.",
-      )
-    ) {
-      return;
+
+  const performPendingDelete = async () => {
+    if (!pendingDelete) return;
+    if (pendingDelete.kind === "video") {
+      setBusy(true);
+      try {
+        await apiClient.deleteLibraryItem(videoId);
+        onClose();
+        onDeleted?.();
+      } finally {
+        setBusy(false);
+      }
+    } else if (pendingDelete.kind === "transcript") {
+      await apiClient.deleteSrt(videoId, "transcribe", pendingDelete.id);
+      await refreshDetail();
+    } else if (pendingDelete.kind === "translation") {
+      await apiClient.deleteSrt(videoId, "translate", pendingDelete.id);
+      await refreshDetail();
     }
-    await apiClient.deleteSrt(videoId, "transcribe", id);
-    await refreshDetail();
   };
-  const onDeleteTranslation = async (id: string) => {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm("Delete this translation?")
-    ) {
-      return;
+
+  const onDeleteVideo = () => setPendingDelete({ kind: "video" });
+  const onDeleteTranscript = (id: string) =>
+    setPendingDelete({ kind: "transcript", id });
+  const onDeleteTranslation = (id: string) =>
+    setPendingDelete({ kind: "translation", id });
+
+  const pendingDeleteCopy = (() => {
+    if (!pendingDelete) return { title: "", message: "" };
+    if (pendingDelete.kind === "video") {
+      return {
+        title: "Delete the entire library entry?",
+        message: `"${
+          detail?.titleOriginal ?? fallbackTitle ?? videoId
+        }" — this removes the audio and all SRTs. Cannot be undone.`,
+      };
     }
-    await apiClient.deleteSrt(videoId, "translate", id);
-    await refreshDetail();
-  };
+    if (pendingDelete.kind === "transcript") {
+      return {
+        title: "Delete this transcript?",
+        message:
+          "Any translations derived from it will also be deleted. Cannot be undone.",
+      };
+    }
+    return {
+      title: "Delete this translation?",
+      message: "The translated SRT will be removed. Cannot be undone.",
+    };
+  })();
 
   const translationsBySource = React.useMemo(() => {
     const map = new Map<string, TranslateRun[]>();
@@ -170,7 +187,7 @@ export function VideoDetailModal({
       open={open}
       onOpenChange={onOpenChange}
       title={titleForHeader}
-      width={720}
+      width={640}
     >
       <YStack gap="$lg">
         {/* Header: thumbnail + url + meta */}
@@ -264,9 +281,16 @@ export function VideoDetailModal({
               {detail?.transcribes.map((t) => {
                 const group = translationsBySource.get(t.id) ?? [];
                 if (group.length === 0) return null;
+                const sourceLabel = [
+                  humanEngine(t.engine),
+                  t.model,
+                  t.language,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
                 return (
                   <YStack key={t.id} gap="$xs">
-                    <CaptionUpper>from {t.id}</CaptionUpper>
+                    <CaptionUpper>from · {sourceLabel}</CaptionUpper>
                     <YStack gap="$xs">
                       {group.map((tr) => (
                         <TranslateRow
@@ -290,7 +314,7 @@ export function VideoDetailModal({
                 if (orphans.length === 0) return null;
                 return (
                   <YStack gap="$xs">
-                    <CaptionUpper>orphan (source deleted)</CaptionUpper>
+                    <CaptionUpper>source transcript deleted</CaptionUpper>
                     <YStack gap="$xs">
                       {orphans.map((tr) => (
                         <TranslateRow
@@ -361,6 +385,18 @@ export function VideoDetailModal({
           initialSourceTranscribeId={translationSourceId}
           onComplete={() => void refreshDetail()}
         />
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingDelete(null);
+          }}
+          title={pendingDeleteCopy.title}
+          message={pendingDeleteCopy.message}
+          confirmLabel="Delete"
+          onConfirm={() => {
+            void performPendingDelete();
+          }}
+        />
       </YStack>
     </Modal>
   );
@@ -377,7 +413,9 @@ function TranscribeRow({
   onTranslate: () => void;
   onDelete: () => void;
 }) {
-  const facets = [run.engine, run.model, run.language].filter(Boolean).join(" · ");
+  const facets = [humanEngine(run.engine), run.model, run.language]
+    .filter(Boolean)
+    .join(" · ");
   const meta = [
     formatDurationMs(run.durationMs),
     `${run.segmentCount} segment${run.segmentCount === 1 ? "" : "s"}`,
@@ -410,7 +448,7 @@ function TranscribeRow({
         />
       </XStack>
       <YStack flex={1} gap={2} minWidth={0}>
-        <Code numberOfLines={1}>{facets}</Code>
+        <BodySm numberOfLines={1}>{facets}</BodySm>
         <Caption fontSize={11}>{meta}</Caption>
       </YStack>
       <IconButton
@@ -432,7 +470,11 @@ function TranslateRow({
   onPlay: () => void;
   onDelete: () => void;
 }) {
-  const facets = [run.translator, run.translatorModel, run.targetLang]
+  const facets = [
+    humanTranslator(run.translator),
+    run.translatorModel,
+    run.targetLang,
+  ]
     .filter(Boolean)
     .join(" · ");
   const meta = [
@@ -448,18 +490,20 @@ function TranslateRow({
       gap="$sm"
       padding="$sm"
       borderRadius="$md"
-      backgroundColor="$surfaceGlass"
+      backgroundColor="$accentSoft"
       borderWidth={1}
-      borderColor="$borderSubtle"
+      borderColor="$accentDim"
     >
       <IconButton
-        icon={<PlayCircle size={14} color="$textSecondary" />}
+        icon={<PlayCircle size={14} color="$accent" />}
         aria-label="Play with this translation"
         size={32}
         onPress={onPlay}
       />
       <YStack flex={1} gap={2} minWidth={0}>
-        <Code numberOfLines={1}>{facets}</Code>
+        <BodySm numberOfLines={1} color="$textPrimary">
+          {facets}
+        </BodySm>
         <Caption fontSize={11}>{meta}</Caption>
       </YStack>
       <IconButton

@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-13T00:00:00Z",
+  "title": "Design System: yt-subtitle-maker",
+  "extensions": {
+    "colorMeta": {
+      "bgBase": {
+        "role": "neutral",
+        "displayName": "Theater Black",
+        "canonical": "oklch(7% 0.005 280)",
+        "tonalRamp": [
+          "oklch(4% 0.004 280)",
+          "oklch(7% 0.005 280)",
+          "oklch(11% 0.006 280)",
+          "oklch(17% 0.006 280)",
+          "oklch(25% 0.006 280)",
+          "oklch(38% 0.005 280)",
+          "oklch(55% 0.004 280)",
+          "oklch(75% 0.003 280)"
+        ]
+      },
+      "bgElevated": {
+        "role": "neutral",
+        "displayName": "Stage Black",
+        "canonical": "oklch(10% 0.005 280)",
+        "tonalRamp": [
+          "oklch(5% 0.005 280)",
+          "oklch(10% 0.005 280)",
+          "oklch(16% 0.006 280)",
+          "oklch(24% 0.006 280)",
+          "oklch(34% 0.005 280)",
+          "oklch(48% 0.004 280)",
+          "oklch(65% 0.004 280)",
+          "oklch(82% 0.003 280)"
+        ]
+      },
+      "textPrimary": {
+        "role": "neutral",
+        "displayName": "Picture White",
+        "canonical": "oklch(96% 0.002 280)",
+        "tonalRamp": [
+          "oklch(15% 0.002 280)",
+          "oklch(25% 0.002 280)",
+          "oklch(40% 0.002 280)",
+          "oklch(55% 0.002 280)",
+          "oklch(70% 0.002 280)",
+          "oklch(82% 0.002 280)",
+          "oklch(90% 0.002 280)",
+          "oklch(96% 0.002 280)"
+        ]
+      },
+      "textSecondary": {
+        "role": "neutral",
+        "displayName": "Foyer Grey",
+        "canonical": "oklch(70% 0.003 280)",
+        "tonalRamp": [
+          "oklch(15% 0.003 280)",
+          "oklch(25% 0.003 280)",
+          "oklch(38% 0.003 280)",
+          "oklch(50% 0.003 280)",
+          "oklch(60% 0.003 280)",
+          "oklch(70% 0.003 280)",
+          "oklch(82% 0.002 280)",
+          "oklch(92% 0.002 280)"
+        ]
+      },
+      "textMuted": {
+        "role": "neutral",
+        "displayName": "Aisle Grey",
+        "canonical": "oklch(50% 0.003 280)",
+        "tonalRamp": [
+          "oklch(15% 0.003 280)",
+          "oklch(25% 0.003 280)",
+          "oklch(35% 0.003 280)",
+          "oklch(45% 0.003 280)",
+          "oklch(50% 0.003 280)",
+          "oklch(62% 0.003 280)",
+          "oklch(75% 0.002 280)",
+          "oklch(88% 0.002 280)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Sunset Orange",
+        "canonical": "oklch(74% 0.16 50)",
+        "tonalRamp": [
+          "oklch(20% 0.05 50)",
+          "oklch(30% 0.09 50)",
+          "oklch(40% 0.12 50)",
+          "oklch(50% 0.14 50)",
+          "oklch(60% 0.15 50)",
+          "oklch(74% 0.16 50)",
+          "oklch(85% 0.12 50)",
+          "oklch(92% 0.07 50)"
+        ]
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Frame Green",
+        "canonical": "oklch(72% 0.11 145)",
+        "tonalRamp": [
+          "oklch(20% 0.04 145)",
+          "oklch(30% 0.06 145)",
+          "oklch(42% 0.08 145)",
+          "oklch(55% 0.10 145)",
+          "oklch(72% 0.11 145)",
+          "oklch(82% 0.09 145)",
+          "oklch(90% 0.06 145)",
+          "oklch(95% 0.03 145)"
+        ]
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Marquee Amber",
+        "canonical": "oklch(75% 0.11 60)",
+        "tonalRamp": [
+          "oklch(22% 0.04 60)",
+          "oklch(32% 0.07 60)",
+          "oklch(45% 0.09 60)",
+          "oklch(58% 0.10 60)",
+          "oklch(75% 0.11 60)",
+          "oklch(85% 0.09 60)",
+          "oklch(92% 0.06 60)",
+          "oklch(96% 0.03 60)"
+        ]
+      },
+      "error": {
+        "role": "status",
+        "displayName": "Reel Red",
+        "canonical": "oklch(67% 0.21 25)",
+        "tonalRamp": [
+          "oklch(20% 0.07 25)",
+          "oklch(30% 0.12 25)",
+          "oklch(42% 0.16 25)",
+          "oklch(55% 0.19 25)",
+          "oklch(67% 0.21 25)",
+          "oklch(78% 0.17 25)",
+          "oklch(88% 0.11 25)",
+          "oklch(95% 0.05 25)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Md", "purpose": "Per-screen headlines and hero copy. Fraunces 28/1.2." },
+      "headline": { "displayName": "Display Lg", "purpose": "Large title moments (About hero, empty-state heading). Fraunces 40/1.1." },
+      "title": { "displayName": "Title Md", "purpose": "Card titles, control labels, settings group titles. Inter 15 600." },
+      "body": { "displayName": "Body Md", "purpose": "Paragraph copy, subtitles, helper text. Cap at 65–75ch." },
+      "label": { "displayName": "Caption Upper", "purpose": "Section eyebrow labels (TRANSLATED TITLE, PROCESSING). Inter 11 600 1.5px uppercase." },
+      "mono": { "displayName": "Code", "purpose": "SRT bodies, log lines, file paths, engine names. JetBrains Mono 12/1.6." }
+    },
+    "shadows": [
+      { "name": "accent-glow", "value": "0 4px 16px rgba(251,146,60,0.35)", "purpose": "Soft sunset halo under the primary CTA at rest (Init, idle Generate)." },
+      { "name": "accent-glow-strong", "value": "0 4px 20px rgba(251,146,60,0.40)", "purpose": "Generate CTA when the form is ready — one step louder than the standard glow." },
+      { "name": "floating-surface", "value": "0 24px 48px rgba(0,0,0,0.4)", "purpose": "Modal, action sheet, toast, logs drawer. The only surfaces that earn a drop shadow." },
+      { "name": "floating-surface-hover", "value": "0 24px 48px rgba(0,0,0,0.5)", "purpose": "Hover-state of floating surfaces." }
+    ],
+    "motion": [
+      { "name": "duration-quick", "value": "150ms", "purpose": "Press feedback, card-hover lift, micro state changes." },
+      { "name": "duration-normal", "value": "250ms", "purpose": "Default for slide-up, fade-in, configure expand/collapse." },
+      { "name": "duration-slow", "value": "400ms", "purpose": "Larger transitions: processing card → result card swap." },
+      { "name": "duration-slowest", "value": "600ms", "purpose": "Page-level or stage transitions, rarely used." },
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for state transitions." },
+      { "name": "ease-decelerate", "value": "cubic-bezier(0, 0, 0.2, 1)", "purpose": "Fade-in, slide-up entrances." },
+      { "name": "ease-spring", "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "Toggle thumb, button press release, scale-in on radio cards." },
+      { "name": "preset-press", "value": "transform: scale(0.97); duration-quick; ease-spring", "purpose": "Active-state press feedback on buttons and icon buttons." },
+      { "name": "preset-card-hover", "value": "transform: translateY(-2px); duration-quick; ease-standard", "purpose": "Card hover lift; no shadow change." },
+      { "name": "preset-stagger", "value": "child delay 40ms", "purpose": "Sequential entrance for lists and grids." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "<768px", "purpose": "Bottom tab bar; sidebar hidden." },
+      { "name": "tablet", "value": "768–1024px", "purpose": "Collapsed sidebar at 64px (icons only). Grid drops to 3-up." },
+      { "name": "desktop", "value": "≥1024px", "purpose": "Full 240px sidebar. Library grid 4-up. Content max-width 960px centered." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Accent gradient CTA with a sunset glow at rest. The only surface that wears the brand accent at full saturation.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Generate</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 56px; padding: 0 24px; border: none; border-radius: 12px; background: linear-gradient(180deg, #fb923c, #f97316); color: #f5f5f7; font-family: Inter, system-ui, sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0; cursor: pointer; box-shadow: 0 4px 16px rgba(251,146,60,0.35); transition: transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { box-shadow: 0 4px 20px rgba(251,146,60,0.40); } .ds-btn-primary:focus-visible { outline: 2px solid #fb923c; outline-offset: 3px; } .ds-btn-primary:active { transform: scale(0.97); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quieter glass-low button for stage-2 actions (Open folder, Re-transcribe).",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Open folder</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; background: rgba(255,255,255,0.05); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); color: #a1a1a6; font-family: Inter, system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-secondary:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); color: #f5f5f7; } .ds-btn-secondary:focus-visible { outline: 2px solid #fb923c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "text-input",
+      "description": "The URL field and every other text input. Glass-low at rest, accent ring on focus that survives the blur.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Paste a YouTube URL\" />",
+      "css": ".ds-input { display: block; width: 100%; height: 44px; padding: 0 16px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; background: rgba(255,255,255,0.05); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); color: #f5f5f7; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.55; outline: none; transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-input::placeholder { color: #6e6e73; } .ds-input:hover { border-color: rgba(255,255,255,0.12); } .ds-input:focus { border-color: #fb923c; box-shadow: 0 0 0 3px rgba(251,146,60,0.15); }"
+    },
+    {
+      "name": "Glass Card",
+      "kind": "card",
+      "refersTo": "card-glass",
+      "description": "Workhorse container surface. Used for Hero, Configure, Result, Library tile, History row, Settings group.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card__eyebrow\">PROCESSING</div><div class=\"ds-card__title\">Transcribing with faster-whisper…</div><div class=\"ds-card__meta\">Step 2 / 4 · about 30s left</div></div>",
+      "css": ".ds-card { padding: 24px; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-card:hover { transform: translateY(-2px); } .ds-card__eyebrow { font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #a1a1a6; margin-bottom: 12px; } .ds-card__title { font-family: Inter, system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #f5f5f7; line-height: 1.4; margin-bottom: 4px; } .ds-card__meta { font-family: Inter, system-ui, sans-serif; font-size: 13px; font-weight: 400; color: #a1a1a6; line-height: 1.55; }"
+    },
+    {
+      "name": "Accent Badge",
+      "kind": "chip",
+      "refersTo": "badge-accent",
+      "description": "Eyebrow-style accent pill: 'Recommended', 'TRANSLATED TITLE', 'Default'. Uses the accent-soft fill so the screen reads quiet at rest.",
+      "html": "<span class=\"ds-badge-accent\">RECOMMENDED</span>",
+      "css": ".ds-badge-accent { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9999px; background: rgba(251,146,60,0.15); color: #fb923c; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }"
+    },
+    {
+      "name": "Filter Chip (Active)",
+      "kind": "chip",
+      "refersTo": "filter-chip-active",
+      "description": "Active state of the Library/History filter row. Accent-soft fill + accent text + accent-dim border.",
+      "html": "<button class=\"ds-chip-active\" type=\"button\">All</button>",
+      "css": ".ds-chip-active { display: inline-flex; align-items: center; padding: 6px 14px; border: 1px solid rgba(251,146,60,0.25); border-radius: 9999px; background: rgba(251,146,60,0.15); color: #fb923c; font-family: Inter, system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-chip-active:hover { background: rgba(251,146,60,0.20); } .ds-chip-active:focus-visible { outline: 2px solid #fb923c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Sidebar Item (Active)",
+      "kind": "nav",
+      "refersTo": "sidebar-item-active",
+      "description": "The active route in the 240px sidebar. The 3px accent left-bar is the one sanctioned use of a left edge stripe in this system.",
+      "html": "<a class=\"ds-nav-active\" href=\"#\"><span class=\"ds-nav-active__icon\" aria-hidden=\"true\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12 12 3l9 9\"/><path d=\"M5 10v10h14V10\"/></svg></span><span class=\"ds-nav-active__label\">Generate</span></a>",
+      "css": ".ds-nav-active { position: relative; display: inline-flex; align-items: center; gap: 12px; height: 44px; padding: 0 16px 0 19px; border-radius: 12px; background: rgba(251,146,60,0.15); color: #f5f5f7; font-family: Inter, system-ui, sans-serif; font-size: 14px; font-weight: 500; text-decoration: none; } .ds-nav-active::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: #fb923c; } .ds-nav-active__icon { display: inline-flex; color: #fb923c; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Screening Room",
+    "overview": "The app is a private screening room: dark walls, a single warm light, a serif title card before the picture rolls. Surfaces are matte-black at the base, lifted only by frosted glass panels. The single accent, a sunset orange, lives on the things you actually press. Everything else recedes into the dark. The viewer (someone curious about a video in a language they don't speak) reaches for the app the way they would reach for a remote. The system rejects four neighboring registers: SaaS dashboard, crypto/AI neon, enterprise software, and toy consumer app. The depth model is backdrop blur, not shadow. Type carries the personality: Fraunces serif for screen titles, Inter for the machine, JetBrains Mono for code and time.",
+    "keyCharacteristics": [
+      "Single locked accent: sunset orange #fb923c, used on ≤10% of any screen.",
+      "Serif display moments (Fraunces 400), sans operating type (Inter), mono for time and code (JetBrains Mono).",
+      "Three glass elevation steps; no drop shadows on cards.",
+      "Dark theme only. Never #ffffff, never pure black on the foreground.",
+      "Animations ease out exponentially. No bounce, no elastic, no sparkle."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Sunset Orange is used on ≤10% of any given screen. Its rarity is the point. If two items on a screen need accent, only one is actually load-bearing; the other should be glass-low or text-secondary.", "section": "colors" },
+      { "name": "The Never-White Rule", "body": "#ffffff is forbidden anywhere in the product. Text uses #f5f5f7 (Picture White); pure white jars against the dark glass surfaces.", "section": "colors" },
+      { "name": "The Locked-Accent Rule", "body": "#fb923c is the only accent. Do not introduce a second hue for novelty (no 'blue for info', no 'purple for premium'). Status colors are functional, not brand.", "section": "colors" },
+      { "name": "The Fraunces-Only-For-Moments Rule", "body": "Fraunces appears in screen titles, hero copy, and the About page only. It never appears inside buttons, table rows, settings labels, or body paragraphs. Weight is always 400.", "section": "typography" },
+      { "name": "The Tabular Numbers Rule", "body": "Any monospace number in a column carries font-feature-settings: 'tnum'. Columns must align without the eye fighting the type.", "section": "typography" },
+      { "name": "The 75ch Body Rule", "body": "Body paragraph lines cap at 65–75ch. Anything wider becomes unreadable on the dark surface.", "section": "typography" },
+      { "name": "The No-Shadow-On-Cards Rule", "body": "Glass cards never carry drop shadows. The backdrop-filter IS the elevation system. Shadows on cards turn the dark theme heavy.", "section": "elevation" },
+      { "name": "The Glow-As-Affordance Rule", "body": "Accent glow appears only on actionable CTAs at rest. It is a 'this is the next button you'll press' signal, not decoration. If three buttons wear a glow, none of them do.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use #fb923c (Sunset Orange) as the only accent. Status colors are functional, not brand.",
+      "Do use Fraunces at weight 400 only, for screen titles and hero moments. Set negative letterspacing at display sizes (-0.5 to -1.5px).",
+      "Do use backdrop-filter: blur(...) saturate(...) plus a 1px translucent border on glass surfaces. The blur IS the elevation.",
+      "Do apply font-feature-settings: 'tnum' to every monospace number in a column.",
+      "Do give every focusable element a visible 2px accent border and 0 0 0 3px accentSoft ring on focus.",
+      "Do cap body lines at 65–75ch.",
+      "Do keep accent coverage on any screen at ≤10%.",
+      "Do consume glassRecipes.low/mid/high from @yt-subtitle-maker/ui instead of recreating blur values inline."
+    ],
+    "donts": [
+      "Don't use #ffffff anywhere. Text is #f5f5f7 (Picture White).",
+      "Don't use Fraunces for body, buttons, table cells, or filler.",
+      "Don't use border-left or border-right greater than 1px as a colored stripe accent. The sidebar active state is the one sanctioned exception (a 3px accent bar inside an accentSoft background).",
+      "Don't apply background-clip: text with a gradient to headlines. Emphasis is weight or scale, never gradient text.",
+      "Don't add drop shadows to glass cards.",
+      "Don't introduce a second accent hue.",
+      "Don't reach for a modal as the first thought. Exhaust inline expansion and progressive disclosure first.",
+      "Don't ship the generic SaaS dashboard look (hero-metric templates, identical card grids, Linear-clone chrome, gradient text).",
+      "Don't ship the crypto / AI-startup neon look (cyan-on-black, glowing gradient edges, sci-fi grid).",
+      "Don't ship the heavy enterprise software look (dense checkbox forms, native OS chrome, beige FFmpeg-GUI energy).",
+      "Don't ship the toy / playful consumer app look (rainbow gradients, oversized cartoon roundness, Duolingo-doodle warmth).",
+      "Don't animate CSS layout properties. Use transform and opacity. Ease out with exponential curves. No bounce, no elastic."
+    ]
+  }
+}

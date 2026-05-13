@@ -174,18 +174,8 @@ export default function Library() {
               backgroundColor="$surfaceGlass"
               borderWidth={1}
               borderColor="$borderSubtle"
-              position="relative"
+              opacity={0.5}
             >
-              {/* Inner accent halo to hint action */}
-              <Stack
-                position="absolute"
-                width={32}
-                height={32}
-                borderRadius="$pill"
-                backgroundColor="$accentSoft"
-                opacity={0.6}
-                style={{ filter: "blur(12px)" }}
-              />
               <LibraryIconLucide size={48} color="$textMuted" />
             </Stack>
             <YStack alignItems="center" gap="$xs" maxWidth={360}>
@@ -199,7 +189,10 @@ export default function Library() {
               </BodyMd>
             </YStack>
             {items.length === 0 ? (
-              <ButtonPrimary onPress={() => router.push("/")}>
+              <ButtonPrimary
+                onPress={() => router.push("/")}
+                height={48}
+              >
                 Open Generate
               </ButtonPrimary>
             ) : (

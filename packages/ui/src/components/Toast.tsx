@@ -14,8 +14,10 @@ import { IconButton } from "./IconButton";
  *   radius   : $md (12px)
  *   padding  : $sm $md
  *   entrance : opacity 0 + y 16, animation="quick" (slide-up)
- *   tone     : neutral (default), success ($success border-left 3px),
- *              error   ($error   border-left 3px)
+ *   tone     : neutral (default), success, error — encoded by a leading
+ *              status dot + a soft full-edge tone-tinted border. (DESIGN.md
+ *              §6 explicitly bans border-left > 1px as a colored stripe;
+ *              the sidebar active state is the one sanctioned exception.)
  *
  * The Toast renders an absolute-positioned bottom-center container so it
  * floats above page content. Caller controls visibility via `open`.
@@ -34,11 +36,11 @@ export type ToastProps = {
   children: React.ReactNode;
 };
 
-const TONE_BORDER: Record<ToastTone, string | undefined> = {
-  neutral: undefined,
-  success: "$success",
-  error: "$error",
-};
+const TONE = {
+  neutral: { dot: undefined, border: undefined },
+  success: { dot: "$success", border: "rgba(93,184,114,0.30)" },
+  error: { dot: "$error", border: "rgba(255,90,95,0.30)" },
+} as const;
 
 export function Toast({
   open,
@@ -49,7 +51,7 @@ export function Toast({
 }: ToastProps) {
   if (!open) return null;
 
-  const borderLeftColor = TONE_BORDER[tone];
+  const toneStyle = TONE[tone];
 
   return (
     <Stack
@@ -69,9 +71,7 @@ export function Toast({
         borderRadius="$md"
         backgroundColor={glassRecipes.glassHigh.bg}
         borderWidth={1}
-        borderColor="$borderStrong"
-        borderLeftWidth={borderLeftColor ? 3 : 1}
-        borderLeftColor={borderLeftColor ?? "$borderStrong"}
+        borderColor={toneStyle.border ?? "$borderStrong"}
         animation="quick"
         enterStyle={{ opacity: 0, y: 16 }}
         exitStyle={{ opacity: 0, y: 16 }}
@@ -81,6 +81,15 @@ export function Toast({
           boxShadow: glassRecipes.glassHigh.boxShadow,
         }}
       >
+        {toneStyle.dot ? (
+          <Stack
+            width={8}
+            height={8}
+            borderRadius="$pill"
+            backgroundColor={toneStyle.dot}
+            flexShrink={0}
+          />
+        ) : null}
         <Text
           fontFamily="$body"
           fontSize={14}

@@ -2,9 +2,9 @@ import { Stack, XStack, YStack } from "tamagui";
 import { ArrowUpRight, Github, FileText, Bug } from "@tamagui/lucide-icons";
 import {
   GlassCard,
-  BadgeAccent,
   BadgePill,
   DisplayLg,
+  TitleMd,
   TitleSm,
   BodyMd,
   Caption,
@@ -40,44 +40,65 @@ const RESOURCES: ResourceLink[] = [
   },
 ];
 
-const TECH_PILLS = ["Tauri", "Expo", "Tamagui", "FastAPI", "yt-dlp", "OpenAI Whisper"];
+const TECH_PILLS = [
+  "Tauri",
+  "Expo",
+  "Tamagui",
+  "FastAPI",
+  "yt-dlp",
+  "OpenAI Whisper",
+  "faster-whisper",
+  "Google Gemini",
+  "FFmpeg",
+  "MPV",
+];
+
+// Build metadata. App version comes from package.json; backend version is fetched
+// from /api/version on demand if/when wired. Build date is set at build time;
+// for the dev build we render "dev" rather than guessing.
+const APP_VERSION = "2.0.0-alpha";
+const BUILD_DATE = "dev";
+const PLATFORM_LABEL =
+  typeof navigator === "undefined" ? "—" : navigator.platform || "—";
 
 export default function About() {
   return (
     <YStack gap="$lg">
-      {/* Hero */}
-      <YStack gap="$xs">
-        <XStack>
-          <BadgeAccent>v2.0 · alpha</BadgeAccent>
-        </XStack>
+      {/* Hero — no pre-heading badge per spec ("No logo mark — heading only"). */}
+      <YStack alignItems="center" gap="$xs" paddingVertical="$xl">
         <DisplayLg>YT Subtitle Maker</DisplayLg>
-        <BodyMd color="$textSecondary">
+        <BodyMd color="$textSecondary" textAlign="center">
           A desktop-first transcription studio. Whisper or YouTube
           captions, then translation via Gemini or any local AI.
         </BodyMd>
       </YStack>
 
-      {/* Stack */}
+      {/* Version grid — 2×2, JetBrains Mono values per spec */}
       <GlassCard variant="mid">
-        <YStack gap="$md">
-          <CaptionUpper>Stack</CaptionUpper>
-          <XStack gap="$xl" flexWrap="wrap">
-            <YStack gap="$xxs" flex={1} minWidth={220}>
-              <CaptionUpper>Frontend</CaptionUpper>
-              <Code>Tauri 2 · Expo 51 · Tamagui 1.115</Code>
-            </YStack>
-            <YStack gap="$xxs" flex={1} minWidth={220}>
-              <CaptionUpper>Backend</CaptionUpper>
-              <Code>FastAPI · faster-whisper · Gemini</Code>
-            </YStack>
-          </XStack>
-        </YStack>
+        <XStack flexWrap="wrap" gap="$lg">
+          <YStack gap="$xxs" flex={1} minWidth={200}>
+            <CaptionUpper>App version</CaptionUpper>
+            <Code>{APP_VERSION}</Code>
+          </YStack>
+          <YStack gap="$xxs" flex={1} minWidth={200}>
+            <CaptionUpper>Backend version</CaptionUpper>
+            <Code>fetched on start</Code>
+          </YStack>
+          <YStack gap="$xxs" flex={1} minWidth={200}>
+            <CaptionUpper>Build date</CaptionUpper>
+            <Code>{BUILD_DATE}</Code>
+          </YStack>
+          <YStack gap="$xxs" flex={1} minWidth={200}>
+            <CaptionUpper>Platform</CaptionUpper>
+            <Code>{PLATFORM_LABEL}</Code>
+          </YStack>
+        </XStack>
       </GlassCard>
 
       {/* Resources */}
       <GlassCard variant="mid">
         <YStack gap="$md">
-          <CaptionUpper>Resources</CaptionUpper>
+          <TitleMd>Resources</TitleMd>
           <YStack gap="$xs">
             {RESOURCES.map((r) => {
               const Icon = r.icon;
@@ -128,7 +149,7 @@ export default function About() {
         <CaptionUpper>Built with</CaptionUpper>
         <XStack gap="$xs" flexWrap="wrap">
           {TECH_PILLS.map((t) => (
-            <BadgePill key={t} tone="neutral">
+            <BadgePill key={t} tone="neutral" font="mono">
               {t}
             </BadgePill>
           ))}
@@ -137,7 +158,7 @@ export default function About() {
 
       {/* Footer */}
       <Caption color="$textMuted" textAlign="center" marginTop="$md">
-        MIT licensed · Made by Kelvin
+        MIT License · © 2026
       </Caption>
     </YStack>
   );

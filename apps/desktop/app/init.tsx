@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Stack, XStack, YStack } from "tamagui";
-import { Sparkles, Check } from "@tamagui/lucide-icons";
+import { Check } from "@tamagui/lucide-icons";
 import {
   RadioCard,
   ButtonPrimary,
@@ -171,21 +171,6 @@ export default function Init() {
       minHeight={600}
       position="relative"
     >
-      {/* Accent atmosphere */}
-      <Stack
-        position="absolute"
-        top={120}
-        left="50%"
-        width={420}
-        height={420}
-        marginLeft={-210}
-        borderRadius="$pill"
-        backgroundColor="$accent"
-        opacity={0.18}
-        pointerEvents="none"
-        style={{ filter: "blur(80px)" }}
-      />
-
       <Stack
         width="100%"
         maxWidth={520}
@@ -201,7 +186,6 @@ export default function Init() {
       >
         <YStack gap="$lg">
           <YStack gap="$xs">
-            <BadgeAccent>setup · one time</BadgeAccent>
             <DisplayMd>Setting up your studio</DisplayMd>
             <BodyMd color="$textSecondary">
               {state === "connecting"
@@ -230,10 +214,10 @@ export default function Init() {
 
           {state === "connecting" || state === "checking" ? (
             <XStack alignItems="center" gap="$sm">
-              <StatusDot status="warning" size={8} />
+              <StatusDot status="untested" size={8} />
               <BodySm color="$textSecondary">
                 {state === "connecting"
-                  ? "127.0.0.1:8000"
+                  ? "Reaching the local backend…"
                   : "Reading dependency state…"}
               </BodySm>
             </XStack>
@@ -295,10 +279,7 @@ export default function Init() {
           {state === "picking" ? (
             <YStack gap="$xs">
               <ButtonPrimary onPress={onDownload}>
-                <XStack alignItems="center" gap="$xs">
-                  <Sparkles size={16} color="$textPrimary" />
-                  <TitleMd>Download {picked}</TitleMd>
-                </XStack>
+                <TitleMd>Download {picked}</TitleMd>
               </ButtonPrimary>
               <ButtonGhost
                 onPress={() => {

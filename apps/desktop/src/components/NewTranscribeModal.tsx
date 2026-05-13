@@ -33,36 +33,14 @@ import type {
   WhisperModel,
 } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "../state/client";
+import {
+  WHISPER_MODELS,
+  WHISPER_DEVICES,
+  LANGUAGES,
+  humanEngine,
+} from "../constants";
 
 type Phase = "idle" | "transcribing" | "done" | "error";
-
-const WHISPER_MODELS: { label: string; value: WhisperModel }[] = [
-  { label: "tiny · 75 MB", value: "tiny" },
-  { label: "base · 150 MB", value: "base" },
-  { label: "small · 500 MB", value: "small" },
-  { label: "medium · 1.5 GB", value: "medium" },
-  { label: "turbo · 1.5 GB", value: "turbo" },
-  { label: "large-v3 · 3 GB", value: "large-v3" },
-];
-
-const DEVICES: { label: string; value: WhisperDevice }[] = [
-  { label: "Auto", value: "auto" },
-  { label: "CPU", value: "cpu" },
-  { label: "GPU (CUDA)", value: "gpu" },
-];
-
-const LANGUAGES = [
-  { label: "English", value: "en" },
-  { label: "中文 (Chinese)", value: "zh" },
-  { label: "日本語 (Japanese)", value: "ja" },
-  { label: "한국어 (Korean)", value: "ko" },
-  { label: "Español", value: "es" },
-  { label: "Français", value: "fr" },
-  { label: "Deutsch", value: "de" },
-  { label: "Português", value: "pt" },
-  { label: "Русский", value: "ru" },
-  { label: "Tiếng Việt", value: "vi" },
-];
 
 export function NewTranscribeModal({
   open,
@@ -143,10 +121,16 @@ export function NewTranscribeModal({
   };
 
   const isYtCaptions = sttEngine === "yt_captions";
-  const sttEngineOptions = installedEngines.map((e) => ({ label: e, value: e }));
+  const sttEngineOptions = installedEngines.map((e) => ({
+    label: humanEngine(e),
+    value: e,
+  }));
   // yt_captions is always available alongside installed Whisper engines.
   if (!sttEngineOptions.some((o) => o.value === "yt_captions")) {
-    sttEngineOptions.push({ label: "yt_captions", value: "yt_captions" });
+    sttEngineOptions.push({
+      label: humanEngine("yt_captions"),
+      value: "yt_captions",
+    });
   }
   const whisperModelOptions = WHISPER_MODELS.filter((opt) =>
     installedModels.size === 0 ? true : installedModels.has(opt.value),
@@ -241,7 +225,7 @@ export function NewTranscribeModal({
               <Dropdown
                 value={whisperDevice}
                 onValueChange={(v) => setWhisperDevice(v as WhisperDevice)}
-                options={DEVICES}
+                options={WHISPER_DEVICES}
                 aria-label="Device"
                 disabled={phase === "transcribing"}
               />
@@ -315,6 +299,9 @@ export function NewTranscribeModal({
           <ButtonPrimary
             onPress={onRun}
             disabled={phase === "transcribing" || phase === "done"}
+            glow={
+              phase === "transcribing" || phase === "done" ? "none" : "ready"
+            }
           >
             Run transcribe
           </ButtonPrimary>

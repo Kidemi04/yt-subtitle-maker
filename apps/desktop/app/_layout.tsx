@@ -29,7 +29,6 @@ import {
   History as HistoryIcon,
   Settings as SettingsIcon,
   Info,
-  Bell,
   Terminal,
   X as XIcon,
   Trash2,
@@ -50,6 +49,7 @@ import {
 import { config } from "../tamagui.config";
 import { useLogs, type LogLevel } from "../src/state/logs";
 import { apiClient } from "../src/state/client";
+import { platformModKey } from "../src/constants";
 import { anyModelInstalled } from "@yt-subtitle-maker/api-client";
 
 type NavRoute = "/" | "/library" | "/history" | "/settings" | "/about";
@@ -172,14 +172,11 @@ function Topbar() {
         {subtitle ? <Caption>{subtitle}</Caption> : null}
       </YStack>
       <XStack gap="$sm" alignItems="center">
-        <IconButton
-          icon={<Bell size={16} color="$textSecondary" />}
-          aria-label="Notifications"
-          size={32}
-        />
+        {/* Bell icon removed — no notifications surface wired. Adding it back
+            when toasts/inbox lands. */}
         <IconButton
           icon={<Terminal size={16} color="$textSecondary" />}
-          aria-label="Toggle logs (⌘L)"
+          aria-label={`Toggle logs (${platformModKey()}+L)`}
           size={32}
           onPress={toggleDrawer}
         />
@@ -337,7 +334,7 @@ function LogsDrawer() {
         <Caption fontSize={11}>
           {visible.length} entr{visible.length === 1 ? "y" : "ies"}
         </Caption>
-        <Caption fontSize={11}>⌘L to close</Caption>
+        <Caption fontSize={11}>{platformModKey()}+L to close</Caption>
       </XStack>
     </YStack>
   );
