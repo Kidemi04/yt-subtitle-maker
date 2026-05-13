@@ -17,6 +17,7 @@ share locks and stay consistent.
 """
 from __future__ import annotations
 
+import copy
 import os
 import re
 import threading
@@ -116,6 +117,15 @@ def _make_translator(request: dict, cfg: AppConfig):
                 model=request.get("translatorModel") or cfg.openai_model,
                 api_key=request.get("translatorApiKey") or cfg.openai_api_key,
             )
+        if override_provider.startswith("custom:"):
+            # Per-job override pointing at a named profile (custom_translators).
+            # Reuse get_active_translator's dispatch — it already knows how to
+            # look up the entry by id and build an OpenAICompatTranslator from
+            # the saved credentials. Override on a shallow copy so cfg itself
+            # isn't mutated.
+            tmp_cfg = copy.copy(cfg)
+            tmp_cfg.active_translator = override_provider
+            return get_active_translator(tmp_cfg)
         raise ValueError(f"unknown translator provider: {override_provider!r}")
     # No per-job override → use the active translator from config (respects
     # gemini / local_openai / custom:<id> profiles).

@@ -98,3 +98,37 @@ def test_pipeline_per_job_override_still_wins():
             )
             mock_gat.assert_not_called()
             mock_gt.assert_called_once()
+
+
+def test_pipeline_per_job_override_custom_profile():
+    """`translatorProvider="custom:<id>"` per-job override dispatches via
+    get_active_translator on a cfg copy with active_translator set. Lets the
+    Generate screen pick a user-saved custom profile (e.g. DeepSeek) without
+    re-typing credentials."""
+    from core.pipeline import _make_translator
+
+    cfg = AppConfig()
+    cfg.custom_translators = [{
+        "id": "deepseek-1",
+        "name": "DeepSeek",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "ds-key",
+        "model": "deepseek-chat",
+    }]
+    cfg.active_translator = "gemini"  # would be the default without override
+
+    with patch("core.pipeline.get_active_translator") as mock_gat:
+        with patch("core.pipeline.get_translator") as mock_gt:
+            mock_gat.return_value = MagicMock()
+            _make_translator(
+                {"translatorProvider": "custom:deepseek-1"},
+                cfg,
+            )
+            mock_gt.assert_not_called()
+            mock_gat.assert_called_once()
+            # The cfg passed to get_active_translator should have
+            # active_translator overridden to the requested custom profile.
+            (cfg_arg,) = mock_gat.call_args[0]
+            assert cfg_arg.active_translator == "custom:deepseek-1"
+            # And the original cfg must NOT have been mutated.
+            assert cfg.active_translator == "gemini"

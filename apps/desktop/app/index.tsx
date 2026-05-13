@@ -50,20 +50,14 @@ import type {
   SttEngine,
   WhisperModel,
   WhisperDevice,
-  TranslatorProvider,
 } from "@yt-subtitle-maker/api-client";
 
-const TRANSLATOR_LABELS: Record<TranslatorProvider, string> = {
+// Display name for built-in translator profile ids. Custom profiles use
+// their own `name` from `customTranslators`.
+const BUILTIN_TRANSLATOR_LABELS: Record<string, string> = {
   gemini: "Gemini",
   local_openai: "Local AI",
-  openai: "OpenAI-compat",
 };
-
-const TRANSLATOR_OPTIONS: { label: string; value: TranslatorProvider }[] = [
-  { label: "Gemini", value: "gemini" },
-  { label: "Local AI", value: "local_openai" },
-  { label: "OpenAI-compat", value: "openai" },
-];
 
 /* ───────────── helpers ───────────── */
 
@@ -324,28 +318,56 @@ export default function Generate() {
     return WHISPER_MODELS.filter((opt) => installedWhisperModels.has(opt.value));
   }, [installedWhisperModels]);
 
-  // Translator provider — initialized from server config so the user's
-  // Settings choice is the default. Per-job override stays in this state
-  // and is sent in the process request, so flipping providers between
-  // Gemini and Local AI doesn't require visiting Settings each time.
+  // Translator provider — initialized from Settings' `activeTranslator`
+  // (the named-profile model from Phase 4d). Per-job override stays in this
+  // state and is sent in the process request as `translatorProvider`, so
+  // switching between Gemini / Local AI / a saved DeepSeek profile / etc.
+  // doesn't require visiting Settings. Format mirrors `activeTranslator`:
+  // `"gemini" | "local_openai" | "custom:<id>"` — the backend's pipeline
+  // `_make_translator` accepts the same shapes for the override.
   const [translatorProvider, setTranslatorProvider] =
-    React.useState<TranslatorProvider>("gemini");
+    React.useState<string>("gemini");
 
+  // When Settings' active translator finishes loading, seed this screen's
+  // default. Won't clobber a user's mid-session override because we only
+  // run when the source value first becomes defined.
+  const seededFromSettings = React.useRef(false);
   React.useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .fetchConfig()
-      .then((cfg) => {
-        if (cancelled) return;
-        if (cfg.translatorProvider) {
-          setTranslatorProvider(cfg.translatorProvider);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (seededFromSettings.current) return;
+    if (activeTranslator) {
+      setTranslatorProvider(activeTranslator);
+      seededFromSettings.current = true;
+    }
+  }, [activeTranslator]);
+
+  // Build the dropdown options from the live profile list. Built-ins first
+  // (Gemini, Local AI), then every entry in `customTranslators` by its
+  // display name. If `customTranslators` hasn't loaded yet we still show
+  // the two built-ins so the screen renders.
+  const translatorOptions = React.useMemo(() => {
+    const opts: { label: string; value: string }[] = [
+      { label: "Gemini", value: "gemini" },
+      { label: "Local AI", value: "local_openai" },
+    ];
+    for (const p of customTranslators ?? []) {
+      opts.push({ label: p.name || "(unnamed)", value: `custom:${p.id}` });
+    }
+    return opts;
+  }, [customTranslators]);
+
+  // Human-readable label for whatever is selected — used in the
+  // "Translate subtitles · Using {label}" caption.
+  const translatorLabel = React.useMemo(() => {
+    if (translatorProvider in BUILTIN_TRANSLATOR_LABELS) {
+      return BUILTIN_TRANSLATOR_LABELS[translatorProvider];
+    }
+    if (translatorProvider.startsWith("custom:")) {
+      const id = translatorProvider.slice("custom:".length);
+      const p = customTranslators?.find((x) => x.id === id);
+      return p?.name ?? "(custom)";
+    }
+    return translatorProvider;
+  }, [translatorProvider, customTranslators]);
 
   // MPV launch feedback — tells the user the click did something even when
   // the mpv window pops up behind/off-screen, and surfaces backend errors
@@ -385,15 +407,22 @@ export default function Generate() {
   const testCurrentTranslator = async () => {
     setTranslatorTest({ kind: "busy" });
     try {
-      // Send only `provider` — backend resolves baseUrl/model/apiKey from
-      // saved config (see backend/api/routes/translator.py::_resolve_field).
-      // Saves the user from re-typing credentials they've already saved.
+      // Saved-profile form: send the chosen profile id and let the backend
+      // resolve credentials server-side. Works for ALL profiles — built-in
+      // (gemini, local_openai) AND custom (custom:<id>) — using the
+      // ping()-based smoke check from Phase 4d-fix-2 (~250ms, no LLM
+      // inference). Same path the Settings → Translation rows use.
       const res = await apiClient.testTranslator({
-        provider: translatorProvider,
+        profileId: translatorProvider,
+        useSavedKey: true,
+        targetLang: enableTranslation ? targetLang : undefined,
       });
       setTranslatorTest(
         res.ok
-          ? { kind: "ok", text: "Reachable" }
+          ? {
+              kind: "ok",
+              text: `Connected${res.latencyMs ? ` · ${res.latencyMs}ms` : ""}`,
+            }
           : { kind: "error", text: res.error ?? "unreachable" },
       );
     } catch (err) {
@@ -629,9 +658,7 @@ export default function Generate() {
                     <YStack gap={2} flex={1}>
                       <BodyMd fontWeight="500">Translate subtitles</BodyMd>
                       <XStack gap={4} alignItems="center" flexWrap="wrap">
-                        <Caption>
-                          Using {TRANSLATOR_LABELS[translatorProvider]}
-                        </Caption>
+                        <Caption>Using {translatorLabel}</Caption>
                         <Caption>·</Caption>
                         <Caption
                           color="$accent"
@@ -662,13 +689,17 @@ export default function Generate() {
 
                   {enableTranslation && !downloadOnly ? (
                     <YStack gap="$xs">
-                      <SegmentedControl
+                      {/* Dropdown of every available translator profile
+                          (built-ins + custom_translators). Replaces the old
+                          3-slot SegmentedControl that couldn't pick user-
+                          configured custom profiles like DeepSeek. Initial
+                          value seeded from Settings' activeTranslator. */}
+                      <Dropdown
                         value={translatorProvider}
-                        onValueChange={(v) =>
-                          setTranslatorProvider(v as TranslatorProvider)
-                        }
-                        options={TRANSLATOR_OPTIONS}
-                        aria-label="Translator provider"
+                        onValueChange={(v) => setTranslatorProvider(v)}
+                        options={translatorOptions}
+                        width="100%"
+                        aria-label="Translator profile"
                       />
                       <XStack alignItems="center" gap="$sm">
                         <ButtonGhost

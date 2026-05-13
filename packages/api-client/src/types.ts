@@ -62,7 +62,13 @@ export interface ProcessRequest {
   sourceLang: string;
   enableTranslation: boolean;
   targetLang?: string;
-  translatorProvider?: TranslatorProvider;
+  /**
+   * Per-job translator override. Accepts the legacy 3-slot identifiers
+   * ("gemini" / "local_openai" / "openai") AND the active-translator form
+   * "custom:<id>" for a user-saved profile in `customTranslators`. When
+   * omitted, the pipeline falls back to `AppConfig.activeTranslator`.
+   */
+  translatorProvider?: string;
   translatorBaseUrl?: string;
   translatorModel?: string;
   translatorApiKey?: string;
@@ -240,7 +246,8 @@ export interface LibraryTranscribeRequest {
 export interface LibraryTranslateRequest {
   sourceTranscribeId: string;
   targetLang: string;
-  translatorProvider?: TranslatorProvider;
+  /** Same shape as `ProcessRequest.translatorProvider` — see that field. */
+  translatorProvider?: string;
   translatorModel?: string;
   translatorBaseUrl?: string;
   translatorApiKey?: string;
