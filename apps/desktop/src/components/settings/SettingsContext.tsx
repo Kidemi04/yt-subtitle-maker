@@ -6,6 +6,9 @@ import {
   type DependencyStatus,
   type EngineDescriptor,
   type SystemReport,
+  type TranslatorProfile,
+  type TranslatorProvider,
+  type TranslatorTestResult,
 } from "@yt-subtitle-maker/api-client";
 import { STT_ENGINE_LABELS, TABS, WHISPER_MODEL_IDS, type TabId } from "./constants";
 import { useSettingsDraft, type SaveStatus } from "./useSettingsDraft";
@@ -57,6 +60,21 @@ export interface SettingsContextValue {
   resetTab: (t: TabId) => void;
   flush: () => void;
   testTranslator: () => Promise<void>;
+  // Phase 4d-frontend: named provider profiles
+  customTranslators: TranslatorProfile[] | undefined;
+  activeTranslator: string | undefined;
+  lastTestResult: Record<string, TranslatorTestResult & { at: number }>;
+  recordTestResult: (profileId: string, result: TranslatorTestResult) => void;
+  testProfile: (profileId: string) => Promise<TranslatorTestResult>;
+  testAdhoc: (
+    spec:
+      | { provider: TranslatorProvider; baseUrl?: string; apiKey?: string; model?: string; targetLang?: string }
+      | { profileId: string; useSavedKey: true; targetLang?: string },
+  ) => Promise<TranslatorTestResult>;
+  setActiveTranslator: (id: string) => void;
+  addCustomTranslator: (profile: TranslatorProfile) => void;
+  removeCustomTranslator: (id: string) => void;
+  updateCustomTranslator: (id: string, patch: Partial<TranslatorProfile>) => void;
   testCookies: () => Promise<void>;
   refreshLocalOpenaiModels: () => Promise<void>;
   refreshOpenaiModels: () => Promise<void>;
@@ -121,6 +139,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [modelsBusy, setModelsBusy] = React.useState<
     "gemini" | "local_openai" | "openai" | undefined
   >(undefined);
+  const [lastTestResult, setLastTestResult] = React.useState<
+    Record<string, TranslatorTestResult & { at: number }>
+  >({});
   const [deps, setDeps] = React.useState<DependencyStatus | undefined>();
   const [engines, setEngines] = React.useState<EngineDescriptor[] | undefined>(undefined);
   const [system, setSystem] = React.useState<SystemReport | undefined>(undefined);
@@ -238,35 +259,115 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     });
   }, [deps, draft?.defaultWhisperModel]);
 
-  const testTranslator = async () => {
+  const recordTestResult = React.useCallback(
+    (profileId: string, result: TranslatorTestResult) => {
+      setLastTestResult((prev) => ({
+        ...prev,
+        [profileId]: { ...result, at: Date.now() },
+      }));
+    },
+    [],
+  );
+
+  const testProfile = React.useCallback(
+    async (profileId: string): Promise<TranslatorTestResult> => {
+      if (!draft) throw new Error("No draft");
+      const result = await apiClient.testTranslator({
+        profileId,
+        useSavedKey: true,
+        targetLang: draft.defaultTargetLang,
+      });
+      recordTestResult(profileId, result);
+      return result;
+    },
+    [draft, recordTestResult],
+  );
+
+  const testAdhoc = React.useCallback(
+    async (
+      spec:
+        | { provider: TranslatorProvider; baseUrl?: string; apiKey?: string; model?: string; targetLang?: string }
+        | { profileId: string; useSavedKey: true; targetLang?: string },
+    ): Promise<TranslatorTestResult> => {
+      const result = await apiClient.testTranslator(spec);
+      // For ad-hoc specs with a profileId, record the result
+      if ("profileId" in spec) {
+        recordTestResult(spec.profileId, result);
+      }
+      return result;
+    },
+    [recordTestResult],
+  );
+
+  // Legacy alias — used by the old Translation tab (being replaced in Task 5)
+  const testTranslator = React.useCallback(async () => {
     if (!draft) return;
     setTranslatorStatus("untested");
+    const provider = draft.translatorProvider;
+    const baseUrl =
+      provider === "local_openai"
+        ? draft.localOpenaiBaseUrl
+        : provider === "openai"
+        ? draft.openaiBaseUrl
+        : undefined;
+    const apiKey =
+      provider === "local_openai"
+        ? draft.localOpenaiApiKey
+        : provider === "openai"
+        ? draft.openaiApiKey
+        : draft.geminiApiKey;
+    const model =
+      provider === "local_openai"
+        ? draft.localOpenaiModel
+        : provider === "openai"
+        ? draft.openaiModel
+        : draft.geminiModel;
     try {
-      const provider = draft.translatorProvider;
-      const baseUrl =
-        provider === "local_openai"
-          ? draft.localOpenaiBaseUrl
-          : provider === "openai"
-          ? draft.openaiBaseUrl
-          : undefined;
-      const apiKey =
-        provider === "local_openai"
-          ? draft.localOpenaiApiKey
-          : provider === "openai"
-          ? draft.openaiApiKey
-          : draft.geminiApiKey;
-      const model =
-        provider === "local_openai"
-          ? draft.localOpenaiModel
-          : provider === "openai"
-          ? draft.openaiModel
-          : draft.geminiModel;
       const res = await apiClient.testTranslator({ provider, baseUrl, apiKey, model });
       setTranslatorStatus(res.ok ? "ok" : "error");
     } catch {
       setTranslatorStatus("error");
     }
-  };
+  }, [draft]);
+
+  const setActiveTranslator = React.useCallback(
+    (id: string) => {
+      update("activeTranslator", id);
+    },
+    [update],
+  );
+
+  const addCustomTranslator = React.useCallback(
+    (profile: TranslatorProfile) => {
+      update("customTranslators", [
+        ...(draft?.customTranslators ?? []),
+        profile,
+      ]);
+    },
+    [draft, update],
+  );
+
+  const removeCustomTranslator = React.useCallback(
+    (id: string) => {
+      update(
+        "customTranslators",
+        (draft?.customTranslators ?? []).filter((p) => p.id !== id),
+      );
+    },
+    [draft, update],
+  );
+
+  const updateCustomTranslator = React.useCallback(
+    (id: string, patch: Partial<TranslatorProfile>) => {
+      update(
+        "customTranslators",
+        (draft?.customTranslators ?? []).map((p) =>
+          p.id === id ? { ...p, ...patch } : p,
+        ),
+      );
+    },
+    [draft, update],
+  );
 
   const testCookies = async () => {
     if (!draft) return;
@@ -327,6 +428,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     resetTab,
     flush,
     testTranslator,
+    customTranslators: draft?.customTranslators,
+    activeTranslator: draft?.activeTranslator,
+    lastTestResult,
+    recordTestResult,
+    testProfile,
+    testAdhoc,
+    setActiveTranslator,
+    addCustomTranslator,
+    removeCustomTranslator,
+    updateCustomTranslator,
     testCookies,
     refreshLocalOpenaiModels,
     refreshOpenaiModels,
