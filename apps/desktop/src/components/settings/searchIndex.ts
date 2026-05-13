@@ -58,7 +58,11 @@ export const SETTINGS_INDEX: SearchEntry[] = [
   { id: "subtitles.border-size", tab: "subtitles", label: "Outline width", keywords: ["outline", "width", "border", "px"] },
   { id: "subtitles.back-color", tab: "subtitles", label: "Background", keywords: ["background", "box", "color", "alpha"] },
   { id: "subtitles.bold", tab: "subtitles", label: "Bold", keywords: ["bold", "weight"] },
+  { id: "subtitles.test-playback", tab: "subtitles", label: "Test playback", keywords: ["test", "playback", "mpv", "preview", "launch"] },
   // Advanced
   { id: "advanced.backend-url", tab: "advanced", label: "Backend URL", keywords: ["backend", "url", "server", "ngrok", "host", "port"] },
+  { id: "advanced.open-config", tab: "advanced", label: "Open config folder", keywords: ["open", "config", "folder", "reveal", "finder", "explorer"] },
+  { id: "advanced.export-settings", tab: "advanced", label: "Export settings", keywords: ["export", "backup", "download", "json"] },
+  { id: "advanced.import-settings", tab: "advanced", label: "Import settings", keywords: ["import", "restore", "upload", "json"] },
   { id: "advanced.reset-all", tab: "advanced", label: "Reset all to defaults", keywords: ["reset", "defaults", "factory", "wipe"] },
 ];
