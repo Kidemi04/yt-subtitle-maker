@@ -19,11 +19,10 @@ export const SETTINGS_INDEX: SearchEntry[] = [
   { id: "youtube.cookies-txt-path", tab: "youtube", label: "cookies.txt path", keywords: ["cookies.txt", "netscape", "cookie file"] },
   { id: "youtube.js-runtime-path", tab: "youtube", label: "JS runtime for yt-dlp", keywords: ["javascript", "node", "deno", "yt-dlp", "runtime"] },
   // Transcription
-  { id: "transcription.engine", tab: "transcription", label: "Default engine", keywords: ["stt", "speech", "whisper", "engine"] },
-  { id: "transcription.model", tab: "transcription", label: "Default model", keywords: ["whisper", "model", "tiny", "base", "turbo", "large"] },
+  { id: "transcription.source-mode", tab: "transcription", label: "Source mode", keywords: ["auto", "whisper", "youtube", "captions", "source", "stt", "mode"] },
+  { id: "transcription.engine-picker", tab: "transcription", label: "Transcription engine", keywords: ["stt", "speech", "whisper", "engine", "model", "tiny", "base", "turbo", "large", "faster-whisper"] },
   { id: "transcription.device", tab: "transcription", label: "Default device", keywords: ["device", "cpu", "gpu", "cuda", "mps"] },
   { id: "transcription.source-lang", tab: "transcription", label: "Default source language", keywords: ["language", "source", "spoken", "detect"] },
-  { id: "transcription.yt-captions-first", tab: "transcription", label: "Try YouTube auto-captions first", keywords: ["captions", "auto", "youtube", "subtitles"] },
   { id: "transcription.vad", tab: "transcription", label: "Voice-Activity Detection (VAD) by default", keywords: ["vad", "silence", "voice activity"] },
   { id: "transcription.ffmpeg-resample-16k", tab: "transcription", label: "FFmpeg 16 kHz pre-resample", keywords: ["ffmpeg", "resample", "16khz", "audio"] },
   // Translation (base only)

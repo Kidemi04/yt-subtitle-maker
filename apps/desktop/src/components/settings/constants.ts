@@ -110,11 +110,13 @@ export const SETTING_FIELD: Partial<Record<string, keyof AppConfig>> = {
   "youtube.cookies-txt-path": "cookiesTxtPath",
   "youtube.js-runtime-path": "jsRuntimePath",
   // Transcription
-  "transcription.engine": "defaultSttEngine",
-  "transcription.model": "defaultWhisperModel",
+  // Note: transcription.source-mode and transcription.engine-picker are NOT here
+  // because they map to multiple AppConfig keys (or none); they live only in
+  // SETTINGS_INDEX (for search). The old transcription.engine /
+  // transcription.model / transcription.yt-captions-first rows are gone —
+  // replaced by SourceModeControl + EnginePicker in the rewritten tab.
   "transcription.device": "defaultWhisperDevice",
   "transcription.source-lang": "defaultSourceLang",
-  "transcription.yt-captions-first": "ytCaptionsFirst",
   "transcription.vad": "vadEnabled",
   "transcription.ffmpeg-resample-16k": "ffmpegResample16k",
   // Translation

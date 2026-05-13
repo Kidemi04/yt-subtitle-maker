@@ -7,7 +7,6 @@ import {
   ButtonGhost,
   ProgressBar,
   Caption,
-  BodySm,
   TitleSm,
   BadgePill,
 } from "@yt-subtitle-maker/ui";
@@ -142,17 +141,17 @@ export function ModelRow({ model, engineId, selected, onSelect }: Props) {
         {/* Action buttons — separate hit area, do not propagate to the row's onSelect */}
         {!isDownloaded && dlState === "idle" ? (
           <ButtonSecondary onPress={startDownload}>
-            <BodySm>Download ({formatSize(model.sizeMb)})</BodySm>
+            Download ({formatSize(model.sizeMb)})
           </ButtonSecondary>
         ) : null}
         {dlState === "downloading" ? (
           <ButtonGhost onPress={cancelDownload}>
-            <Caption color="$textSecondary">Cancel</Caption>
+            Cancel
           </ButtonGhost>
         ) : null}
         {dlState === "error" ? (
           <ButtonSecondary onPress={startDownload}>
-            <Caption color="$error">Retry</Caption>
+            Retry
           </ButtonSecondary>
         ) : null}
       </XStack>
