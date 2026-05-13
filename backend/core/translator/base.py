@@ -24,6 +24,16 @@ class TranslationProvider(Protocol):
         """
         ...
 
+    def ping(self) -> None:
+        """Same probe as is_available(), but RAISES on failure instead of
+        returning False. Used by POST /api/translator/test so the route's
+        error-categoriser can see the real exception type
+        (httpx.ConnectError / openai.AuthenticationError / etc.) and produce
+        a precise message. Implementations should be cheap — a `models.list()`
+        round-trip, not an LLM inference.
+        """
+        ...
+
     def list_models(self) -> list[str]:
         """Return available model identifiers. UI dropdown source."""
         ...

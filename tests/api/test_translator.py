@@ -36,7 +36,7 @@ def _openai_response(status: int, message: str) -> httpx.Response:
 def test_test_endpoint_success_adhoc(mock_get):
     """Ad-hoc spec (provider + baseUrl + model) returns structured success."""
     mock_provider = MagicMock()
-    mock_provider.translate_title.return_value = "你好，世界。"
+    mock_provider.ping.return_value = "你好，世界。"
     mock_provider.model = "gemma-3-27b-it"
     mock_get.return_value = mock_provider
 
@@ -49,15 +49,12 @@ def test_test_endpoint_success_adhoc(mock_get):
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is True
-    assert body["sample"] == {"src": "Hello, world.", "dst": "你好，世界。"}
+    # Phase 4d-fix: ping-based smoke check, no sample.
+    assert "sample" not in body
     assert "latencyMs" in body
     assert isinstance(body["latencyMs"], int)
     assert body["model"] == "gemma-3-27b-it"
-    # The mocked translate_title was called with the target language
-    mock_provider.translate_title.assert_called_once()
-    args, _ = mock_provider.translate_title.call_args
-    assert args[0] == "Hello, world."
-    assert args[1] == "zh-CN"
+    mock_provider.ping.assert_called_once()
 
 
 @patch("api.routes.translator.get_active_translator")
@@ -76,7 +73,7 @@ def test_test_endpoint_success_saved_profile_gemini(mock_gat, tmp_path, monkeypa
     }), encoding="utf-8")
 
     mock_provider = MagicMock()
-    mock_provider.translate_title.return_value = "你好，世界。"
+    mock_provider.ping.return_value = "你好，世界。"
     mock_provider.model = "gemini-2.5-flash-lite"
     mock_gat.return_value = mock_provider
 
@@ -88,8 +85,9 @@ def test_test_endpoint_success_saved_profile_gemini(mock_gat, tmp_path, monkeypa
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is True
-    assert body["sample"] == {"src": "Hello, world.", "dst": "你好，世界。"}
+    assert "sample" not in body
     assert body["model"] == "gemini-2.5-flash-lite"
+    mock_provider.ping.assert_called_once()
     mock_gat.assert_called_once()
     # The cfg passed to get_active_translator should have active_translator
     # set to the requested profileId.
@@ -118,7 +116,7 @@ def test_test_endpoint_success_saved_profile_custom(mock_gat, tmp_path, monkeypa
     }), encoding="utf-8")
 
     mock_provider = MagicMock()
-    mock_provider.translate_title.return_value = "你好"
+    mock_provider.ping.return_value = "你好"
     mock_provider.model = "deepseek-chat"
     mock_gat.return_value = mock_provider
 
@@ -144,7 +142,7 @@ def test_test_endpoint_auth_error(mock_get):
 
     mock_provider = MagicMock()
     r = _openai_response(401, "invalid key")
-    mock_provider.translate_title.side_effect = AuthenticationError(
+    mock_provider.ping.side_effect = AuthenticationError(
         "invalid key", response=r, body={"error": {"message": "invalid key"}}
     )
     mock_provider.model = "gpt-4o"
@@ -171,7 +169,7 @@ def test_test_endpoint_model_not_found(mock_get):
 
     mock_provider = MagicMock()
     r = _openai_response(404, "model not found")
-    mock_provider.translate_title.side_effect = NotFoundError(
+    mock_provider.ping.side_effect = NotFoundError(
         "model not found", response=r, body={"error": {"message": "model not found"}}
     )
     mock_provider.model = "gpt-99"
@@ -192,7 +190,7 @@ def test_test_endpoint_model_not_found(mock_get):
 def test_test_endpoint_connection_error(mock_get):
     """httpx.ConnectError → 'Couldn't reach …' message."""
     mock_provider = MagicMock()
-    mock_provider.translate_title.side_effect = httpx.ConnectError("Connection refused")
+    mock_provider.ping.side_effect = httpx.ConnectError("Connection refused")
     mock_provider.model = "gemma"
     mock_get.return_value = mock_provider
 
@@ -211,7 +209,7 @@ def test_test_endpoint_connection_error(mock_get):
 def test_test_endpoint_timeout(mock_get):
     """httpx.TimeoutException → 'Request timed out'."""
     mock_provider = MagicMock()
-    mock_provider.translate_title.side_effect = httpx.TimeoutException("timeout")
+    mock_provider.ping.side_effect = httpx.TimeoutException("timeout")
     mock_provider.model = "gemma"
     mock_get.return_value = mock_provider
 
@@ -232,7 +230,7 @@ def test_test_endpoint_quota_error(mock_get):
 
     mock_provider = MagicMock()
     r = _openai_response(429, "quota exceeded")
-    mock_provider.translate_title.side_effect = RateLimitError(
+    mock_provider.ping.side_effect = RateLimitError(
         "quota exceeded", response=r, body={"error": {"message": "quota exceeded"}}
     )
     mock_provider.model = "gpt-4o"
@@ -257,7 +255,7 @@ def test_test_endpoint_unexpected_response_shape(mock_get):
     JSON shape). The categoriser maps that family to a friendlier hint.
     """
     mock_provider = MagicMock()
-    mock_provider.translate_title.side_effect = KeyError("choices")
+    mock_provider.ping.side_effect = KeyError("choices")
     mock_provider.model = "weird-model"
     mock_get.return_value = mock_provider
 
@@ -276,7 +274,7 @@ def test_test_endpoint_unexpected_response_shape(mock_get):
 def test_test_endpoint_default_target_lang(mock_get, tmp_path, monkeypatch):
     """Omitting targetLang falls back to the schema default ('zh-CN')."""
     mock_provider = MagicMock()
-    mock_provider.translate_title.return_value = "你好"
+    mock_provider.ping.return_value = "你好"
     mock_provider.model = "x"
     mock_get.return_value = mock_provider
 
@@ -286,8 +284,9 @@ def test_test_endpoint_default_target_lang(mock_get, tmp_path, monkeypatch):
     })
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
-    args, _ = mock_provider.translate_title.call_args
-    assert args[1] == "zh-CN"
+    # ping takes no args — targetLang is now a no-op on the smoke check,
+    # but the schema still accepts/defaults it for backward-compat.
+    mock_provider.ping.assert_called_once()
 
 
 # ── list-models ────────────────────────────────────────────────────────────────

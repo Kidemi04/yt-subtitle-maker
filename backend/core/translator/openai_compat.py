@@ -46,6 +46,12 @@ class OpenAICompatTranslator:
         except Exception:
             return False
 
+    def ping(self) -> None:
+        """Raises the real exception type (httpx.ConnectError /
+        openai.AuthenticationError / etc.) so /api/translator/test can
+        categorise it. ~200ms; no LLM inference."""
+        self._client.models.list()
+
     def list_models(self) -> list[str]:
         try:
             resp = self._client.models.list()

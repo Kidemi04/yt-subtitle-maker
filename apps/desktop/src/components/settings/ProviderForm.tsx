@@ -303,11 +303,19 @@ export function ProviderForm({
           borderWidth={1}
           borderColor={testResult.ok ? "$success" : "$warning"}
         >
-          {testResult.ok && testResult.sample ? (
+          {testResult.ok ? (
             <Caption color="$success">
-              {`✓ ${testResult.sample.src} → ${testResult.sample.dst}${
-                testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ""
-              }`}
+              {testResult.sample
+                ? // Legacy success shape (round-trip): keep showing the
+                  // translation. Won't occur anymore now that /api/translator/test
+                  // does a ping-only smoke check, but harmless to keep.
+                  `✓ ${testResult.sample.src} → ${testResult.sample.dst}${
+                    testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ""
+                  }`
+                : // Ping-only success — no translation sample.
+                  `✓ Connected${
+                    testResult.model ? ` · ${testResult.model}` : ""
+                  }${testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ""}`}
             </Caption>
           ) : (
             <Caption color="$warning">{`⚠ ${testResult.error ?? "Unknown error"}`}</Caption>

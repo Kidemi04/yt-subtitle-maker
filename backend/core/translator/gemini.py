@@ -35,6 +35,15 @@ class GeminiTranslator:
         except Exception:
             return False
 
+    def ping(self) -> None:
+        """Raises the real google.genai exception type on failure so
+        /api/translator/test can categorise it. ~300ms; no inference."""
+        if not self.api_key:
+            raise ValueError("api_key required")
+        # `models.list()` returns a pager — wrap in list() to actually hit
+        # the API. The page-size config makes it a single GET, not multi-page.
+        list(self._client.models.list(config={"page_size": 1}))
+
     def list_models(self) -> list[str]:
         return KNOWN_MODELS
 

@@ -197,25 +197,35 @@ def _categorise_error(exc: Exception, model: str | None, base_url: str | None) -
 
 @router.post("/test")
 def test_translator(req: TranslatorTestRequest):
-    """Perform a real one-line translation round-trip and report structured result."""
+    """Lightweight connectivity test for a translator provider.
+
+    Calls `provider.ping()` (a ~200ms `models.list()` round-trip), NOT a real
+    LLM inference. Validates: base-URL reachability, API-key auth,
+    OpenAI-compatible response shape. Categorises failures into precise
+    human-readable strings via _categorise_error.
+
+    Originally this did a real one-line translation round-trip
+    (`translate_title("Hello, world.", target_lang)`), but that was 10-30s on
+    "thinking" models like DeepSeek-R1 since it triggers actual inference.
+    The ping path matches how openai-python's playground / LM Studio / most
+    other API-key validators work: probe the cheap endpoint, not the expensive
+    one. `targetLang` is no longer used by the probe itself but stays on the
+    schema for backward-compat / future use.
+    """
     cfg = load_config()
     t0 = time.perf_counter()
     model_name: str | None = None
     base_url: str | None = None
     try:
         provider = _resolve_provider_for_test(req, cfg)
-        # Both GeminiTranslator and OpenAICompatTranslator expose `.model`;
-        # OpenAICompatTranslator also exposes `.base_url`. Capture them for
-        # the response shape *and* for error messages (e.g. "Couldn't reach
-        # 127.0.0.1") before issuing the round-trip call.
         model_name = getattr(provider, "model", None)
         base_url = getattr(provider, "base_url", None)
-        target_lang = req.targetLang or cfg.default_target_lang
-        dst = provider.translate_title(_TEST_SRC, target_lang)
+        provider.ping()
         latency_ms = int((time.perf_counter() - t0) * 1000)
         return {
             "ok": True,
-            "sample": {"src": _TEST_SRC, "dst": dst},
+            # No `sample` — we didn't translate anything. Frontend shows
+            # "✓ Connected · <latency>ms" when sample is absent.
             "latencyMs": latency_ms,
             "model": model_name,
         }
