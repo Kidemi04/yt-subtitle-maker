@@ -51,7 +51,7 @@ class AppConfig:
     # Each entry: { id, name, base_url, api_key, model }.
     # Built-in profiles ("gemini", "local_openai") are stored separately below;
     # custom entries (including migrated legacy openai_*) live here.
-    custom_translators: list = field(default_factory=list)
+    custom_translators: list[dict] = field(default_factory=list)
     # "gemini" | "local_openai" | "custom:<id>"
     active_translator: str = "gemini"
 
@@ -118,6 +118,7 @@ def _migrate_config(data: dict) -> dict:
     openai_key = data.get("openai_api_key", "")
     openai_model = data.get("openai_model", "")
     openai_url = data.get("openai_base_url", _DEFAULT_OPENAI_URL)
+    # "gpt-4o-mini" is AppConfig.openai_model's default — keep in sync if that changes.
     is_non_default = bool(openai_key) or (openai_model and openai_model != "gpt-4o-mini")
 
     if is_non_default and "openai-legacy" not in existing_ids:
