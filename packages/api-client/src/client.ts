@@ -18,6 +18,8 @@ import type {
   VideoDetail,
   VideoMetadata,
   WhisperModel,
+  CheckFsRequest,
+  CheckFsResult,
 } from "./types";
 
 /**
@@ -352,6 +354,17 @@ export class ApiClient {
       engine ? { model, engine } : { model },
       signal,
     );
+  }
+
+  // ─── Filesystem path check ────────────────────────────────────────────
+  async checkFs(req: CheckFsRequest): Promise<CheckFsResult> {
+    const res = await fetch(`${this.baseUrl}/api/fs/check`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`/api/fs/check ${res.status}`);
+    return res.json();
   }
 
   // ─── NDJSON streaming primitive ────────────────────────────────────────

@@ -392,3 +392,21 @@ export interface EngineDescriptor {
   tunables: EngineTunable[];
   note: string | null;
 }
+
+// ─── Filesystem path check (POST /api/fs/check) ───────────────────────────
+
+export interface CheckFsRequest {
+  path: string;
+  kind: "dir" | "executable";
+}
+
+export interface CheckFsResult {
+  exists: boolean;
+  // dir only
+  isDir?: boolean;
+  writable?: boolean;
+  // executable only
+  executable?: boolean;
+  // present on transport failure
+  error?: string;
+}
