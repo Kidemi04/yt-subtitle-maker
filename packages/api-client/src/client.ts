@@ -2,6 +2,7 @@ import type {
   AppConfig,
   BackendCapabilities,
   DependencyStatus,
+  EngineDescriptor,
   HistoryItem,
   InstallEvent,
   LibraryItem,
@@ -10,6 +11,7 @@ import type {
   LibraryTranslateRequest,
   ProcessEvent,
   ProcessRequest,
+  SystemReport,
   TranslatorProvider,
   VideoDetail,
   VideoMetadata,
@@ -61,6 +63,24 @@ export class ApiClient {
       headers: this.headers(),
     });
     if (!res.ok) throw new Error(`/api/version ${res.status}`);
+    return res.json();
+  }
+
+  // ─── System report ────────────────────────────────────────────────────
+  async getSystem(): Promise<SystemReport> {
+    const res = await fetch(`${this.baseUrl}/api/system`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) throw new Error(`/api/system ${res.status}`);
+    return res.json();
+  }
+
+  // ─── Engine descriptors ───────────────────────────────────────────────
+  async getEngines(): Promise<EngineDescriptor[]> {
+    const res = await fetch(`${this.baseUrl}/api/engines`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) throw new Error(`/api/engines ${res.status}`);
     return res.json();
   }
 
@@ -288,8 +308,11 @@ export class ApiClient {
   }
 
   // ─── Dependencies (Whisper model) ──────────────────────────────────────
-  async fetchDependencies(): Promise<DependencyStatus> {
-    const res = await fetch(`${this.baseUrl}/api/dependencies`, {
+  async fetchDependencies(engine?: string): Promise<DependencyStatus> {
+    const url = engine
+      ? `${this.baseUrl}/api/dependencies?engine=${encodeURIComponent(engine)}`
+      : `${this.baseUrl}/api/dependencies`;
+    const res = await fetch(url, {
       headers: this.headers(),
     });
     if (!res.ok) throw new Error(`/api/dependencies ${res.status}`);
@@ -299,10 +322,11 @@ export class ApiClient {
   async *installDependency(
     model: WhisperModel,
     signal?: AbortSignal,
+    engine?: string,
   ): AsyncIterable<InstallEvent> {
     yield* this.streamNdjson<InstallEvent>(
       "/api/dependencies/install",
-      { model },
+      engine ? { model, engine } : { model },
       signal,
     );
   }

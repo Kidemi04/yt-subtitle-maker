@@ -316,3 +316,56 @@ export type InstallEvent =
     }
   | { status: "done"; model: string; path?: string }
   | { status: "error"; error: string; recoverable?: boolean };
+
+// ─── System report (GET /api/system) ──────────────────────────────────────
+
+export interface GpuInfo {
+  /** "apple" | "nvidia" | "amd" | "intel" | "none" */
+  vendor: "apple" | "nvidia" | "amd" | "intel" | "none";
+  /** GPU display name, or null if undetectable. */
+  name: string | null;
+  cudaAvailable: boolean;
+  mpsAvailable: boolean;
+}
+
+export interface SystemReport {
+  os: "macos" | "windows" | "linux";
+  arch: "arm64" | "x86_64";
+  gpu: GpuInfo;
+}
+
+// ─── Engine descriptors (GET /api/engines) ────────────────────────────────
+
+export interface EngineTunable {
+  key: string;
+  label: string;
+  /** "select" | "int" | "float" | "bool" */
+  type: "select" | "int" | "float" | "bool";
+  /** Present when type is "select". */
+  choices?: string[];
+  default: string | number | boolean | null;
+  help: string;
+}
+
+export interface EngineModel {
+  name: string;
+  /** Size in MB (from openai-whisper's published checkpoint sizes). */
+  sizeMb: number;
+  /** True if the model file is present in the local cache. */
+  downloaded: boolean;
+}
+
+export interface EngineDescriptor {
+  id: string;
+  label: string;
+  available: boolean;
+  /** Package download size in MB; null if the engine is bundled (openai-whisper). */
+  packageSizeMb: number | null;
+  requirements: {
+    platform: string[];
+    accelerators: string[];
+  };
+  models: EngineModel[];
+  tunables: EngineTunable[];
+  note: string | null;
+}
