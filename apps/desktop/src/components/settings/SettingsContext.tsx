@@ -1,5 +1,5 @@
 import * as React from "react";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useGlobalSearchParams } from "expo-router";
 import { apiClient } from "../../state/client";
 import {
   type AppConfig,
@@ -128,7 +128,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [engines, setEngines] = React.useState<EngineDescriptor[] | undefined>(undefined);
   const [system, setSystem] = React.useState<SystemReport | undefined>(undefined);
 
-  const params = useLocalSearchParams<{ tab?: string | string[] }>();
+  // useGlobalSearchParams (not useLocalSearchParams) — this provider lives in
+  // app/_layout.tsx so the Generate-screen safety banner can read
+  // lastTestResult (Phase 4d-frontend Task 6). useLocalSearchParams in a
+  // layout returns the layout segment's params (empty for the root layout),
+  // so the ?tab= query string was invisible and tab clicks didn't switch.
+  const params = useGlobalSearchParams<{ tab?: string | string[] }>();
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const activeTab: TabId =
     tabParam && (TAB_IDS as string[]).includes(tabParam) ? (tabParam as TabId) : "general";
