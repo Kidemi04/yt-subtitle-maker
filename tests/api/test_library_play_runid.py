@@ -93,11 +93,13 @@ def test_play_mpv_with_transcribeId_picks_exact_srt(
     assert body["subtitle"] == "yt_captions-en.srt"
 
     cmd = mock_popen.call_args.args[0]
-    assert "--sub-files-append=yt_captions-en.srt" in cmd
-    # --sub-file-paths now points at the SRT's parent (transcripts/), not folder root
-    sub_paths = next((a for a in cmd if a.startswith("--sub-file-paths=")), None)
-    assert sub_paths is not None
-    assert sub_paths.endswith("transcripts")
+    # Run-id path → exactly ONE sub loaded (the run the caller named).
+    sub_args = [a for a in cmd if a.startswith("--sub-file=")]
+    assert len(sub_args) == 1, sub_args
+    # Full path ending in transcripts/yt_captions-en.srt (works on both
+    # POSIX `/` and Windows `\` — use os.sep-agnostic substring matches).
+    assert sub_args[0].endswith("yt_captions-en.srt")
+    assert "transcripts" in sub_args[0]
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -120,9 +122,10 @@ def test_play_mpv_with_translateId_picks_exact_srt(
     assert body["subtitle"] == "openai-whisper-tiny-en__gemini-flash__ja.srt"
 
     cmd = mock_popen.call_args.args[0]
-    sub_paths = next((a for a in cmd if a.startswith("--sub-file-paths=")), None)
-    assert sub_paths is not None
-    assert sub_paths.endswith("translations")
+    sub_args = [a for a in cmd if a.startswith("--sub-file=")]
+    assert len(sub_args) == 1, sub_args
+    assert sub_args[0].endswith("openai-whisper-tiny-en__gemini-flash__ja.srt")
+    assert "translations" in sub_args[0]
 
 
 @patch("api.routes.library.subprocess.Popen")

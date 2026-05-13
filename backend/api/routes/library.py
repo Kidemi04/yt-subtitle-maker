@@ -317,47 +317,74 @@ def _pick_subtitle_by_run_id(
     return None
 
 
-def _pick_subtitle(
+def _pick_subtitles_for_mpv(
     folder: Path, preference: str | None = "translated"
-) -> Path | None:
-    """Pick which SRT (if any) to overlay in mpv based on user preference.
+) -> list[Path]:
+    """Pick which SRTs to load in mpv based on user preference.
 
-    "translated" → translated SRT first, original as fallback (default).
-    "original"   → original (source-language) SRT only, no fallback.
-    "none"       → return None (caller skips the --sub-files-append flag).
+    Returns an ordered list with the user's preferred sub LAST — mpv's
+    `--sub-file=` selects the most-recently-added external sub as the
+    default active track. The OTHER sub is still loaded as an alternative
+    track the user can switch to with `j` (mpv's default subtitle-cycle
+    keybind).
+
+    "translated" (default) → [original, translated]
+    "original"             → [translated, original]
+    "none"                 → []
 
     Reads sidecar first (new layout). Falls back to scanning legacy *.srt
-    files at the folder root for unmigrated folders.
+    files at the folder root for unmigrated folders. Skips empty (0-byte)
+    files — those are leftovers from a failed translation run and would
+    show as a silent track in mpv.
     """
     if preference == "none":
-        return None
+        return []
 
     sidecar = library_runs.read_sidecar(folder)
 
     def _resolve(filename: str, subdir: str) -> Path | None:
         p = folder / subdir / filename
-        if p.is_file():
+        if p.is_file() and p.stat().st_size > 0:
             return p
         p = folder / filename
-        return p if p.is_file() else None
+        if p.is_file() and p.stat().st_size > 0:
+            return p
+        return None
 
     translations = sidecar.get("translations", [])
     transcribes = sidecar.get("transcribes", [])
 
     translated_path: Path | None = None
     if translations:
-        # Latest translation (last appended).
-        latest = translations[-1]
-        translated_path = _resolve(latest["filename"], "translations")
+        translated_path = _resolve(translations[-1]["filename"], "translations")
 
     original_path: Path | None = None
     if transcribes:
-        latest = transcribes[-1]
-        original_path = _resolve(latest["filename"], "transcripts")
+        original_path = _resolve(transcribes[-1]["filename"], "transcripts")
 
+    # Order: preferred LAST so mpv auto-selects it.
+    out: list[Path] = []
     if preference == "original":
-        return original_path
-    return translated_path or original_path
+        if translated_path:
+            out.append(translated_path)
+        if original_path:
+            out.append(original_path)
+    else:  # "translated" (default), or any unrecognized value
+        if original_path:
+            out.append(original_path)
+        if translated_path:
+            out.append(translated_path)
+    return out
+
+
+# Back-compat alias — tests/other call sites may still expect the old
+# single-Path return shape. Returns the preferred (last-in-list) entry,
+# or None if no subs are loaded.
+def _pick_subtitle(
+    folder: Path, preference: str | None = "translated"
+) -> Path | None:
+    subs = _pick_subtitles_for_mpv(folder, preference)
+    return subs[-1] if subs else None
 
 
 def _pick_local_media(folder: Path) -> Path | None:
@@ -482,8 +509,14 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
                     f"{'transcribe ' + req.transcribeId if req.transcribeId else 'translate ' + req.translateId}"
                 ),
             }
+        subs: list[Path] = [sub]
     else:
-        sub = _pick_subtitle(folder, req.subtitlePreference)
+        # Load BOTH translated + original (when both exist) so the user can
+        # cycle between them inside mpv with the `j` key. The list is
+        # ordered with the user's PREFERRED sub last — mpv's `--sub-file=`
+        # auto-selects the most-recently-added external sub as the default
+        # active track.
+        subs = _pick_subtitles_for_mpv(folder, req.subtitlePreference)
 
     # Prefer streaming the actual YouTube video (gives the user real picture).
     # Fall back to a local media file if one exists (works offline).
@@ -501,19 +534,24 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
         media_arg,
         "--force-window=immediate",  # guarantees a visible window
     ]
-    if sub is not None:
-        # mpv on Windows REQUIRES the `--option=value` form for these flags;
-        # passing them as separate `--option` `value` args makes mpv exit
-        # rc=1 with "option requires parameter". `subprocess.Popen` with a
-        # list arg quotes each element correctly, so embedded spaces /
-        # unicode in the folder name still work — only the literal `=`
-        # would be a problem and it cannot legally appear in a Windows
-        # path. We pass just the basename and use --sub-file-paths to
-        # point at the SRT's parent dir (which may be transcripts/ or
-        # translations/ under the V2 multi-SRT layout).
-        cmd.append(f"--sub-files-append={sub.name}")
-        cmd.append(f"--sub-file-paths={sub.parent}")
-        cmd.append("--sub-auto=exact")  # actually load the sub we attached
+    if subs:
+        # Pass each SRT explicitly as `--sub-file=<full-path>`. Two reasons
+        # over the older `--sub-files-append=<basename>` + `--sub-file-paths=`
+        # pattern:
+        #   1) `--sub-file=` is the mpv idiom for "add AND auto-select" —
+        #      the LAST one in the arg list becomes the default active track,
+        #      which is exactly the preferred-last ordering above.
+        #   2) Full paths sidestep the need for a separate `--sub-file-paths`
+        #      directory list when the two SRTs live in different subfolders
+        #      (translations/ vs transcripts/ under the multi-SRT layout).
+        # `subprocess.Popen` with a list arg handles spaces/unicode in
+        # paths; mpv splits each `--sub-file=...` arg on the FIRST `=`,
+        # so an `=` in a path (legal on Linux/macOS) survives intact.
+        # The user can switch the active sub at runtime with `j` (mpv's
+        # default subtitle-cycle keybind).
+        for s in subs:
+            cmd.append(f"--sub-file={s}")
+        cmd.append("--sub-auto=exact")  # avoid auto-attaching any unrelated *.srt
 
         # Subtitle style overrides — only emit the flags the user has set,
         # so an unmodified config keeps mpv's built-in defaults.
@@ -603,10 +641,16 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
             "error": f"mpv exited immediately (rc={rc}): {out_text[:1000] or 'no output'}",
         }
 
+    # Active sub = the last one in `subs` (mpv selects the most-recently-
+    # added external sub). `subtitle` preserves the existing field name for
+    # backward-compat with the frontend toast; `subtitles` lists every sub
+    # loaded (in mpv's track order), so the UI can hint at the `j` keybind.
+    active_sub = subs[-1] if subs else None
     return {
         "ok": True,
         "media": media_label,
-        "subtitle": sub.name if sub else None,
+        "subtitle": active_sub.name if active_sub else None,
+        "subtitles": [s.name for s in subs],
     }
 
 

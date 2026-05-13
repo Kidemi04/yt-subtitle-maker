@@ -249,7 +249,19 @@ export class ApiClient {
       transcribeId?: string;
       translateId?: string;
     },
-  ): Promise<{ ok: boolean; error?: string; media?: string; subtitle?: string | null }> {
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    media?: string;
+    /** The ACTIVE subtitle filename (the one mpv selected as the default track) — or null when no sub overlay. */
+    subtitle?: string | null;
+    /**
+     * Every subtitle loaded into mpv, in track order. When both translated
+     * and original exist, BOTH are loaded so the user can switch with `j`.
+     * The last entry is the active track; earlier entries are alternatives.
+     */
+    subtitles?: string[];
+  }> {
     const res = await fetch(`${this.baseUrl}/api/library/play-mpv`, {
       method: "POST",
       headers: this.headers(),

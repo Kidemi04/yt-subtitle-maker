@@ -1075,12 +1075,17 @@ export default function Generate() {
                       subtitlePreference: subPreference,
                     });
                     if (res.ok) {
-                      setMpvStatus({
-                        kind: "ok",
-                        text: res.subtitle
+                      // When BOTH SRTs are loaded (the new multi-sub mpv
+                      // behavior) the toast nudges the user toward mpv's
+                      // `j` keybind so they can switch tracks at runtime.
+                      const subs = res.subtitles ?? [];
+                      const text =
+                        subs.length >= 2
+                          ? `Launched mpv · ${res.subtitle} active · press j to switch (${subs.length} subs loaded)`
+                          : res.subtitle
                           ? `Launched mpv · subs ${res.subtitle}`
-                          : "Launched mpv",
-                      });
+                          : "Launched mpv";
+                      setMpvStatus({ kind: "ok", text });
                     } else {
                       setMpvStatus({
                         kind: "error",

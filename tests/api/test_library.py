@@ -124,7 +124,9 @@ def test_library_open_folder_unknown_returns_404(fake_output_dir):
 def test_library_play_mpv_streams_youtube_with_translated_srt(
     mock_which, mock_popen, fake_output_dir
 ):
-    """Default: mpv streams the YouTube URL with the translated SRT overlaid."""
+    """Default: mpv streams the YouTube URL with BOTH SRTs overlaid — the
+    translated one as the default active track (last `--sub-file=`), the
+    original loaded as an alternative track the user can cycle to via `j`."""
     mock_which.return_value = "/fake/mpv"
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
@@ -132,7 +134,11 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is True
+    # `subtitle` is the ACTIVE sub (last in order) — preferred translated.
     assert body["subtitle"] == "abcDEFghIJK_zh-CN.srt"
+    # `subtitles` lists every sub loaded, in mpv's track order.
+    # Original first (alternative), translated last (active).
+    assert body["subtitles"] == ["abcDEFghIJK_original.srt", "abcDEFghIJK_zh-CN.srt"]
     # Default playback uses the YouTube URL so the user gets actual video,
     # not just the .wav audio that was downloaded for transcription.
     assert body["media"] == "youtube:abcDEFghIJK"
@@ -142,10 +148,13 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert cmd[0] == "/fake/mpv"
     assert "https://www.youtube.com/watch?v=abcDEFghIJK" in cmd
     assert "--force-window=immediate" in cmd
-    # mpv on Windows requires the `--option=value` form for these flags;
-    # the previous two-arg form caused mpv to exit rc=1 immediately.
-    assert "--sub-files-append=abcDEFghIJK_zh-CN.srt" in cmd
-    assert any(arg.startswith("--sub-file-paths=") for arg in cmd)
+    # Each SRT is passed as `--sub-file=<full-path>`. The order matters —
+    # mpv auto-selects the LAST one as the active track. The user picked
+    # "translated" (the default) so the translated SRT must come last.
+    sub_args = [a for a in cmd if a.startswith("--sub-file=")]
+    assert len(sub_args) == 2, sub_args
+    assert sub_args[0].endswith("abcDEFghIJK_original.srt"), sub_args[0]
+    assert sub_args[1].endswith("abcDEFghIJK_zh-CN.srt"), sub_args[1]
     assert "--sub-auto=exact" in cmd
     # Stream path needs mpv pointed at our yt-dlp + must enable EJS
     # remote components so n-challenge solving works.
@@ -176,7 +185,7 @@ def test_library_play_mpv_uses_local_video_when_present(
 def test_library_play_mpv_falls_back_to_original_srt(
     mock_which, mock_popen, fake_output_dir
 ):
-    """When only the original SRT exists, that's what mpv should get."""
+    """When only the original SRT exists, that's what mpv should get (alone)."""
     mock_which.return_value = "/fake/mpv"
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=False)
 
@@ -184,8 +193,11 @@ def test_library_play_mpv_falls_back_to_original_srt(
     body = resp.json()
     assert body["ok"] is True
     assert body["subtitle"] == "abcDEFghIJK_original.srt"
+    assert body["subtitles"] == ["abcDEFghIJK_original.srt"]
     cmd = mock_popen.call_args.args[0]
-    assert "--sub-files-append=abcDEFghIJK_original.srt" in cmd
+    sub_args = [a for a in cmd if a.startswith("--sub-file=")]
+    assert len(sub_args) == 1, sub_args
+    assert sub_args[0].endswith("abcDEFghIJK_original.srt")
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -193,7 +205,10 @@ def test_library_play_mpv_falls_back_to_original_srt(
 def test_library_play_mpv_subtitle_preference_original(
     mock_which, mock_popen, fake_output_dir
 ):
-    """preference="original" forces original SRT even when translation exists."""
+    """preference="original" still loads BOTH SRTs but makes original the
+    DEFAULT active track (it goes last in the --sub-file list — mpv
+    auto-selects the most-recently-added). The user can still press `j` in
+    mpv to cycle to the translated track."""
     mock_which.return_value = "/fake/mpv"
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
@@ -203,7 +218,71 @@ def test_library_play_mpv_subtitle_preference_original(
     )
     body = resp.json()
     assert body["ok"] is True
+    # `subtitle` (the ACTIVE one) is now the original.
     assert body["subtitle"] == "abcDEFghIJK_original.srt"
+    # But both are still loaded in mpv (translated first/alternative, original
+    # last/active) — so the user can press `j` to cycle to the translated one.
+    assert body["subtitles"] == ["abcDEFghIJK_zh-CN.srt", "abcDEFghIJK_original.srt"]
+    cmd = mock_popen.call_args.args[0]
+    sub_args = [a for a in cmd if a.startswith("--sub-file=")]
+    assert len(sub_args) == 2, sub_args
+    assert sub_args[0].endswith("abcDEFghIJK_zh-CN.srt")
+    assert sub_args[1].endswith("abcDEFghIJK_original.srt")
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_loads_both_srts_so_user_can_cycle_in_mpv(
+    mock_which, mock_popen, fake_output_dir
+):
+    """User feature: 'i need in mpv i can select original and translate
+    subtitle.' Default 'translated' preference loads BOTH SRTs as mpv tracks
+    — translated as the active default, original as a track the user can
+    cycle to with `j` (mpv's subtitle-cycle keybind). The order in the
+    --sub-file flags determines mpv's auto-select (last = active)."""
+    mock_which.return_value = "/fake/mpv"
+    _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    body = resp.json()
+    assert body["ok"] is True
+    # Both filenames in the response, original first (alternative), translated last (active).
+    assert body["subtitles"] == ["abcDEFghIJK_original.srt", "abcDEFghIJK_zh-CN.srt"]
+    # And in the actual mpv cmd, two --sub-file= flags in the same order.
+    cmd = mock_popen.call_args.args[0]
+    sub_args = [a for a in cmd if a.startswith("--sub-file=")]
+    assert len(sub_args) == 2
+    assert sub_args[0].endswith("_original.srt")
+    assert sub_args[1].endswith("_zh-CN.srt")
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_skips_empty_srt_files(
+    mock_which, mock_popen, fake_output_dir
+):
+    """A 0-byte translated SRT (leftover from a failed translation run)
+    should be skipped — otherwise mpv loads a phantom silent track and the
+    user can't tell why no subtitles show up. The original SRT is still
+    loaded so the user sees something."""
+    mock_which.return_value = "/fake/mpv"
+    folder = _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
+    # Truncate the translated SRT to zero bytes — simulates the failed
+    # translation that the user originally hit pre-bisection-fix.
+    (folder / "abcDEFghIJK_zh-CN.srt").write_text("", encoding="utf-8")
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    body = resp.json()
+    assert body["ok"] is True
+    # Only the original SRT survives the size > 0 filter.
+    assert body["subtitle"] == "abcDEFghIJK_original.srt"
+    assert body["subtitles"] == ["abcDEFghIJK_original.srt"]
+    cmd = mock_popen.call_args.args[0]
+    sub_args = [a for a in cmd if a.startswith("--sub-file=")]
+    assert len(sub_args) == 1
+    assert sub_args[0].endswith("_original.srt")
+    # The empty translated SRT must NOT be in the cmd.
+    assert not any("_zh-CN.srt" in a for a in cmd)
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -223,7 +302,7 @@ def test_library_play_mpv_subtitle_preference_none(
     assert body["ok"] is True
     assert body["subtitle"] is None
     cmd = mock_popen.call_args.args[0]
-    assert not any(arg.startswith("--sub-files-append") for arg in cmd)
+    assert not any(arg.startswith("--sub-file=") for arg in cmd)
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -242,7 +321,7 @@ def test_library_play_mpv_no_subtitle_still_launches(
     assert body["subtitle"] is None
     assert body["media"] == "youtube:abcDEFghIJK"
     cmd = mock_popen.call_args.args[0]
-    assert not any(arg.startswith("--sub-files-append") for arg in cmd)
+    assert not any(arg.startswith("--sub-file=") for arg in cmd)
 
 
 @patch("api.routes.library.shutil.which")
