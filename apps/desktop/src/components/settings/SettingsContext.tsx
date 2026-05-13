@@ -1,7 +1,12 @@
 import * as React from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { apiClient } from "../../state/client";
-import { type AppConfig, type DependencyStatus } from "@yt-subtitle-maker/api-client";
+import {
+  type AppConfig,
+  type DependencyStatus,
+  type EngineDescriptor,
+  type SystemReport,
+} from "@yt-subtitle-maker/api-client";
 import { STT_ENGINE_LABELS, TABS, WHISPER_MODEL_IDS, type TabId } from "./constants";
 import { useSettingsDraft, type SaveStatus } from "./useSettingsDraft";
 
@@ -41,6 +46,9 @@ export interface SettingsContextValue {
   modelsBusy: "gemini" | "local_openai" | "openai" | undefined;
   sttEngineOptions: { label: string; value: string }[];
   whisperModelOptions: { label: string; value: string }[];
+  engines: EngineDescriptor[] | undefined;
+  system: SystemReport | undefined;
+  refreshEngines: () => Promise<void>;
   // mutations / actions
   update: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
   retrySave: () => void;
@@ -114,6 +122,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     "gemini" | "local_openai" | "openai" | undefined
   >(undefined);
   const [deps, setDeps] = React.useState<DependencyStatus | undefined>();
+  const [engines, setEngines] = React.useState<EngineDescriptor[] | undefined>(undefined);
+  const [system, setSystem] = React.useState<SystemReport | undefined>(undefined);
 
   const params = useLocalSearchParams<{ tab?: string | string[] }>();
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
@@ -149,9 +159,26 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       .fetchDependencies()
       .then((d) => !cancelled && setDeps(d))
       .catch(() => undefined);
+    apiClient
+      .getEngines()
+      .then((e) => !cancelled && setEngines(e))
+      .catch(() => undefined);
+    apiClient
+      .getSystem()
+      .then((s) => !cancelled && setSystem(s))
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const refreshEngines = React.useCallback(async () => {
+    try {
+      const e = await apiClient.getEngines();
+      setEngines(e);
+    } catch {
+      /* best-effort — ModelRow handles its own local error state */
+    }
   }, []);
 
   const refreshLocalOpenaiModels = async () => {
@@ -290,6 +317,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     modelsBusy,
     sttEngineOptions,
     whisperModelOptions,
+    engines,
+    system,
+    refreshEngines,
     update,
     retrySave,
     tabDiffersFromDefaults,
