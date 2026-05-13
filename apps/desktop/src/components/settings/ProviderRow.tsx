@@ -208,11 +208,31 @@ export function ProviderRow({
       {/* Model badge */}
       {model ? <BadgePill tone="neutral">{model}</BadgePill> : null}
 
-      {/* Last-test dot + timestamp */}
-      <XStack alignItems="center" gap="$xs">
+      {/* Last-test dot + a human-readable result string.
+          Phase 4d post-fix: the row's only feedback used to be the 8px dot
+          + a "just now" timestamp, which was effectively invisible — users
+          clicked Test, got a successful ping, and thought nothing happened.
+          We now render the actual outcome inline ("✓ Connected · 327ms" /
+          "⚠ Authentication failed (check the API key)") so the result is
+          visible without opening the edit form. */}
+      <XStack alignItems="center" gap="$xs" maxWidth={260}>
         <StatusDot status={dotStatus} size={8} />
         {lastTest ? (
-          <Caption color="$textMuted">{formatTimeAgo(lastTest.at)}</Caption>
+          <YStack flex={1} minWidth={0}>
+            <Caption
+              color={lastTest.ok ? "$success" : "$warning"}
+              numberOfLines={1}
+            >
+              {lastTest.ok
+                ? `✓ Connected${
+                    lastTest.latencyMs ? ` · ${lastTest.latencyMs}ms` : ""
+                  }`
+                : `⚠ ${lastTest.error ?? "Test failed"}`}
+            </Caption>
+            <Caption color="$textMuted" numberOfLines={1}>
+              {formatTimeAgo(lastTest.at)}
+            </Caption>
+          </YStack>
         ) : null}
       </XStack>
 
