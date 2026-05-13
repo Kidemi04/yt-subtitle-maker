@@ -60,20 +60,38 @@ class ProcessRequest(BaseModel):
 
 
 class TranslatorTestRequest(BaseModel):
-    provider: TranslatorProvider
-    # All credential fields default to None so the backend resolves missing
-    # values from the saved config. Lets the Generate page test the chosen
-    # provider with just `{provider}` instead of forcing the user to repeat
-    # baseUrl/model/apiKey already saved in Settings.
+    # Ad-hoc spec form — specify the provider + credentials directly. All
+    # credential fields default to None so the backend resolves missing values
+    # from the saved config (so the Generate page can test with just
+    # `{provider}` instead of forcing the user to repeat baseUrl/model/apiKey
+    # already saved in Settings).
+    provider: TranslatorProvider | None = None
     baseUrl: str | None = None
     model: str | None = None
     apiKey: str | None = None
 
+    # Saved-profile form — resolve credentials server-side via
+    # `get_active_translator`. profileId: "gemini" | "local_openai" |
+    # "custom:<id>". `useSavedKey=True` is required for this form so the
+    # backend doesn't silently fall back to the ad-hoc path if `provider` is
+    # omitted by accident.
+    profileId: str | None = None
+    useSavedKey: bool = False
+
+    # Language to translate the test phrase ("Hello, world.") into. Frontend
+    # passes the current cfg.default_target_lang; we default to the same on
+    # the server so this is safe to omit.
+    targetLang: str = "zh-CN"
+
 
 class ListModelsRequest(BaseModel):
-    provider: TranslatorProvider
+    # Ad-hoc form (existing behaviour)
+    provider: TranslatorProvider | None = None
     baseUrl: str | None = None
     apiKey: str | None = None
+    # Saved-profile form (Phase 4d)
+    profileId: str | None = None
+    useSavedKey: bool = False
 
 
 class BackendCapabilities(BaseModel):
