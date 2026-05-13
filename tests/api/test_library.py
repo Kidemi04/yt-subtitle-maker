@@ -134,11 +134,11 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is True
-    # `subtitle` is the ACTIVE sub (last in order) — preferred translated.
+    # `subtitle` is the ACTIVE sub (sid=1, FIRST in order) — preferred translated.
     assert body["subtitle"] == "abcDEFghIJK_zh-CN.srt"
-    # `subtitles` lists every sub loaded, in mpv's track order.
-    # Original first (alternative), translated last (active).
-    assert body["subtitles"] == ["abcDEFghIJK_original.srt", "abcDEFghIJK_zh-CN.srt"]
+    # `subtitles` lists every sub loaded, in mpv's track order — sid=1 first.
+    # Translated first (sid=1, active), original second (sid=2, alternative).
+    assert body["subtitles"] == ["abcDEFghIJK_zh-CN.srt", "abcDEFghIJK_original.srt"]
     # Default playback uses the YouTube URL so the user gets actual video,
     # not just the .wav audio that was downloaded for transcription.
     assert body["media"] == "youtube:abcDEFghIJK"
@@ -149,12 +149,13 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert "https://www.youtube.com/watch?v=abcDEFghIJK" in cmd
     assert "--force-window=immediate" in cmd
     # Each SRT is passed as `--sub-file=<full-path>`. The order matters —
-    # mpv auto-selects the LAST one as the active track. The user picked
-    # "translated" (the default) so the translated SRT must come last.
+    # mpv assigns sid=1 to the FIRST --sub-file= and --sid=auto picks
+    # sid=1 as active. The user picked "translated" (the default) so the
+    # translated SRT must come FIRST. Verified against real mpv 0.41.0.
     sub_args = [a for a in cmd if a.startswith("--sub-file=")]
     assert len(sub_args) == 2, sub_args
-    assert sub_args[0].endswith("abcDEFghIJK_original.srt"), sub_args[0]
-    assert sub_args[1].endswith("abcDEFghIJK_zh-CN.srt"), sub_args[1]
+    assert sub_args[0].endswith("abcDEFghIJK_zh-CN.srt"), sub_args[0]
+    assert sub_args[1].endswith("abcDEFghIJK_original.srt"), sub_args[1]
     assert "--sub-auto=exact" in cmd
     # Stream path needs mpv pointed at our yt-dlp + must enable EJS
     # remote components so n-challenge solving works.
@@ -206,9 +207,9 @@ def test_library_play_mpv_subtitle_preference_original(
     mock_which, mock_popen, fake_output_dir
 ):
     """preference="original" still loads BOTH SRTs but makes original the
-    DEFAULT active track (it goes last in the --sub-file list — mpv
-    auto-selects the most-recently-added). The user can still press `j` in
-    mpv to cycle to the translated track."""
+    DEFAULT active track (it goes FIRST in the --sub-file list → sid=1 →
+    --sid=auto selects it). The user can still press `j` in mpv to cycle
+    to the translated track (sid=2)."""
     mock_which.return_value = "/fake/mpv"
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
@@ -218,16 +219,16 @@ def test_library_play_mpv_subtitle_preference_original(
     )
     body = resp.json()
     assert body["ok"] is True
-    # `subtitle` (the ACTIVE one) is now the original.
+    # `subtitle` (the ACTIVE one) is now the original (sid=1).
     assert body["subtitle"] == "abcDEFghIJK_original.srt"
-    # But both are still loaded in mpv (translated first/alternative, original
-    # last/active) — so the user can press `j` to cycle to the translated one.
-    assert body["subtitles"] == ["abcDEFghIJK_zh-CN.srt", "abcDEFghIJK_original.srt"]
+    # Both still loaded — original FIRST/active, translated SECOND/alternative.
+    # User cycles to translated with `j` in mpv.
+    assert body["subtitles"] == ["abcDEFghIJK_original.srt", "abcDEFghIJK_zh-CN.srt"]
     cmd = mock_popen.call_args.args[0]
     sub_args = [a for a in cmd if a.startswith("--sub-file=")]
     assert len(sub_args) == 2, sub_args
-    assert sub_args[0].endswith("abcDEFghIJK_zh-CN.srt")
-    assert sub_args[1].endswith("abcDEFghIJK_original.srt")
+    assert sub_args[0].endswith("abcDEFghIJK_original.srt")
+    assert sub_args[1].endswith("abcDEFghIJK_zh-CN.srt")
 
 
 @patch("api.routes.library.subprocess.Popen")
@@ -237,23 +238,22 @@ def test_library_play_mpv_loads_both_srts_so_user_can_cycle_in_mpv(
 ):
     """User feature: 'i need in mpv i can select original and translate
     subtitle.' Default 'translated' preference loads BOTH SRTs as mpv tracks
-    — translated as the active default, original as a track the user can
-    cycle to with `j` (mpv's subtitle-cycle keybind). The order in the
-    --sub-file flags determines mpv's auto-select (last = active)."""
+    — translated as the active default (sid=1, first --sub-file=), original
+    as a track the user can cycle to with `j` (sid=2, second --sub-file=).
+    mpv's --sid=auto picks sid=1; verified against real mpv 0.41.0."""
     mock_which.return_value = "/fake/mpv"
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
     resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
     body = resp.json()
     assert body["ok"] is True
-    # Both filenames in the response, original first (alternative), translated last (active).
-    assert body["subtitles"] == ["abcDEFghIJK_original.srt", "abcDEFghIJK_zh-CN.srt"]
-    # And in the actual mpv cmd, two --sub-file= flags in the same order.
+    # Translated FIRST (sid=1 active), original SECOND (sid=2 alternative).
+    assert body["subtitles"] == ["abcDEFghIJK_zh-CN.srt", "abcDEFghIJK_original.srt"]
     cmd = mock_popen.call_args.args[0]
     sub_args = [a for a in cmd if a.startswith("--sub-file=")]
     assert len(sub_args) == 2
-    assert sub_args[0].endswith("_original.srt")
-    assert sub_args[1].endswith("_zh-CN.srt")
+    assert sub_args[0].endswith("_zh-CN.srt")
+    assert sub_args[1].endswith("_original.srt")
 
 
 @patch("api.routes.library.subprocess.Popen")
