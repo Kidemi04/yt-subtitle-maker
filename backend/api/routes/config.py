@@ -33,6 +33,8 @@ _CAMEL_TO_SNAKE = {
     "enableTranslation": "enable_translation",
     "autoTranslateTitle": "auto_translate_title",
     "translatorProvider": "translator_provider",
+    "customTranslators": "custom_translators",
+    "activeTranslator": "active_translator",
     "geminiApiKey": "gemini_api_key",
     "geminiModel": "gemini_model",
     "localOpenaiBaseUrl": "local_openai_base_url",
@@ -71,6 +73,44 @@ def _mask_secrets(d: dict) -> dict:
     return {k: (MASK if k in SECRET_KEYS and v else v) for k, v in d.items()}
 
 
+def _profile_to_camel(p: dict) -> dict:
+    """Convert a single custom_translators entry (snake_case) to camelCase wire format."""
+    return {
+        "id": p.get("id", ""),
+        "name": p.get("name", ""),
+        "baseUrl": p.get("base_url", ""),
+        "apiKey": MASK if p.get("api_key") else "",
+        "model": p.get("model", ""),
+    }
+
+
+def _mask_profile_keys(profiles: list) -> list:
+    """Return a list of camelCase per-profile dicts with api_key masked."""
+    return [_profile_to_camel(p) for p in profiles]
+
+
+def _profile_from_camel(entry: dict, existing_by_id: dict) -> dict:
+    """Convert an incoming camelCase profile entry to snake_case for storage.
+
+    If apiKey == MASK and we have a saved entry with the same id,
+    keep the saved api_key (don't overwrite with the sentinel).
+    """
+    profile_id = entry.get("id", "")
+    raw_key = entry.get("apiKey", "")
+    if raw_key == MASK:
+        saved = existing_by_id.get(profile_id, {})
+        api_key = saved.get("api_key", "")
+    else:
+        api_key = raw_key
+    return {
+        "id": profile_id,
+        "name": entry.get("name", ""),
+        "base_url": entry.get("baseUrl", ""),
+        "api_key": api_key,
+        "model": entry.get("model", ""),
+    }
+
+
 # Path config fields that are blank-by-default and resolved at runtime relative
 # to the backend's CWD (output/downloads) or to a system location. The frontend
 # shows these resolved values as placeholders / uses them for ↺-to-default.
@@ -91,8 +131,19 @@ def _effective_defaults() -> dict:
 
 
 def _config_response(cfg: AppConfig) -> dict:
-    out = _mask_secrets(_to_camel(asdict(cfg)))
-    out["_defaults"] = _mask_secrets(_to_camel(_effective_defaults()))
+    d = asdict(cfg)
+    # Separate custom_translators before the generic camel conversion: the
+    # per-profile dicts need their own snake→camel pass AND per-profile masking
+    # of api_key, which the flat _to_camel/_mask_secrets helpers don't cover.
+    profiles_snake = d.pop("custom_translators", [])
+    out = _mask_secrets(_to_camel(d))
+    out["customTranslators"] = _mask_profile_keys(profiles_snake)
+
+    defaults_d = _effective_defaults()
+    defaults_profiles = defaults_d.pop("custom_translators", [])
+    defaults_out = _mask_secrets(_to_camel(defaults_d))
+    defaults_out["customTranslators"] = _mask_profile_keys(defaults_profiles)
+    out["_defaults"] = defaults_out
     return out
 
 
@@ -104,7 +155,17 @@ def get_config() -> dict:
 @router.post("/config")
 def update_config(payload: dict[str, Any] = Body(...)) -> dict:  # noqa: B008
     cfg = load_config()
+    existing_by_id = {e["id"]: e for e in cfg.custom_translators}
+
     for camel_key, value in payload.items():
+        if camel_key == "customTranslators":
+            # value is a list of camelCase profile dicts. Snake-case each entry
+            # and apply the "***"-keeps-saved-key rule before assigning.
+            cfg.custom_translators = [
+                _profile_from_camel(entry, existing_by_id)
+                for entry in (value or [])
+            ]
+            continue
         # Don't overwrite real keys with the GET-side mask
         if camel_key in SECRET_KEYS and value == MASK:
             continue
