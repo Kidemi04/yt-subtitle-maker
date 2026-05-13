@@ -7,7 +7,7 @@ import {
   BodySm,
   Caption,
 } from "@yt-subtitle-maker/ui";
-import { SettingsProvider, useSettings } from "../src/components/settings/SettingsContext";
+import { useSettings } from "../src/components/settings/SettingsContext";
 import { Section } from "../src/components/settings/shared";
 import { TABS, type TabId } from "../src/components/settings/constants";
 import { SettingsRail } from "../src/components/settings/SettingsRail";
@@ -29,11 +29,7 @@ const TAB_COMPONENTS: Record<TabId, React.ComponentType> = {
 };
 
 export default function Settings() {
-  return (
-    <SettingsProvider>
-      <SettingsShell />
-    </SettingsProvider>
-  );
+  return <SettingsShell />;
 }
 
 function SettingsShell() {

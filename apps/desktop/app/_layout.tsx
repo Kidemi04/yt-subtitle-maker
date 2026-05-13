@@ -1,5 +1,6 @@
 import { Slot, usePathname, useRouter } from "expo-router";
 import { useEffect } from "react";
+import { SettingsProvider } from "../src/components/settings/SettingsContext";
 import {
   TamaguiProvider,
   Stack,
@@ -406,41 +407,45 @@ export default function RootLayout() {
   if (pathname === "/init") {
     return (
       <TamaguiProvider config={config} defaultTheme="dark">
-        <Stack flex={1} backgroundColor="$bgBase">
-          <Slot />
-        </Stack>
+        <SettingsProvider>
+          <Stack flex={1} backgroundColor="$bgBase">
+            <Slot />
+          </Stack>
+        </SettingsProvider>
       </TamaguiProvider>
     );
   }
 
   return (
     <TamaguiProvider config={config} defaultTheme="dark">
-      <Stack flex={1} backgroundColor="$bgBase">
-        <XStack flex={1}>
-          <Sidebar />
-          <YStack flex={1}>
-            <Topbar />
-            <ScrollView
-              flex={1}
-              contentContainerStyle={{
-                flexGrow: 1,
-                paddingHorizontal: 32,
-                paddingVertical: 32,
-              }}
-            >
-              <YStack
-                width="100%"
-                maxWidth={960}
-                gap="$lg"
-                alignSelf="center"
+      <SettingsProvider>
+        <Stack flex={1} backgroundColor="$bgBase">
+          <XStack flex={1}>
+            <Sidebar />
+            <YStack flex={1}>
+              <Topbar />
+              <ScrollView
+                flex={1}
+                contentContainerStyle={{
+                  flexGrow: 1,
+                  paddingHorizontal: 32,
+                  paddingVertical: 32,
+                }}
               >
-                <Slot />
-              </YStack>
-            </ScrollView>
-          </YStack>
-        </XStack>
-        <LogsDrawer />
-      </Stack>
+                <YStack
+                  width="100%"
+                  maxWidth={960}
+                  gap="$lg"
+                  alignSelf="center"
+                >
+                  <Slot />
+                </YStack>
+              </ScrollView>
+            </YStack>
+          </XStack>
+          <LogsDrawer />
+        </Stack>
+      </SettingsProvider>
     </TamaguiProvider>
   );
 }

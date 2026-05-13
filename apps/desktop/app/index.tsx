@@ -42,6 +42,7 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { useGenerate } from "../src/state/generate";
 import { apiClient } from "../src/state/client";
+import { useSettings } from "../src/components/settings/SettingsContext";
 import { NewTranscribeModal } from "../src/components/NewTranscribeModal";
 import { useRouter } from "expo-router";
 import type {
@@ -221,6 +222,33 @@ export default function Generate() {
     cancel,
     reset,
   } = useGenerate();
+
+  // Translation-may-fail banner — reads last test result from SettingsContext
+  // (persisted in-memory across route navigations; SettingsProvider lives in
+  // the root layout so it is always mounted).
+  const { lastTestResult, activeTranslator, customTranslators } = useSettings();
+
+  // Derive the profile id used as key into lastTestResult.
+  // activeTranslator is stored as "gemini" | "local_openai" | "custom:<id>".
+  // Strip the "custom:" prefix to get the raw id used when recording results.
+  const activeProfileId = activeTranslator?.startsWith("custom:")
+    ? activeTranslator.slice("custom:".length)
+    : (activeTranslator ?? "gemini");
+
+  // Derive a human-readable name for the active profile.
+  function activeProfileName(): string {
+    if (!activeTranslator || activeTranslator === "gemini") return "Gemini";
+    if (activeTranslator === "local_openai") return "Local AI";
+    // custom profile — look up by id in customTranslators
+    const id = activeTranslator.startsWith("custom:")
+      ? activeTranslator.slice("custom:".length)
+      : activeTranslator;
+    const profile = customTranslators?.find((p) => p.id === id);
+    return profile?.name ?? activeTranslator;
+  }
+
+  const activeLastTest = lastTestResult[activeProfileId];
+  const translationMayFail = Boolean(activeLastTest && !activeLastTest.ok);
 
   /* form state — defaults match the spec's recommended pick (Auto + faster-whisper + turbo + EN→ZH) */
   const [sttSource, setSttSource] = React.useState<SttSource>("auto");
@@ -622,6 +650,15 @@ export default function Generate() {
                       aria-label="Translate subtitles"
                     />
                   </XStack>
+
+                  {translationMayFail && enableTranslation && !downloadOnly ? (
+                    <BadgePill tone="warning">
+                      <Caption>
+                        Translation may fail — {activeProfileName()}&apos;s last test failed
+                        {activeLastTest?.error ? `: ${activeLastTest.error}` : ""}
+                      </Caption>
+                    </BadgePill>
+                  ) : null}
 
                   {enableTranslation && !downloadOnly ? (
                     <YStack gap="$xs">
