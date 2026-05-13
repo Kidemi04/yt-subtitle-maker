@@ -54,7 +54,19 @@ export function LanguagePicker({
     }
   };
 
+  React.useEffect(() => {
+    const inBuiltIn = ALL_LANGUAGES.some((o) => o.value === value);
+    if (inBuiltIn) {
+      setShowingCustom(false);
+      setCustomText("");
+    } else if (value) {
+      setShowingCustom(true);
+      setCustomText(value);
+    }
+  }, [value]);
+
   const handleCustomDismiss = () => {
+    onValueChange("");
     setShowingCustom(false);
     setCustomText("");
   };
