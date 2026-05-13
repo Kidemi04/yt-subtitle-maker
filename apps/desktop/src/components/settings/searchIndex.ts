@@ -25,8 +25,26 @@ export const SETTINGS_INDEX: SearchEntry[] = [
   { id: "transcription.source-lang", tab: "transcription", label: "Default source language", keywords: ["language", "source", "spoken", "detect"] },
   { id: "transcription.vad", tab: "transcription", label: "Voice-Activity Detection (VAD) by default", keywords: ["vad", "silence", "voice activity"] },
   { id: "transcription.ffmpeg-resample-16k", tab: "transcription", label: "FFmpeg 16 kHz pre-resample", keywords: ["ffmpeg", "resample", "16khz", "audio"] },
-  // Translation (base only)
-  { id: "translation.provider", tab: "translation", label: "Provider", keywords: ["translate", "provider", "gemini", "openai", "local ai", "lm studio"] },
+  // Translation
+  {
+    id: "translation.active-provider",
+    tab: "translation",
+    label: "Active translation provider",
+    keywords: [
+      "translate", "provider", "translator", "gemini", "deepseek", "groq",
+      "openrouter", "together", "mistral", "xai", "fireworks", "openai",
+      "local ai", "lm studio", "ollama", "custom", "api key", "endpoint",
+    ],
+  },
+  {
+    id: "translation.add-provider",
+    tab: "translation",
+    label: "Add translation provider",
+    keywords: [
+      "add provider", "new provider", "custom translator", "deepseek", "groq",
+      "openrouter", "together", "mistral", "xai", "fireworks", "openai",
+    ],
+  },
   { id: "translation.target-lang", tab: "translation", label: "Default target language", keywords: ["target", "language", "translate to"] },
   { id: "translation.enable-by-default", tab: "translation", label: "Enable translation by default", keywords: ["translate", "enable", "default"] },
   { id: "translation.auto-translate-title", tab: "translation", label: "Auto-translate the video title", keywords: ["title", "translate"] },

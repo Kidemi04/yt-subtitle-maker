@@ -120,7 +120,6 @@ export const SETTING_FIELD: Partial<Record<string, keyof AppConfig>> = {
   "transcription.vad": "vadEnabled",
   "transcription.ffmpeg-resample-16k": "ffmpegResample16k",
   // Translation
-  "translation.provider": "translatorProvider",
   "translation.target-lang": "defaultTargetLang",
   "translation.enable-by-default": "enableTranslation",
   "translation.auto-translate-title": "autoTranslateTitle",
