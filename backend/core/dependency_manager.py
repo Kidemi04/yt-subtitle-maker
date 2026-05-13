@@ -15,6 +15,17 @@ MODELS_URLS = {
     "turbo": "https://openaipublic.azureedge.net/main/whisper/models/aff26ae408abcba5fbf8813c21e62b0941638c5f6eebfb145be0c9839262a19a/large-v3-turbo.pt",
 }
 
+# Published checkpoint sizes in MB (openai-whisper README, 2024).
+# Used by GET /api/engines to populate the model catalog's sizeMb field.
+MODEL_SIZES_MB: dict[str, int] = {
+    "tiny": 75,
+    "base": 145,
+    "small": 484,
+    "medium": 1536,
+    "large-v3": 3093,
+    "turbo": 1624,
+}
+
 def get_whisper_cache_dir():
     """Returns the directory where Whisper stores models (local 'models' folder)."""
     if getattr(sys, 'frozen', False):
