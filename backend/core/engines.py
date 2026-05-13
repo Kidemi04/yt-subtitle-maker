@@ -86,3 +86,8 @@ def _openai_whisper_descriptor() -> dict:
 def build_engine_descriptors() -> list[dict]:
     """Return the full engine descriptor list (available first, then planned)."""
     return [_openai_whisper_descriptor(), *_PLANNED_STUBS]
+
+
+# Convenience sets for the dependencies route engine-param guard.
+PLANNED_ENGINE_IDS: frozenset[str] = frozenset(s["id"] for s in _PLANNED_STUBS)
+AVAILABLE_ENGINE_IDS: frozenset[str] = frozenset({"openai-whisper"})
