@@ -27,13 +27,11 @@ export interface SettingsContextValue {
   saveStatus: SaveStatus;
   failedFields: Set<keyof AppConfig>;
   // secret-field UI
+  // TODO(4d-followup): showApiKey / setShowApiKey are unused after the 4d-frontend rewrite — remove in a follow-up.
   showApiKey: boolean;
   setShowApiKey: React.Dispatch<React.SetStateAction<boolean>>;
-  replacingKey: Record<"gemini" | "openai" | "localOpenai", boolean>;
-  setReplacingKey: React.Dispatch<
-    React.SetStateAction<Record<"gemini" | "openai" | "localOpenai", boolean>>
-  >;
   // connection test statuses
+  // TODO(4d-followup): translatorStatus was driven by the removed testTranslator legacy alias — remove in a follow-up.
   translatorStatus: ConnState;
   cookieStatus: ConnState;
   cookieError: string | undefined;
@@ -43,10 +41,6 @@ export interface SettingsContextValue {
   installedEngines: string[] | undefined;
   jsRuntime: string | null | undefined;
   deps: DependencyStatus | undefined;
-  geminiModels: string[];
-  localOpenaiModels: string[];
-  openaiModels: string[];
-  modelsBusy: "gemini" | "local_openai" | "openai" | undefined;
   sttEngineOptions: { label: string; value: string }[];
   whisperModelOptions: { label: string; value: string }[];
   engines: EngineDescriptor[] | undefined;
@@ -59,7 +53,6 @@ export interface SettingsContextValue {
   revertField: (id: string) => void;
   resetTab: (t: TabId) => void;
   flush: () => void;
-  testTranslator: () => Promise<void>;
   // Phase 4d-frontend: named provider profiles
   customTranslators: TranslatorProfile[] | undefined;
   activeTranslator: string | undefined;
@@ -76,8 +69,6 @@ export interface SettingsContextValue {
   removeCustomTranslator: (id: string) => void;
   updateCustomTranslator: (id: string, patch: Partial<TranslatorProfile>) => void;
   testCookies: () => Promise<void>;
-  refreshLocalOpenaiModels: () => Promise<void>;
-  refreshOpenaiModels: () => Promise<void>;
   // setters exposed for inline handlers (e.g. "Reset all to defaults")
   setConfig: React.Dispatch<React.SetStateAction<AppConfig | undefined>>;
   setDraft: React.Dispatch<React.SetStateAction<AppConfig | undefined>>;
@@ -123,9 +114,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   } = ds;
 
   const [showApiKey, setShowApiKey] = React.useState(false);
-  const [replacingKey, setReplacingKey] = React.useState<
-    Record<"gemini" | "openai" | "localOpenai", boolean>
-  >({ gemini: false, openai: false, localOpenai: false });
   const [translatorStatus, setTranslatorStatus] = React.useState<ConnState>("untested");
   const [cookieStatus, setCookieStatus] = React.useState<ConnState>("untested");
   const [cookieError, setCookieError] = React.useState<string | undefined>();
@@ -133,12 +121,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [cookiesAttached, setCookiesAttached] = React.useState<boolean | undefined>();
   const [installedEngines, setInstalledEngines] = React.useState<string[] | undefined>(undefined);
   const [jsRuntime, setJsRuntime] = React.useState<string | null | undefined>(undefined);
-  const [geminiModels, setGeminiModels] = React.useState<string[]>([]);
-  const [localOpenaiModels, setLocalOpenaiModels] = React.useState<string[]>([]);
-  const [openaiModels, setOpenaiModels] = React.useState<string[]>([]);
-  const [modelsBusy, setModelsBusy] = React.useState<
-    "gemini" | "local_openai" | "openai" | undefined
-  >(undefined);
   const [lastTestResult, setLastTestResult] = React.useState<
     Record<string, TranslatorTestResult & { at: number }>
   >({});
@@ -167,15 +149,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setJsRuntime(v.jsRuntime ?? null);
       })
       .catch(() => undefined);
-    // Gemini list is static (KNOWN_MODELS in the backend) — fetch once on
-    // mount; doesn't depend on credentials.
-    apiClient
-      .listTranslatorModels({ provider: "gemini" })
-      .then((res) => {
-        if (cancelled) return;
-        if (res.ok) setGeminiModels(res.models);
-      })
-      .catch(() => undefined);
     apiClient
       .fetchDependencies()
       .then((d) => !cancelled && setDeps(d))
@@ -201,40 +174,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       /* best-effort — ModelRow handles its own local error state */
     }
   }, []);
-
-  const refreshLocalOpenaiModels = async () => {
-    if (!draft) return;
-    setModelsBusy("local_openai");
-    try {
-      const res = await apiClient.listTranslatorModels({
-        provider: "local_openai",
-        baseUrl: draft.localOpenaiBaseUrl,
-        apiKey: draft.localOpenaiApiKey,
-      });
-      if (res.ok) setLocalOpenaiModels(res.models);
-    } catch {
-      /* surface via translator status */
-    } finally {
-      setModelsBusy(undefined);
-    }
-  };
-
-  const refreshOpenaiModels = async () => {
-    if (!draft) return;
-    setModelsBusy("openai");
-    try {
-      const res = await apiClient.listTranslatorModels({
-        provider: "openai",
-        baseUrl: draft.openaiBaseUrl,
-        apiKey: draft.openaiApiKey,
-      });
-      if (res.ok) setOpenaiModels(res.models);
-    } catch {
-      /* surface via translator status */
-    } finally {
-      setModelsBusy(undefined);
-    }
-  };
 
   const sttEngineOptions = React.useMemo(() => {
     // "auto" is always offered; the rest is exactly what the backend reports
@@ -298,37 +237,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     },
     [recordTestResult],
   );
-
-  // Legacy alias — used by the old Translation tab (being replaced in Task 5)
-  const testTranslator = React.useCallback(async () => {
-    if (!draft) return;
-    setTranslatorStatus("untested");
-    const provider = draft.translatorProvider;
-    const baseUrl =
-      provider === "local_openai"
-        ? draft.localOpenaiBaseUrl
-        : provider === "openai"
-        ? draft.openaiBaseUrl
-        : undefined;
-    const apiKey =
-      provider === "local_openai"
-        ? draft.localOpenaiApiKey
-        : provider === "openai"
-        ? draft.openaiApiKey
-        : draft.geminiApiKey;
-    const model =
-      provider === "local_openai"
-        ? draft.localOpenaiModel
-        : provider === "openai"
-        ? draft.openaiModel
-        : draft.geminiModel;
-    try {
-      const res = await apiClient.testTranslator({ provider, baseUrl, apiKey, model });
-      setTranslatorStatus(res.ok ? "ok" : "error");
-    } catch {
-      setTranslatorStatus("error");
-    }
-  }, [draft]);
 
   const setActiveTranslator = React.useCallback(
     (id: string) => {
@@ -402,8 +310,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     failedFields,
     showApiKey,
     setShowApiKey,
-    replacingKey,
-    setReplacingKey,
     translatorStatus,
     cookieStatus,
     cookieError,
@@ -412,10 +318,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     installedEngines,
     jsRuntime,
     deps,
-    geminiModels,
-    localOpenaiModels,
-    openaiModels,
-    modelsBusy,
     sttEngineOptions,
     whisperModelOptions,
     engines,
@@ -427,7 +329,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     revertField,
     resetTab,
     flush,
-    testTranslator,
     customTranslators: draft?.customTranslators,
     activeTranslator: draft?.activeTranslator,
     lastTestResult,
@@ -439,8 +340,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     removeCustomTranslator,
     updateCustomTranslator,
     testCookies,
-    refreshLocalOpenaiModels,
-    refreshOpenaiModels,
     setConfig,
     setDraft,
     activeTab,
