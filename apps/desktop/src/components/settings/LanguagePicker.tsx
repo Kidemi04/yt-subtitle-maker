@@ -35,7 +35,7 @@ export function LanguagePicker({
   const handleDropdownChange = (v: string) => {
     if (v === CUSTOM_SENTINEL) {
       setShowingCustom(true);
-      setCustomText("");
+      setCustomText(value);
     } else {
       onValueChange(v);
     }
@@ -45,6 +45,10 @@ export function LanguagePicker({
     const trimmed = customText.trim();
     if (trimmed) {
       onValueChange(trimmed);
+      if (ALL_LANGUAGES.some((o) => o.value === trimmed)) {
+        setShowingCustom(false);
+        setCustomText("");
+      }
     }
   };
 
