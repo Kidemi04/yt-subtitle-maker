@@ -84,6 +84,12 @@ class AppConfig:
     # nothing here keeps behaviour identical to a fresh mpv install.
     # Reference: mpv --sub-* options.
     sub_font: str = ""           # e.g. "Noto Sans CJK SC", "Inter", "Arial"
+    # Per-language font overrides: { "zh": "PingFang SC", "ja": "Hiragino Sans" }.
+    # Keys are matched against the active sub's BCP-47 language code by prefix
+    # (so "zh" covers zh, zh-CN, zh-Hans, zh-TW, ...) — see `_resolve_sub_font`
+    # in backend/api/routes/library.py. Missing language → fall back to
+    # `sub_font` → platform-default CJK font.
+    sub_fonts_by_lang: dict[str, str] = field(default_factory=dict)
     sub_font_size: int = 0       # 0 = mpv default (55)
     sub_color: str = ""          # "#RRGGBB" — text fill
     sub_border_color: str = ""   # "#RRGGBB" — outline

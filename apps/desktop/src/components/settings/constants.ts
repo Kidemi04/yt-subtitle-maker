@@ -5,6 +5,7 @@
 // shared.tsx breaks the old `SettingsContext.tsx -> shared.tsx -> SettingsContext.tsx`
 // Metro require-cycle warning.
 import type { AppConfig } from "@yt-subtitle-maker/api-client";
+export { ALL_LANGUAGES as LANGS } from "./languages";
 
 export const MASK = "***";
 export const isMasked = (v: string | undefined): boolean => v === MASK;
@@ -61,17 +62,7 @@ export const DEVICES = [
   { label: "GPU", value: "gpu" },
 ];
 
-export const LANGS = [
-  { label: "English", value: "en" },
-  { label: "中文", value: "zh" },
-  { label: "日本語", value: "ja" },
-  { label: "한국어", value: "ko" },
-  { label: "Español", value: "es" },
-  { label: "Français", value: "fr" },
-  { label: "Deutsch", value: "de" },
-  { label: "Português", value: "pt" },
-  { label: "Tiếng Việt", value: "vi" },
-];
+
 
 /** Build dropdown option lists. If the saved value isn't in the fetched
  * list (e.g. user edited config.json by hand, or we haven't fetched yet),

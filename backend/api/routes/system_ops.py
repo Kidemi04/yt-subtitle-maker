@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import APIRouter
 
 from core import config as cfgmod
+from api.routes.library import _resolve_sub_font
 
 router = APIRouter(prefix="/api/system", tags=["system_ops"])
 
@@ -57,8 +58,9 @@ def _clip_path() -> Path:
 def _mpv_args_from_cfg(cfg: Any) -> list[str]:
     """Build --sub-* args, skipping empty/default sentinels per core/config.py."""
     args: list[str] = []
-    if getattr(cfg, "sub_font", ""):
-        args.append(f"--sub-font={cfg.sub_font}")
+    font = _resolve_sub_font(cfg, None)  # No lang context for test playback
+    if font:
+        args.append(f"--sub-font={font}")
     if getattr(cfg, "sub_font_size", 0):
         args.append(f"--sub-font-size={cfg.sub_font_size}")
     if getattr(cfg, "sub_color", ""):

@@ -116,7 +116,7 @@ function Sidebar() {
         <CaptionUpper>v2.0 · alpha</CaptionUpper>
       </YStack>
 
-      <YStack flex={1} gap={2}>
+      <YStack flex={1} gap="$sm">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);

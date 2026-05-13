@@ -102,6 +102,30 @@ def test_test_playback_uses_cfg_mpv_path(monkeypatch):
     assert argv[0] == "/opt/mpv/bin/mpv"
 
 
+def test_test_playback_falls_back_to_cjk_font_when_no_global_set(monkeypatch):
+    """When cfg.sub_font is empty, the platform-default CJK font is resolved."""
+    import core.config as cfgmod
+    from core.config import AppConfig
+
+    cfg = AppConfig()
+    # cfg.sub_font defaults to "" — _resolve_sub_font(None) must pick a CJK font.
+    monkeypatch.setattr(cfgmod, "load_config", lambda: cfg)
+
+    proc = MagicMock(pid=12345)
+    with patch("api.routes.system_ops.subprocess.Popen", return_value=proc) as popen, \
+         patch("api.routes.system_ops.shutil.which", return_value="/usr/local/bin/mpv"):
+        resp = client.post("/api/system/test-playback")
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+    argv = popen.call_args[0][0]
+    if sys.platform == "darwin":
+        assert "--sub-font=Heiti SC" in argv
+    elif sys.platform == "win32":
+        assert "--sub-font=Microsoft YaHei" in argv
+    else:
+        assert "--sub-font=Noto Sans CJK SC" in argv
+
+
 def test_test_playback_no_mpv_found(monkeypatch):
     import core.config as cfgmod
     from core.config import AppConfig

@@ -1,0 +1,61 @@
+<h2>Design — part 2 of 3: how saving works + the trust fixes</h2>
+<p class="subtitle">Hybrid save: safe stuff persists instantly; the few dangerous fields are "armed" — Edit → validate → apply. Plus the list of correctness bugs we're killing. Click ✓ to move on, or comment.</p>
+
+<style>
+  .wf{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.55;color:#cfd3dc;background:#15171c;border:1px solid #2a2e37;border-radius:8px;padding:12px;white-space:pre;overflow:auto;margin-top:6px}
+  .wf .dim{color:#6b7280}.wf .accent{color:#e8a55a}.wf .on{color:#9bb5f9}.wf .ok{color:#7fb98a}.wf .err{color:#e8787d}
+  .fixtbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  .fixtbl th,.fixtbl td{border:1px solid #2a2e37;padding:7px 10px;text-align:left;vertical-align:top}
+  .fixtbl th{background:#1b1e25;color:#9bb5f9;width:230px}.fixtbl td{color:#cfd3dc}
+  .fixtbl code{color:#e8a55a}
+</style>
+
+<div class="section">
+  <p class="label">Safe fields — autosave, no buttons</p>
+  <p class="subtitle">Toggles, dropdowns, segmented controls, the subtitle numbers/colors, languages, VAD… change one, it debounces ~400 ms, writes, and a quiet "Saved" pill blinks on the tab footer. If the write fails you get a red "Couldn't save — retry" inline; nothing is silently lost.</p>
+  <div class="wf">  ▸ Voice-activity detection            [ <span class="on">on</span> ]      ← you flip it
+  ▸ FFmpeg 16 kHz pre-resample          [ on ]
+ ──────────────────────────────────────────────────────
+  <span class="ok">✓ saved</span>  <span class="dim">(2s ago)</span>                    [ Reset this tab ]   ← footer, every tab</div>
+</div>
+
+<div class="section">
+  <p class="label">"Armed" fields — Backend URL · Output folder · Download folder · Whisper cache · JS runtime path · mpv path</p>
+  <p class="subtitle">Read-only by default with a value + lock. Hit "Edit", change it, hit "Apply" — that runs a real check before committing: Backend URL → pings <code>GET /api/version</code>; folders → must exist &amp; be writable; runtime path → must be executable. Pass = applied. Fail = stays put, shows why, with "Apply anyway" if you insist.</p>
+  <div class="wf"> Backend URL   <span class="dim">http://127.0.0.1:8000</span>  🔒 [ Edit ]                  ← resting state
+                ─────────────────────────────────────────────
+ Backend URL   [ http://127.0.0.1:8000‸                    ]  [ Cancel ] [ Apply ]   ← editing
+                ─────────────────────────────────────────────
+ Backend URL   [ http://192.168.1.5:9000 ]  <span class="err">✗ no backend answered there</span>  [ Apply anyway ]
+                ─────────────────────────────────────────────
+ Backend URL   <span class="dim">http://127.0.0.1:8001</span>  🔒 [ Edit ]   <span class="ok">✓ applied · talking to it now</span>
+               <span class="on">↺ Reset to 127.0.0.1:8000</span></div>
+</div>
+
+<div class="section">
+  <p class="label">Per-field "revert to default"</p>
+  <p class="subtitle">Hover any setting that differs from its shipped default → a small <code>↺</code> appears that puts it back. The footer's "Reset this tab" reverts the whole tab; Advanced has a real "Reset everything" (new <code>POST /api/config/reset</code> on the backend — today's "Reset to defaults" button is a lie, it just re-fetches your current config).</p>
+</div>
+
+<div class="section">
+  <p class="label">The trust / correctness fixes</p>
+  <table class="fixtbl">
+    <tr><th>Fake STT engines</th><td>Drop <code>faster-whisper ⭐</code>, <code>WhisperX</code>, <code>insanely-fast-whisper</code> and the ⭐. The backend only has <code>openai-whisper</code> + the YT-captions path — that's all the UI offers. (When a real new engine ships, it appears because <code>/api/version → installedSttEngines</code> says so.)</td></tr>
+    <tr><th>"Reset to defaults" is a lie</th><td>Today it calls <code>fetchConfig()</code> → re-loads your <em>saved</em> config, not defaults. Fix: <code>POST /api/config/reset</code> returns <code>asdict(AppConfig())</code> &amp; persists it; the button (in Advanced, danger zone, with confirm) actually resets.</td></tr>
+    <tr><th>"Test" breaks after saving a key</th><td>GET masks the key to <code>***</code>; the input round-trips that; Test then sends <code>***</code> → fails. Fix: don't put the mask in the input — show <code>•••• (saved)</code> + "Replace"; Test, when no new key is typed, tells the backend "use the saved one" (<code>useSavedKey: true</code>) instead of the literal mask.</td></tr>
+    <tr><th>Wrong-platform copy</th><td><code>placeholder="C:\Users\you\Downloads"</code> on a Mac app → gone. Placeholders show the <em>actual resolved default</em> (<code>~/Downloads</code>, the real output dir) — backend exposes effective defaults so the hint is true and the <code>↺</code>-to-default knows the value.</td></tr>
+    <tr><th>Backend URL out in the open</th><td>Moves to Advanced, becomes an "armed" field with validation + one-click reset (above). Stops being a foot-gun you can't undo without editing JSON.</td></tr>
+    <tr><th>Whisper model picker is blind</th><td>Doesn't know which models are downloaded; offers all 6 equally. Fix: shows <code>✓ downloaded · size</code> vs <code>not downloaded · Download</code> (streams <code>/api/dependencies/install</code> with progress). Settings &amp; the Init screen stop diverging.</td></tr>
+    <tr><th>Cookie browser "(may fail)" guesswork</th><td>Keep the Firefox-is-best guidance but lean on the real <code>Test</code> result (it already reports <code>cookieSource</code> / <code>cookiesAttached</code>) instead of pre-judging every option in its label.</td></tr>
+    <tr><th>Defaults vs. per-job is fuzzy</th><td>Every "default" gets one consistent line: "Default for new jobs — change it per-job on the Generate screen." So nobody thinks Settings is the only place to set it.</td></tr>
+  </table>
+</div>
+
+<div class="options" style="margin-top:14px">
+  <div class="option" data-choice="ok" onclick="toggleSelect(this)">
+    <div class="letter">✓</div><div class="content"><h3>Yep — on to part 3 (Subtitles preview + native polish)</h3></div>
+  </div>
+  <div class="option" data-choice="comment" onclick="toggleSelect(this)">
+    <div class="letter">~</div><div class="content"><h3>One thing first</h3><p>e.g. "more/fewer fields should be 'armed'", "I'd rather autosave nothing and keep a Save button", "skip per-field revert", …</p></div>
+  </div>
+</div>

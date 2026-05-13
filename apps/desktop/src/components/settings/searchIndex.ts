@@ -51,6 +51,7 @@ export const SETTINGS_INDEX: SearchEntry[] = [
   // Subtitles
   { id: "subtitles.mpv-path", tab: "subtitles", label: "MPV executable path", keywords: ["mpv", "player", "executable", "path"] },
   { id: "subtitles.font", tab: "subtitles", label: "Font family", keywords: ["font", "typeface", "family", "cjk"] },
+  { id: "subtitles.fonts-by-lang", tab: "subtitles", label: "Per-language fonts", keywords: ["font", "language", "lang", "cjk", "chinese", "japanese", "korean", "override", "bcp-47"] },
   { id: "subtitles.font-size", tab: "subtitles", label: "Font size", keywords: ["font", "size", "px"] },
   { id: "subtitles.margin-y", tab: "subtitles", label: "Bottom margin", keywords: ["margin", "bottom", "position"] },
   { id: "subtitles.color", tab: "subtitles", label: "Text color", keywords: ["color", "text", "hex", "white"] },

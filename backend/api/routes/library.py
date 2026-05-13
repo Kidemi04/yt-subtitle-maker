@@ -410,16 +410,120 @@ def _pick_local_media(folder: Path) -> Path | None:
     )
 
 
-def _subtitle_style_flags(cfg) -> list[str]:
+def _default_sub_font() -> str | None:
+    """Pick a system-shipped font that covers CJK glyphs.
+
+    mpv's built-in --sub-font defaults to "sans-serif", which resolves to
+    Helvetica on macOS / DejaVu Sans on Linux / Arial on Windows — none of
+    which contain Chinese / Japanese / Korean glyphs, so translated subs
+    render as tofu boxes. libass font fallback is unreliable when the
+    primary font has zero coverage for the script, so we pick a font with
+    coverage upfront. CJK fonts also ship Latin glyphs, so English subs
+    still render fine with these.
+
+    On macOS PingFang SC lives in a PrivateFrameworks path that fontconfig
+    cannot open (SIP), so we use Heiti SC instead — it ships with macOS
+    in a standard /System/Library/Fonts location that fontconfig can reach.
+    """
+    if sys.platform == "darwin":
+        return "Heiti SC"   # ships with macOS; fontconfig-accessible
+    if sys.platform == "win32":
+        return "Microsoft YaHei"   # ships with Windows Vista+
+    return "Noto Sans CJK SC"   # standard on most Linux distros
+
+
+def _resolve_sub_font(cfg, lang: str | None) -> str | None:
+    """Pick the font name to pass to mpv for the active subtitle.
+
+    Resolution order:
+      1) Per-language override from `cfg.sub_fonts_by_lang` — exact match on
+         the BCP-47 code first ("zh-CN"), then prefix match on the primary
+         subtag ("zh" matches "zh-CN" / "zh-Hans" / "zh-TW"). The exact-
+         match win lets users still pin a single sub-tag if they want.
+      2) If the active language is CJK (zh / ja / ko), use the platform
+         CJK default. Global `cfg.sub_font` is skipped here because it
+         rarely contains CJK glyphs — the per-language override (step 1)
+         is the intended escape hatch for CJK.
+      3) Global `cfg.sub_font` (Settings → Subtitles → Font) — used for
+         non-CJK languages or when the sidecar has no language info.
+      4) Platform default that covers CJK (`_default_sub_font`).
+    """
+    fonts_by_lang = getattr(cfg, "sub_fonts_by_lang", None) or {}
+    if lang and fonts_by_lang:
+        if lang in fonts_by_lang and fonts_by_lang[lang]:
+            return fonts_by_lang[lang]
+        primary = lang.split("-", 1)[0]
+        if primary in fonts_by_lang and fonts_by_lang[primary]:
+            return fonts_by_lang[primary]
+    if lang and lang.split("-", 1)[0] in ("zh", "ja", "ko"):
+        return _default_sub_font()
+    if cfg.sub_font:
+        return cfg.sub_font
+    return _default_sub_font()
+
+
+def _active_sub_lang(
+    folder: Path,
+    *,
+    transcribe_id: str | None,
+    translate_id: str | None,
+    subtitle_preference: str | None,
+) -> str | None:
+    """Figure out the BCP-47 language code of the sub that mpv will display.
+
+    The "active" sub is the one mpv assigns sid=1 — that matches the FIRST
+    `--sub-file=` we emit, which `_pick_subtitles_for_mpv` orders by
+    `subtitle_preference` ("translated" first by default). For an explicit
+    `translateId` / `transcribeId`, the language comes straight from the
+    matching sidecar entry. Returns None when no language is known (legacy
+    sidecars, or `subtitle_preference == "none"`) — the caller falls back
+    to the global font.
+    """
+    if subtitle_preference == "none":
+        return None
+    sidecar = library_runs.read_sidecar(folder)
+    if translate_id is not None:
+        for tr in sidecar.get("translations", []):
+            if tr.get("id") == translate_id:
+                return tr.get("targetLang") or None
+        return None
+    if transcribe_id is not None:
+        for t in sidecar.get("transcribes", []):
+            if t.get("id") == transcribe_id:
+                return t.get("language") or None
+        return None
+    # subtitlePreference path: same order as _pick_subtitles_for_mpv. We
+    # pick the LATEST entry to match `[-1]["filename"]` used there.
+    translations = sidecar.get("translations", [])
+    transcribes = sidecar.get("transcribes", [])
+    if subtitle_preference == "original":
+        if transcribes:
+            return transcribes[-1].get("language") or None
+        if translations:
+            return translations[-1].get("targetLang") or None
+        return None
+    # default = "translated"
+    if translations:
+        return translations[-1].get("targetLang") or None
+    if transcribes:
+        return transcribes[-1].get("language") or None
+    return None
+
+
+def _subtitle_style_flags(cfg, lang: str | None = None) -> list[str]:
     """Translate the user's subtitle-style config into mpv CLI flags.
 
-    Each flag is only emitted when the corresponding config field is set to
-    a non-default value, so a fresh install keeps mpv's built-in look.
-    See AppConfig.sub_* + mpv's --sub-* documentation.
+    `lang` is the active sub's BCP-47 language code (best-effort, from the
+    sidecar); when provided, a matching entry in `cfg.sub_fonts_by_lang`
+    takes precedence over the global `cfg.sub_font`. Each flag is only
+    emitted when the corresponding config field is set to a non-default
+    value, so a fresh install keeps mpv's built-in look. See AppConfig.sub_*
+    + mpv's --sub-* documentation.
     """
     flags: list[str] = []
-    if cfg.sub_font:
-        flags.append(f"--sub-font={cfg.sub_font}")
+    chosen_font = _resolve_sub_font(cfg, lang)
+    if chosen_font:
+        flags.append(f"--sub-font={chosen_font}")
     if cfg.sub_font_size and cfg.sub_font_size > 0:
         flags.append(f"--sub-font-size={cfg.sub_font_size}")
     if cfg.sub_color:
@@ -487,6 +591,11 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
     folder = _find_folder_for(req.videoId)
     if folder is None:
         raise HTTPException(status_code=404, detail=f"video not found: {req.videoId}")
+    # mpv is launched with cwd=folder; if folder (and the SRT paths derived
+    # from it) are relative, mpv re-resolves --sub-file= against cwd and the
+    # subs land at <folder>/<folder>/translations/<file>, which doesn't
+    # exist — silent "no subs loaded". Anchor everything to absolute.
+    folder = folder.resolve()
 
     cfg = load_config()
     mpv_exe = cfg.mpv_path if cfg.mpv_path and shutil.which(cfg.mpv_path) else shutil.which("mpv")
@@ -563,11 +672,23 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
         # mpv 0.41.0.
         for s in subs:
             cmd.append(f"--sub-file={s}")
-        cmd.append("--sub-auto=exact")  # avoid auto-attaching any unrelated *.srt
+        cmd.append("--sub-auto=no")  # no auto-loading — we supply files explicitly
+        cmd.append("--sid=1")  # force-select the first track (preferred sub) as active
+        cmd.append("--sub-visibility=yes")  # ensure subtitles are always visible
 
         # Subtitle style overrides — only emit the flags the user has set,
-        # so an unmodified config keeps mpv's built-in defaults.
-        cmd.extend(_subtitle_style_flags(cfg))
+        # so an unmodified config keeps mpv's built-in defaults. The active
+        # (sid=1) sub's language drives the per-language font override.
+        active_lang = _active_sub_lang(
+            folder,
+            transcribe_id=req.transcribeId,
+            translate_id=req.translateId,
+            subtitle_preference=req.subtitlePreference,
+        )
+        sub_cmd = _subtitle_style_flags(cfg, active_lang)
+        cmd.extend(sub_cmd)
+        chosen_font = _resolve_sub_font(cfg, active_lang)
+        print(f"[play-mpv] active lang: {active_lang}, resolved font: {chosen_font}", flush=True)
 
     # When we're streaming from YouTube, wire mpv to the same yt-dlp + JS
     # runtime our backend uses. Without this, mpv finds no `yt-dlp.exe` on

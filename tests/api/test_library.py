@@ -156,12 +156,78 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
     assert len(sub_args) == 2, sub_args
     assert sub_args[0].endswith("abcDEFghIJK_zh-CN.srt"), sub_args[0]
     assert sub_args[1].endswith("abcDEFghIJK_original.srt"), sub_args[1]
-    assert "--sub-auto=exact" in cmd
+    assert "--sub-auto=no" in cmd
+    assert "--sid=1" in cmd
+    assert "--sub-visibility=yes" in cmd
     # Stream path needs mpv pointed at our yt-dlp + must enable EJS
     # remote components so n-challenge solving works.
     assert any(
         arg.startswith("--ytdl-raw-options-append=remote-components=") for arg in cmd
     )
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_uses_per_language_font_override(
+    mock_which, mock_popen, tmp_path, monkeypatch
+):
+    """`sub_fonts_by_lang` wins over `sub_font` when the active sub's
+    language matches an entry. Prefix-match too — a "zh" entry covers
+    a sidecar targetLang of "zh-CN"."""
+    mock_which.return_value = "/fake/mpv"
+
+    out = tmp_path / "output"
+    out.mkdir()
+    from core.config import AppConfig
+
+    def fake_load():
+        cfg = AppConfig()
+        cfg.output_dir = str(out)
+        # Generic Latin font as the global default — must NOT win when a
+        # per-language match exists.
+        cfg.sub_font = "Inter"
+        cfg.sub_fonts_by_lang = {"zh": "PingFang SC"}
+        return cfg
+
+    monkeypatch.setattr("api.routes.library.load_config", fake_load)
+    _make_video_dir(out, "abcDEFghIJK", title="My Video", with_translated=True)
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+
+    cmd = mock_popen.call_args.args[0]
+    font_args = [a for a in cmd if a.startswith("--sub-font=")]
+    assert font_args == ["--sub-font=PingFang SC"], font_args
+
+
+@patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.shutil.which")
+def test_library_play_mpv_cjk_default_wins_when_no_per_lang_entry(
+    mock_which, mock_popen, tmp_path, monkeypatch
+):
+    """CJK active lang with no per-language match → CJK default wins over global."""
+    mock_which.return_value = "/fake/mpv"
+
+    out = tmp_path / "output"
+    out.mkdir()
+    from core.config import AppConfig
+
+    def fake_load():
+        cfg = AppConfig()
+        cfg.output_dir = str(out)
+        cfg.sub_font = "Inter"
+        cfg.sub_fonts_by_lang = {"ja": "Hiragino Sans"}  # only Japanese override
+        return cfg
+
+    monkeypatch.setattr("api.routes.library.load_config", fake_load)
+    # Active sub is zh-CN (the translation), no "zh" / "zh-CN" entry exists.
+    _make_video_dir(out, "abcDEFghIJK", title="My Video", with_translated=True)
+
+    resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
+    cmd = mock_popen.call_args.args[0]
+    font_args = [a for a in cmd if a.startswith("--sub-font=")]
+    assert font_args == ["--sub-font=Heiti SC"], font_args
 
 
 @patch("api.routes.library.subprocess.Popen")

@@ -48,6 +48,7 @@ _CAMEL_TO_SNAKE = {
     "logsVerbosity": "logs_verbosity",
     "jsRuntimePath": "js_runtime_path",
     "subFont": "sub_font",
+    "subFontsByLang": "sub_fonts_by_lang",
     "subFontSize": "sub_font_size",
     "subColor": "sub_color",
     "subBorderColor": "sub_border_color",

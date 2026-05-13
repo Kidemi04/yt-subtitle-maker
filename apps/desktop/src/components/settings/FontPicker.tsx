@@ -23,6 +23,7 @@ const CURATED_FONTS = [
   "Noto Serif CJK SC",
   "Source Han Sans SC",
   "PingFang SC",
+  "Heiti SC",
   "Microsoft YaHei",
   "DejaVu Sans",
   "Liberation Sans",

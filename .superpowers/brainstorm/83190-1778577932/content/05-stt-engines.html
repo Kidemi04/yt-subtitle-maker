@@ -1,0 +1,58 @@
+<h2>STT engines — what do you actually want here?</h2>
+<p class="subtitle">Right now the dropdown <em>lists</em> faster-whisper / WhisperX / insanely-fast-whisper, but the backend only implements <code>openai-whisper</code> + the YouTube-captions path. To make them real options, each one is a separate backend integration (new pip dep, a <code>core/stt/&lt;name&gt;.py</code> provider, its own model handling). That's a feature in its own right — bigger than the Settings redesign. So I want to nail down what you mean before I bake it into the design.</p>
+
+<style>
+  .e{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  .e th,.e td{border:1px solid #2a2e37;padding:7px 9px;text-align:left;vertical-align:top}
+  .e th{background:#1b1e25;color:#9bb5f9}
+  .e td{color:#cfd3dc}
+  .e .y{color:#7fb98a}.e .n{color:#6b7280}.e .w{color:#e8a55a}
+  .e code{color:#e8a55a;font-size:11.5px}
+</style>
+
+<div class="section">
+  <p class="label">The candidates</p>
+  <table class="e">
+    <tr><th style="width:150px">Engine</th><th>What it gives you</th><th style="width:200px">Tunables ("variations")</th><th style="width:130px">Cost to add</th></tr>
+    <tr>
+      <td><b>openai-whisper</b><br><span class="n">have it now</span></td>
+      <td>The reference impl. Accurate, slow-ish. Models: tiny→large-v3, turbo.</td>
+      <td>model · device (cpu/gpu) · language · VAD · fp16</td>
+      <td class="n">already done</td>
+    </tr>
+    <tr>
+      <td><b>faster-whisper</b><br><span class="w">most-wanted</span></td>
+      <td>CTranslate2 reimpl — same models, ~4× faster, ~½ the RAM. The obvious "fast" choice. Word-level timestamps available.</td>
+      <td>model · device · <b>compute type</b> (int8 / int8_float16 / float16 / float32) · beam size · VAD filter · language</td>
+      <td class="w">medium — pip dep + provider + HF-Hub model dl (different from OpenAI's .pt files)</td>
+    </tr>
+    <tr>
+      <td><b>WhisperX</b></td>
+      <td>faster-whisper under the hood + forced-alignment for tight word timestamps + (optional) speaker diarization. Great for precise SRT timing.</td>
+      <td>everything faster-whisper has · alignment model · diarization on/off (needs a HF token)</td>
+      <td class="w">larger — heavy deps (torchaudio, pyannote), HF token for diarization, more moving parts</td>
+    </tr>
+    <tr>
+      <td><b>insanely-fast-whisper</b></td>
+      <td>HF Transformers + batching + (on NVIDIA) flash-attention. Fastest on a good GPU; mediocre on CPU/Mac.</td>
+      <td>model · batch size · device · flash-attn on/off · chunk length</td>
+      <td class="w">medium — transformers/accelerate deps; flash-attn is NVIDIA-only (won't help your Mac)</td>
+    </tr>
+  </table>
+  <p class="subtitle" style="margin-top:8px"><b>On a Mac (Apple Silicon, no NVIDIA):</b> <code>faster-whisper</code> is the clear win — big speedup, runs fine on CPU. <code>insanely-fast-whisper</code>'s headline trick (flash-attn) is NVIDIA-only, so it's not a Mac upgrade. <code>WhisperX</code> is worth it if you care about word-perfect subtitle timing / speaker labels.</p>
+</div>
+
+<div class="options" style="margin-top:14px" data-multiselect>
+  <div class="option" data-choice="impl-fw" onclick="toggleSelect(this)">
+    <div class="letter">A</div><div class="content"><h3>Actually implement faster-whisper</h3><p>Add it as a real backend engine now — pip dep, <code>core/stt/faster_whisper.py</code> provider, HF-Hub model download, its tunables (compute type, beam size, VAD filter) surfaced in Settings &amp; per-job. Treated as part of this work.</p></div>
+  </div>
+  <div class="option" data-choice="impl-more" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>…and WhisperX / insanely-fast-whisper too</h3><p>Implement the others as well. Bigger scope — I'd want to phase it (faster-whisper first, then the rest), and it likely becomes its own spec separate from the Settings redesign.</p></div>
+  </div>
+  <div class="option" data-choice="placeholder" onclick="toggleSelect(this)">
+    <div class="letter">C</div><div class="content"><h3>Just list them as "coming soon" for now</h3><p>Keep them visible in the dropdown but clearly disabled/greyed with a "not yet available" tag — no fake ⭐, no pretending they work. Implement later.</p></div>
+  </div>
+  <div class="option" data-choice="agnostic" onclick="toggleSelect(this)">
+    <div class="letter">D</div><div class="content"><h3>Make Settings engine-driven, decide engines separately</h3><p>Build the Settings tab so it shows whatever engines the backend reports (with per-engine tunables driven by metadata) — so faster-whisper "just appears" the day its backend lands. The "add faster-whisper" work becomes its own brainstorm/spec right after this one.</p></div>
+  </div>
+</div>

@@ -1,0 +1,63 @@
+<h2>Transcription tab — engines, machine-compat verdicts &amp; "downloadable" variants</h2>
+<p class="subtitle">Your direction: list the engines, don't ship them all up front, show the size, and tell the user what works on their machine. Here's how it lands — plus one real constraint you should know about.</p>
+
+<style>
+  .wf{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.6;color:#cfd3dc;background:#15171c;border:1px solid #2a2e37;border-radius:8px;padding:12px;white-space:pre;overflow:auto;margin-top:6px}
+  .wf .dim{color:#6b7280}.wf .accent{color:#e8a55a}.wf .on{color:#9bb5f9}.wf .ok{color:#7fb98a}.wf .warn{color:#e8a55a}.wf .err{color:#e8787d}.wf .sel{background:#23262e}
+  .note{background:#1b1e25;border-left:3px solid #e8a55a;border-radius:6px;padding:10px 12px;margin-top:8px;font-size:13px;line-height:1.55;color:#cfd3dc}
+  .k{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}.k th,.k td{border:1px solid #2a2e37;padding:6px 9px;text-align:left;vertical-align:top}.k th{background:#1b1e25;color:#9bb5f9;width:200px}.k td{color:#cfd3dc}.k code{color:#e8a55a;font-size:11.5px}
+</style>
+
+<div class="section">
+  <p class="label">The engine picker — what you'd see on this Mac (Apple Silicon, no NVIDIA)</p>
+  <div class="wf">  Transcription engine                          <span class="dim">Best for your machine: faster-whisper</span>
+
+ <span class="sel">  ●  faster-whisper          <span class="ok">✓ works</span> · ~4× faster than reference, runs on your CPU (Apple MPS optional)
+       └ models:  turbo <span class="ok">1.6 GB ✓</span>  ·  large-v3 <span class="dim">3.0 GB · Download</span>  ·  medium <span class="dim">1.5 GB · Download</span>  ·  small <span class="dim">480 MB · Download</span>
+       └ compute type:  [ int8 ▾ ]   <span class="dim">int8 = fastest/lowest-RAM on CPU; float16 if you use the GPU</span>          </span>
+    ○  openai-whisper        <span class="ok">✓ works</span> · the reference impl, accurate, slower. <span class="dim">(currently installed)</span>
+       └ models:  turbo <span class="ok">1.6 GB ✓</span>  ·  large-v3 <span class="dim">2.9 GB · Download</span>  ·  …
+    ○  WhisperX              <span class="warn">⚠ available as add-on</span> · word-perfect timing + speaker labels · heavyweight (~600 MB of code + models)
+       └ <span class="on">[ Add WhisperX — downloads ~610 MB ]</span>  <span class="dim">diarization also needs a free Hugging Face token</span>
+    ○  insanely-fast-whisper <span class="err">✗ no speed-up on your Mac</span> · its trick (flash-attention) is NVIDIA-only — on Apple Silicon it's no faster than openai-whisper
+       └ <span class="dim">[ Add anyway — ~700 MB ]</span>
+
+  Device         [ Auto ▾ ]      Source language [ English ▾ ]
+  ▸ Voice-activity detection        [ on ]
+  ▸ FFmpeg 16 kHz pre-resample      [ on ]</div>
+</div>
+
+<div class="section">
+  <p class="label">How "appear / size / what-works" is wired</p>
+  <table class="k">
+    <tr><th>Machine-compat verdict</th><td>Backend exposes a system report: OS, arch, GPU vendor (apple / nvidia / amd / none), CUDA &amp; Apple-MPS availability — extending what <code>/api/version</code> already hints at (<code>cudaAvailable</code>). Each engine has a small "requirements" descriptor; the UI computes <span class="ok">✓ works</span> / <span class="warn">⚠ works but no acceleration here</span> / <span class="err">✗ won't help on this hardware</span> and the "best for your machine" line.</td></tr>
+    <tr><th>"Installed?" detection</th><td>The backend tries to import each engine's package. Present → the engine is selectable. Absent → it shows as an <b>add-on</b> with its download size.</td></tr>
+    <tr><th>Model weights = "downloadable, with size"</th><td>For an installed engine, its models (tiny→large-v3, turbo) are listed with sizes; un-downloaded ones say "Download (X GB)" and stream progress — exactly the mechanism Whisper models already use (<code>/api/dependencies</code>). Nothing big is fetched until you ask.</td></tr>
+    <tr><th>Per-engine "variations"</th><td>Each engine surfaces its real tunables — faster-whisper: compute type (int8 / int8_float16 / float16 / float32), beam size, VAD filter; WhisperX: + alignment + diarization toggle. All driven by per-engine metadata so the UI doesn't hardcode them.</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <p class="label">The constraint you should know</p>
+  <div class="note">
+    Auto-<b>installing a new engine's Python package</b> at runtime works fine when the backend is a normal Python install (dev / from source) — <code>pip install faster-whisper</code> into the venv, done. But the <b>packaged .app</b> is a frozen PyInstaller bundle: it has no <code>pip</code> and you can't extend its site-packages. So in the shipped app, the realistic options are: (a) <b>bundle</b> the engines we support (fine for the small ones — <code>faster-whisper</code> + its <code>ctranslate2</code> wheel only add ~40–60 MB; <b>not</b> fine for WhisperX/insanely-fast — pyannote/torchaudio/transformers would balloon the app by 1 GB+), or (b) ship them as a <b>separate downloadable plugin archive</b> the app unpacks into a user folder and adds to <code>sys.path</code> (a real little plugin system — more machinery).<br><br>
+    <b>So my recommendation:</b> the packaged app bundles <code>openai-whisper</code> + <code>faster-whisper</code> (always there, just download the weights you want); WhisperX / insanely-fast-whisper appear in the list with their compat verdict + size but are "add-on (planned)" — the plugin-download mechanism for the heavy ones is its own future piece. Meanwhile a <b>from-source install</b> auto-detects whatever you've <code>pip install</code>ed.
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">Scope note</p>
+  <p class="subtitle">Actually <b>implementing</b> the <code>faster-whisper</code> provider (and the plugin mechanism for the heavy engines) is real backend work — I'll carve it into its <b>own spec</b>, separate from "Settings tab production-ready". This Settings design just makes the Transcription tab <b>engine-driven</b>: it renders whatever engines + models + tunables the backend reports, with verdicts and sizes — so faster-whisper "just appears" the day its backend lands, and nothing here is fake in the meantime.</p>
+</div>
+
+<div class="options" style="margin-top:14px">
+  <div class="option" data-choice="ok" onclick="toggleSelect(this)">
+    <div class="letter">✓</div><div class="content"><h3>Good — engine-driven tab + verdicts + downloadable weights; faster-whisper impl is its own spec next</h3></div>
+  </div>
+  <div class="option" data-choice="bundle-fw" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>Same, but pull faster-whisper's implementation INTO this work</h3><p>Don't split it out — build the faster-whisper provider as part of the Settings overhaul so it ships together.</p></div>
+  </div>
+  <div class="option" data-choice="plugin" onclick="toggleSelect(this)">
+    <div class="letter">P</div><div class="content"><h3>I want the real plugin-download system for engines</h3><p>Even the heavy ones (WhisperX etc.) downloadable into the packaged app — design the plugin mechanism. (Big; its own spec for sure.)</p></div>
+  </div>
+</div>

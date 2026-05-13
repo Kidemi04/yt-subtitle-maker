@@ -5,9 +5,52 @@ from core.config import AppConfig
 from api.routes.library import _subtitle_style_flags
 
 
-def test_no_overrides_emits_no_flags():
-    """A fresh AppConfig should produce zero flags so mpv keeps its defaults."""
-    assert _subtitle_style_flags(AppConfig()) == []
+def test_no_overrides_emits_only_platform_default_font():
+    """A fresh AppConfig produces ONLY a platform CJK-friendly --sub-font.
+
+    mpv's built-in `sans-serif` resolves to a font with zero CJK coverage
+    (Helvetica / DejaVu Sans / Arial), so translated subs render as tofu
+    boxes. `_subtitle_style_flags` substitutes a platform default
+    (PingFang SC on macOS, Microsoft YaHei on Windows, Noto Sans CJK SC
+    elsewhere) when the user has no preference set. All OTHER style
+    fields still pass through unchanged when their defaults are empty.
+    """
+    flags = _subtitle_style_flags(AppConfig())
+    assert len(flags) == 1, flags
+    assert flags[0].startswith("--sub-font=")
+
+
+def test_per_language_override_wins_over_global_subfont():
+    cfg = AppConfig()
+    cfg.sub_font = "Inter"
+    cfg.sub_fonts_by_lang = {"zh": "PingFang SC", "ja": "Hiragino Sans"}
+    flags = _subtitle_style_flags(cfg, lang="zh-CN")  # primary-subtag prefix match
+    assert "--sub-font=PingFang SC" in flags
+    assert "--sub-font=Inter" not in flags
+
+
+def test_per_language_exact_match_beats_prefix_match():
+    cfg = AppConfig()
+    cfg.sub_fonts_by_lang = {"zh": "Noto Sans CJK SC", "zh-TW": "Noto Serif CJK TC"}
+    flags = _subtitle_style_flags(cfg, lang="zh-TW")
+    assert "--sub-font=Noto Serif CJK TC" in flags
+
+
+def test_global_subfont_used_when_no_lang_match():
+    """For non-CJK languages with no per-language override, the global font wins."""
+    cfg = AppConfig()
+    cfg.sub_font = "Inter"
+    cfg.sub_fonts_by_lang = {"ja": "Hiragino Sans"}
+    flags = _subtitle_style_flags(cfg, lang="fr")
+    assert "--sub-font=Inter" in flags
+
+
+def test_cjk_falls_back_to_default_even_when_global_set():
+    """CJK languages use the CJK default, not a Latin global font."""
+    cfg = AppConfig()
+    cfg.sub_font = "Helvetica"
+    flags = _subtitle_style_flags(cfg, lang="zh-CN")
+    assert "--sub-font=Helvetica" not in flags
 
 
 def test_each_field_emits_its_flag():

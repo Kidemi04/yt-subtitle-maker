@@ -13,6 +13,7 @@ import { Section, SettingRow } from "./shared";
 import { NumberStepper } from "./NumberStepper";
 import { ColorField } from "./ColorField";
 import { FontPicker } from "./FontPicker";
+import { PerLanguageFontList } from "./PerLanguageFontList";
 import { SubtitlePreview } from "./SubtitlePreview";
 import { SubtitlePresets, type StyleFields } from "./SubtitlePresets";
 import { ArmedField } from "./ArmedField";
@@ -128,6 +129,16 @@ export function SubtitlesTab() {
           helper={'e.g. "Noto Sans CJK SC", "Inter", "Arial". Must be installed on the OS — mpv does not download fonts.'}
         >
           <FontPicker value={draft.subFont} onChangeText={(v) => update("subFont", v)} />
+        </SettingRow>
+        <SettingRow
+          id="subtitles.fonts-by-lang"
+          label="Per-language fonts"
+          helper="Override the font above for specific subtitle languages. Match is by BCP-47 code: an exact match wins, otherwise the primary subtag (e.g. zh covers zh-CN / zh-Hans / zh-TW)."
+        >
+          <PerLanguageFontList
+            value={draft.subFontsByLang || {}}
+            onChange={(v) => update("subFontsByLang", v)}
+          />
         </SettingRow>
         <XStack gap="$md">
           <YStack flex={1}>

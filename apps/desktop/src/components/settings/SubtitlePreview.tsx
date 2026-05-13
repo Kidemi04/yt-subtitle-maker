@@ -22,7 +22,7 @@ export function SubtitlePreview({ cfg }: { cfg: AppConfig }) {
   const backColor = /^#?[0-9a-fA-F]{8}$/.test(cfg.subBackColor || "")
     ? (cfg.subBackColor.startsWith("#") ? cfg.subBackColor : `#${cfg.subBackColor}`)
     : "transparent";
-  const fontFamily = cfg.subFont?.trim() ? `"${cfg.subFont.trim()}", "Noto Sans CJK SC", sans-serif` : `"Noto Sans CJK SC", sans-serif`;
+  const fontFamily = cfg.subFont?.trim() ? `"${cfg.subFont.trim()}", "Heiti SC", "Noto Sans CJK SC", sans-serif` : `"Heiti SC", "Noto Sans CJK SC", sans-serif`;
   const fontWeight = cfg.subBold ? 700 : 400;
 
   const lineStyle: React.CSSProperties = {

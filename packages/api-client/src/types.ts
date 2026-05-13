@@ -292,6 +292,13 @@ export interface AppConfig {
   // mpv subtitle style — empty / 0 / -1 means "use mpv's built-in default".
   /** Font family name; empty = mpv default sans. */
   subFont: string;
+  /**
+   * Per-language font overrides keyed by BCP-47 language code.
+   * Backend matches the active sub's language: exact code first ("zh-CN"),
+   * then primary subtag prefix ("zh" → zh-CN / zh-Hans / zh-TW). Falls
+   * back to `subFont`, then to a platform-default CJK font.
+   */
+  subFontsByLang: Record<string, string>;
   /** Font size in pixels; 0 = mpv default (~55). */
   subFontSize: number;
   /** Text fill color, "#RRGGBB"; empty = white default. */
