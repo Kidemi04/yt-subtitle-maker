@@ -10,14 +10,18 @@ import {
   Caption,
 } from "@yt-subtitle-maker/ui";
 import { type AppConfig } from "@yt-subtitle-maker/api-client";
+import { apiClient } from "../../state/client";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
 import { COOKIE_BROWSERS } from "./constants";
+import { ArmedField } from "./ArmedField";
+import { isTauri, openExecutableDialog } from "../../lib/native";
 
 export function YouTubeTab() {
   const {
     draft,
     update,
+    flush,
     cookieStatus,
     cookieError,
     cookieSource,
@@ -132,10 +136,45 @@ export function YouTubeTab() {
               : "⚠ No runtime detected — install Node or Deno, or set the path here. Without one, YouTube extraction degrades."
           }
         >
-          <TextInput
+          <ArmedField
             value={draft.jsRuntimePath}
-            onChangeText={(v: string) => update("jsRuntimePath", v)}
             placeholder="(auto-detect node/deno on PATH)"
+            validate={async (v) => {
+              if (!v.trim()) return { ok: true };
+              try {
+                const r = await apiClient.checkFs({ path: v, kind: "executable" });
+                if (r.exists && r.executable) return { ok: true };
+                return {
+                  ok: false,
+                  reason: r.exists
+                    ? `Found but not executable: ${v}`
+                    : `Runtime not found: ${v}`,
+                };
+              } catch (err) {
+                return {
+                  ok: false,
+                  reason: `Couldn't check the path: ${err instanceof Error ? err.message : String(err)}`,
+                };
+              }
+            }}
+            onApply={(v) => {
+              update("jsRuntimePath", v);
+              flush();
+            }}
+            secondaryAction={
+              isTauri()
+                ? {
+                    label: "Browse…",
+                    onPress: async () => {
+                      const picked = await openExecutableDialog();
+                      if (picked) {
+                        update("jsRuntimePath", picked);
+                        flush();
+                      }
+                    },
+                  }
+                : undefined
+            }
           />
         </SettingRow>
       </YStack>

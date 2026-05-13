@@ -1,6 +1,13 @@
 import * as React from "react";
 import { XStack, YStack } from "tamagui";
-import { GlassCard, TextInput, Toggle } from "@yt-subtitle-maker/ui";
+import {
+  GlassCard,
+  Toggle,
+  ButtonSecondary,
+  BodySm,
+  Caption,
+} from "@yt-subtitle-maker/ui";
+import { apiClient } from "../../state/client";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
 import { NumberStepper } from "./NumberStepper";
@@ -8,9 +15,14 @@ import { ColorField } from "./ColorField";
 import { FontPicker } from "./FontPicker";
 import { SubtitlePreview } from "./SubtitlePreview";
 import { SubtitlePresets, type StyleFields } from "./SubtitlePresets";
+import { ArmedField } from "./ArmedField";
+import { isTauri, openExecutableDialog, testPlayback } from "../../lib/native";
 
 export function SubtitlesTab() {
-  const { draft, update, defaults } = useSettings();
+  const { draft, update, flush, defaults } = useSettings();
+  const [playbackResult, setPlaybackResult] = React.useState<
+    { ok: true; pid?: number } | { ok: false; error: string } | null
+  >(null);
   if (!draft) return null;
 
   const applyPreset = (v: StyleFields) => {
@@ -38,11 +50,77 @@ export function SubtitlesTab() {
           label="MPV executable path"
           helper="Path to the mpv binary. Leave blank to use mpv on your PATH."
         >
-          <TextInput
+          <ArmedField
             value={draft.mpvPath}
-            onChangeText={(v: string) => update("mpvPath", v)}
-            placeholder={defaults?.mpvPath || ""}
+            placeholder={defaults?.mpvPath || "(uses mpv on PATH)"}
+            validate={async (v) => {
+              if (!v.trim()) return { ok: true };
+              try {
+                const r = await apiClient.checkFs({ path: v, kind: "executable" });
+                if (r.exists && r.executable) return { ok: true };
+                return {
+                  ok: false,
+                  reason: r.exists
+                    ? `Found but not executable: ${v}`
+                    : `mpv not found at: ${v}`,
+                };
+              } catch (err) {
+                return {
+                  ok: false,
+                  reason: `Couldn't check the path: ${err instanceof Error ? err.message : String(err)}`,
+                };
+              }
+            }}
+            onApply={(v) => {
+              update("mpvPath", v);
+              flush();
+            }}
+            secondaryAction={
+              isTauri()
+                ? {
+                    label: "Browse…",
+                    onPress: async () => {
+                      const picked = await openExecutableDialog();
+                      if (picked) {
+                        update("mpvPath", picked);
+                        flush();
+                      }
+                    },
+                  }
+                : undefined
+            }
           />
+        </SettingRow>
+        <SettingRow
+          id="subtitles.test-playback"
+          label="Test playback"
+          helper="Launch mpv with the saved style on a 1-second clip — sanity-check colors and font before a real run."
+        >
+          <XStack gap="$sm" alignItems="center">
+            <ButtonSecondary
+              onPress={async () => {
+                const r = await testPlayback();
+                setPlaybackResult(
+                  r.ok
+                    ? { ok: true, pid: r.pid }
+                    : { ok: false, error: r.error ?? "unknown error" },
+                );
+              }}
+            >
+              <BodySm color="$textSecondary">Test playback</BodySm>
+            </ButtonSecondary>
+            {playbackResult ? (
+              playbackResult.ok ? (
+                <Caption color="$textSecondary">
+                  {playbackResult.pid != null
+                    ? `Launched (pid ${playbackResult.pid})`
+                    : "Launched"}
+                </Caption>
+              ) : (
+                <Caption color="$error">Failed: {playbackResult.error}</Caption>
+              )
+            ) : null}
+          </XStack>
         </SettingRow>
         <SettingRow
           id="subtitles.font"

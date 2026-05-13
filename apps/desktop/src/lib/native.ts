@@ -45,6 +45,27 @@ export async function openDirectoryDialog(opts?: {
   return typeof result === "string" ? result : result[0] ?? null;
 }
 
+/** Open a native file picker for an executable. Returns the chosen path, or
+ *  null on cancel. We don't filter by extension because executables have no
+ *  consistent extension on macOS / Linux (and on Windows it's `.exe`); a user
+ *  who is manually pointing at a binary already knows where it lives. Throws
+ *  if called outside the Tauri runtime — callers must `isTauri()` first.
+ */
+export async function openExecutableDialog(): Promise<string | null> {
+  if (!isTauri()) {
+    throw new Error("openExecutableDialog is only available in the Tauri runtime");
+  }
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const { open } = await (Function('return import("@tauri-apps/plugin-dialog")')() as Promise<typeof import("@tauri-apps/plugin-dialog")>);
+  const result = await open({
+    directory: false,
+    multiple: false,
+    title: "Pick an executable",
+  });
+  if (result == null) return null;
+  return typeof result === "string" ? result : result[0] ?? null;
+}
+
 /** Open a native file picker (JSON). Returns the chosen path, or null on cancel. */
 export async function openJsonFileDialog(): Promise<string | null> {
   if (!isTauri()) {
