@@ -4,16 +4,42 @@ import sys
 
 import requests
 
-# Constants for Whisper models
-# Sourced from openai-whisper source code
-MODELS_URLS = {
-    "tiny": "https://openaipublic.azureedge.net/main/whisper/models/65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9/tiny.pt",
-    "base": "https://openaipublic.azureedge.net/main/whisper/models/ed3a0b6b1c0edf879ad9b11b1af5a30983d3d18dec85f1ac08908445ce230c38/base.pt",
-    "small": "https://openaipublic.azureedge.net/main/whisper/models/9ecf779972d90ba4920f711861e6c2756d59539df9087c528944054a4305c925/small.pt",
-    "medium": "https://openaipublic.azureedge.net/main/whisper/models/345ae4da62f9b3d59415adc60127b97dc8de4ea6d666816184264c4e894efff9/medium.pt",
-    "large-v3": "https://openaipublic.azureedge.net/main/whisper/models/e5b1a55b89c1367dacf97e3e19bfd829a01530b52028048e7866ec630b540183/large-v3.pt",
-    "turbo": "https://openaipublic.azureedge.net/main/whisper/models/aff26ae408abcba5fbf8813c21e62b0941638c5f6eebfb145be0c9839262a19a/large-v3-turbo.pt",
-}
+# Whisper model URLs.
+#
+# We deliberately read these from `whisper._MODELS` (the installed package)
+# instead of hardcoding them. OpenAI periodically rotates the checkpoint
+# hashes (the path segment after `/models/`) — when that happens, hardcoded
+# URLs 404 with "The specified blob does not exist" and downloads break.
+# `whisper._MODELS` is the canonical source: the same dict whisper itself
+# uses to download/load models, so it always matches whatever whisper
+# version is installed. Pinning to `whisper._MODELS` makes us automatically
+# benefit from upstream URL updates whenever the whisper package is bumped.
+#
+# `whisper._MODELS` is technically a private symbol but has been stable for
+# years; if it ever moves, the import below will fail loudly at startup and
+# the fix is one line.
+_MODEL_IDS = ["tiny", "base", "small", "medium", "large-v3", "turbo"]
+
+
+def _load_models_urls() -> dict[str, str]:
+    try:
+        from whisper import _MODELS as _WHISPER_MODELS
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import whisper._MODELS — is the openai-whisper package "
+            "installed in this venv?"
+        ) from exc
+    out: dict[str, str] = {}
+    for model_id in _MODEL_IDS:
+        if model_id not in _WHISPER_MODELS:
+            # Should never happen with a current openai-whisper; if it does,
+            # skip this id so the rest still work.
+            continue
+        out[model_id] = _WHISPER_MODELS[model_id]
+    return out
+
+
+MODELS_URLS = _load_models_urls()
 
 # Published checkpoint sizes in MB (openai-whisper README, 2024).
 # Used by GET /api/engines to populate the model catalog's sizeMb field.
