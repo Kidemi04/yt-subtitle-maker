@@ -2,9 +2,10 @@
 import * as React from "react";
 import { XStack, YStack } from "tamagui";
 import { GlassCard, Dropdown, Toggle, Caption } from "@yt-subtitle-maker/ui";
+import { LanguagePicker } from "./LanguagePicker";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
-import { DEVICES, LANGS } from "./constants";
+import { DEVICES } from "./constants";
 import { SourceModeControl } from "./SourceModeControl";
 import { EnginePicker } from "./EnginePicker";
 
@@ -111,11 +112,11 @@ export function TranscriptionTab() {
               label="Default source language"
               helper="Setting a default prevents Whisper misdetection on intros / music."
             >
-              <Dropdown
+              <LanguagePicker
                 value={draft.defaultSourceLang}
                 onValueChange={(v) => update("defaultSourceLang", v)}
-                options={LANGS}
                 width="100%"
+                aria-label="Default source language"
               />
             </SettingRow>
           </YStack>

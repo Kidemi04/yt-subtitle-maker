@@ -3,18 +3,18 @@ import { Stack, XStack, YStack } from "tamagui";
 import { Plus } from "@tamagui/lucide-icons";
 import {
   GlassCard,
-  Dropdown,
   Toggle,
   BadgePill,
   Caption,
 } from "@yt-subtitle-maker/ui";
+import { LanguagePicker } from "./LanguagePicker";
 import type {
   AppConfig,
   TranslatorProfile,
 } from "@yt-subtitle-maker/api-client";
 import { useSettings } from "./SettingsContext";
 import { Section, SettingRow } from "./shared";
-import { LANGS, isMasked } from "./constants";
+import { isMasked } from "./constants";
 import { ProviderRow, type ProviderRowSavePayload } from "./ProviderRow";
 import { AddProviderModal } from "./AddProviderModal";
 
@@ -308,11 +308,11 @@ export function TranslationTab() {
 
         {/* Unchanged setting rows */}
         <SettingRow id="translation.target-lang" label="Default target language">
-          <Dropdown
+          <LanguagePicker
             value={draft.defaultTargetLang}
             onValueChange={(v) => update("defaultTargetLang", v)}
-            options={LANGS}
             width="100%"
+            aria-label="Default target language"
           />
         </SettingRow>
 
