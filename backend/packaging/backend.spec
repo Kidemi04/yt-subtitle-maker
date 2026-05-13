@@ -11,7 +11,9 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 BACKEND_ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))   # the backend/ dir
 ENTRY = os.path.join(BACKEND_ROOT, "packaging", "run_backend.py")
 
-datas, binaries, hiddenimports = [], [], []
+datas, binaries, hiddenimports = [
+    (os.path.join(BACKEND_ROOT, "packaging", "test_clip.mp4"), "packaging"),
+], [], []
 for pkg in ("whisper", "torch", "yt_dlp", "uvicorn", "openai", "google", "google.genai"):
     d, b, h = collect_all(pkg)
     datas += d
