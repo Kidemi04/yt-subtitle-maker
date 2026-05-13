@@ -26,7 +26,9 @@ export function LanguagePicker({
   "aria-label": ariaLabel,
   width,
 }: LanguagePickerProps) {
-  const [customText, setCustomText] = React.useState("");
+  const [customText, setCustomText] = React.useState(
+    !ALL_LANGUAGES.some((o) => o.value === value) ? value : ""
+  );
   const isBuiltIn = ALL_LANGUAGES.some((o) => o.value === value);
   const [showingCustom, setShowingCustom] = React.useState(
     !isBuiltIn && value !== ""
