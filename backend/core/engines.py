@@ -88,6 +88,6 @@ def build_engine_descriptors() -> list[dict]:
     return [_openai_whisper_descriptor(), *_PLANNED_STUBS]
 
 
-# Convenience sets for the dependencies route engine-param guard.
+# Public symbol for future consumers (e.g. 4c-frontend engine picker).
+# Derived — not hardcoded — so it self-maintains as stubs are added/removed.
 PLANNED_ENGINE_IDS: frozenset[str] = frozenset(s["id"] for s in _PLANNED_STUBS)
-AVAILABLE_ENGINE_IDS: frozenset[str] = frozenset({"openai-whisper"})
