@@ -20,6 +20,7 @@ import {
   Caption,
   CaptionUpper,
 } from "@yt-subtitle-maker/ui";
+import { LanguagePicker } from "./settings/LanguagePicker";
 import type {
   TranscribeRun,
   TranslatorProvider,
@@ -32,19 +33,6 @@ const TRANSLATOR_OPTIONS: { label: string; value: TranslatorProvider }[] = [
   { label: "Gemini", value: "gemini" },
   { label: "Local AI", value: "local_openai" },
   { label: "OpenAI", value: "openai" },
-];
-
-const TARGET_LANGUAGES = [
-  { label: "中文 (Chinese)", value: "zh" },
-  { label: "English", value: "en" },
-  { label: "日本語 (Japanese)", value: "ja" },
-  { label: "한국어 (Korean)", value: "ko" },
-  { label: "Español", value: "es" },
-  { label: "Français", value: "fr" },
-  { label: "Deutsch", value: "de" },
-  { label: "Português", value: "pt" },
-  { label: "Русский", value: "ru" },
-  { label: "Tiếng Việt", value: "vi" },
 ];
 
 export function NewTranslationModal({
@@ -194,10 +182,9 @@ export function NewTranslationModal({
 
         <YStack gap="$xs">
           <CaptionUpper>Target language</CaptionUpper>
-          <Dropdown
+          <LanguagePicker
             value={targetLang}
             onValueChange={setTargetLang}
-            options={TARGET_LANGUAGES}
             aria-label="Target language"
             disabled={phase === "translating"}
           />
