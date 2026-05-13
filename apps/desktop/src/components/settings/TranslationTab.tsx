@@ -249,7 +249,12 @@ export function TranslationTab() {
                   setActiveTranslator(`custom:${profile.id}`)
                 }
                 onTest={async () => {
-                  await testProfile(profile.id);
+                  // Send the prefixed form ("custom:<id>") — the backend's
+                  // _resolve_provider_for_test dispatches via
+                  // get_active_translator which only matches the prefixed
+                  // shape. testProfile strips the prefix before keying
+                  // lastTestResult so the row's `lastTest` lookup still hits.
+                  await testProfile(`custom:${profile.id}`);
                 }}
                 onEditToggle={() =>
                   setEditingId((v) => (v === profile.id ? null : profile.id))

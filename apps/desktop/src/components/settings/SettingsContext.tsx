@@ -216,12 +216,25 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const testProfile = React.useCallback(
     async (profileId: string): Promise<TranslatorTestResult> => {
       if (!draft) throw new Error("No draft");
+      // The backend expects the FULL active-translator form here ("gemini" /
+      // "local_openai" / "custom:<id>") — it does
+      //   tmp_cfg.active_translator = req.profileId
+      //   get_active_translator(tmp_cfg)
+      // and get_active_translator only matches those three shapes; anything
+      // else falls back to Gemini (so a bare custom id would silently test
+      // Gemini's creds instead of the user's DeepSeek/etc.).
+      // lastTestResult is keyed by the SHORT id (no "custom:" prefix), per
+      // the convention the row-level lookups in TranslationTab use, so we
+      // strip it before recording.
       const result = await apiClient.testTranslator({
         profileId,
         useSavedKey: true,
         targetLang: draft.defaultTargetLang,
       });
-      recordTestResult(profileId, result);
+      const recordKey = profileId.startsWith("custom:")
+        ? profileId.slice("custom:".length)
+        : profileId;
+      recordTestResult(recordKey, result);
       return result;
     },
     [draft, recordTestResult],
