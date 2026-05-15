@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from api import jobs
 from core import library_runs
 from core.config import load_config
+from core.dependency_manager import check_mpv_status
 from core.downloader.js_runtime import detect_js_runtime
 from core.pipeline import PipelineCancelled
 
@@ -598,7 +599,14 @@ def play_mpv(req: PlayMpvRequest) -> dict[str, Any]:
     folder = folder.resolve()
 
     cfg = load_config()
-    mpv_exe = cfg.mpv_path if cfg.mpv_path and shutil.which(cfg.mpv_path) else shutil.which("mpv")
+    # Resolution order:
+    #   1) explicit cfg.mpv_path if it exists (advanced override)
+    #   2) check_mpv_status() result (bundled > system)
+    if cfg.mpv_path and shutil.which(cfg.mpv_path):
+        mpv_exe = cfg.mpv_path
+    else:
+        status = check_mpv_status()
+        mpv_exe = status["path"] if status["installed"] else None
     if not mpv_exe:
         return {
             "ok": False,

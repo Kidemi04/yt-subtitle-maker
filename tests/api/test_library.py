@@ -120,14 +120,16 @@ def test_library_open_folder_unknown_returns_404(fake_output_dir):
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_streams_youtube_with_translated_srt(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """Default: mpv streams the YouTube URL with BOTH SRTs overlaid — the
     translated one as the default active track (last `--sub-file=`), the
     original loaded as an alternative track the user can cycle to via `j`."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
     resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
@@ -167,14 +169,16 @@ def test_library_play_mpv_streams_youtube_with_translated_srt(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_uses_per_language_font_override(
-    mock_which, mock_popen, tmp_path, monkeypatch
+    mock_which, mock_check_mpv, mock_popen, tmp_path, monkeypatch
 ):
     """`sub_fonts_by_lang` wins over `sub_font` when the active sub's
     language matches an entry. Prefix-match too — a "zh" entry covers
     a sidecar targetLang of "zh-CN"."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
 
     out = tmp_path / "output"
     out.mkdir()
@@ -202,12 +206,14 @@ def test_library_play_mpv_uses_per_language_font_override(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_cjk_default_wins_when_no_per_lang_entry(
-    mock_which, mock_popen, tmp_path, monkeypatch
+    mock_which, mock_check_mpv, mock_popen, tmp_path, monkeypatch
 ):
     """CJK active lang with no per-language match → CJK default wins over global."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
 
     out = tmp_path / "output"
     out.mkdir()
@@ -231,12 +237,14 @@ def test_library_play_mpv_cjk_default_wins_when_no_per_lang_entry(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_uses_local_video_when_present(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """If a local video file exists, prefer it over streaming (offline-OK)."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     folder = _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
     # Drop a local mp4 alongside the .wav.
     (folder / "abcDEFghIJK.mp4").write_bytes(b"\x00" * 200)
@@ -248,12 +256,14 @@ def test_library_play_mpv_uses_local_video_when_present(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_falls_back_to_original_srt(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """When only the original SRT exists, that's what mpv should get (alone)."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=False)
 
     resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
@@ -268,15 +278,17 @@ def test_library_play_mpv_falls_back_to_original_srt(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_subtitle_preference_original(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """preference="original" still loads BOTH SRTs but makes original the
     DEFAULT active track (it goes FIRST in the --sub-file list → sid=1 →
     --sid=auto selects it). The user can still press `j` in mpv to cycle
     to the translated track (sid=2)."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
     resp = client.post(
@@ -298,9 +310,10 @@ def test_library_play_mpv_subtitle_preference_original(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_loads_both_srts_so_user_can_cycle_in_mpv(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """User feature: 'i need in mpv i can select original and translate
     subtitle.' Default 'translated' preference loads BOTH SRTs as mpv tracks
@@ -308,6 +321,7 @@ def test_library_play_mpv_loads_both_srts_so_user_can_cycle_in_mpv(
     as a track the user can cycle to with `j` (sid=2, second --sub-file=).
     mpv's --sid=auto picks sid=1; verified against real mpv 0.41.0."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
     resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})
@@ -323,15 +337,17 @@ def test_library_play_mpv_loads_both_srts_so_user_can_cycle_in_mpv(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_skips_empty_srt_files(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """A 0-byte translated SRT (leftover from a failed translation run)
     should be skipped — otherwise mpv loads a phantom silent track and the
     user can't tell why no subtitles show up. The original SRT is still
     loaded so the user sees something."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     folder = _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
     # Truncate the translated SRT to zero bytes — simulates the failed
     # translation that the user originally hit pre-bisection-fix.
@@ -352,12 +368,14 @@ def test_library_play_mpv_skips_empty_srt_files(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_subtitle_preference_none(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """preference="none" launches without any subtitle overlay."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video", with_translated=True)
 
     resp = client.post(
@@ -372,12 +390,14 @@ def test_library_play_mpv_subtitle_preference_none(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_no_subtitle_still_launches(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """Folder with no SRT yet (e.g. user opened mid-pipeline) still streams."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     folder = fake_output_dir / "Empty_abcDEFghIJK"
     folder.mkdir()
 
@@ -390,12 +410,14 @@ def test_library_play_mpv_no_subtitle_still_launches(
     assert not any(arg.startswith("--sub-file=") for arg in cmd)
 
 
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_library_play_mpv_missing_executable_returns_soft_error(
-    mock_which, fake_output_dir
+    mock_which, mock_check_mpv, fake_output_dir
 ):
     """If mpv isn't in PATH and no config override, return ok:false with a hint."""
     mock_which.return_value = None
+    mock_check_mpv.return_value = {"installed": False, "source": None, "path": None, "version": None}
     _make_video_dir(fake_output_dir, "abcDEFghIJK", title="My Video")
 
     resp = client.post("/api/library/play-mpv", json={"videoId": "abcDEFghIJK"})

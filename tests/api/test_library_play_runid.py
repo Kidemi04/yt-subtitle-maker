@@ -76,11 +76,13 @@ def _make_multi_run_folder(out: Path, video_id: str = "abcDEFghIJK") -> Path:
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_play_mpv_with_transcribeId_picks_exact_srt(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_multi_run_folder(fake_output_dir)
 
     resp = client.post(
@@ -103,11 +105,13 @@ def test_play_mpv_with_transcribeId_picks_exact_srt(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_play_mpv_with_translateId_picks_exact_srt(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_multi_run_folder(fake_output_dir)
 
     resp = client.post(
@@ -129,11 +133,13 @@ def test_play_mpv_with_translateId_picks_exact_srt(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_play_mpv_unknown_run_id_returns_soft_error(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_multi_run_folder(fake_output_dir)
 
     resp = client.post(
@@ -148,11 +154,13 @@ def test_play_mpv_unknown_run_id_returns_soft_error(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_play_mpv_both_run_ids_rejected(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_multi_run_folder(fake_output_dir)
 
     resp = client.post(
@@ -169,12 +177,14 @@ def test_play_mpv_both_run_ids_rejected(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_play_mpv_subtitle_preference_uses_latest_translation(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     """Default behavior (no run id) still works: picks latest translation."""
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_multi_run_folder(fake_output_dir)
 
     resp = client.post(
@@ -188,11 +198,13 @@ def test_play_mpv_subtitle_preference_uses_latest_translation(
 
 
 @patch("api.routes.library.subprocess.Popen")
+@patch("api.routes.library.check_mpv_status")
 @patch("api.routes.library.shutil.which")
 def test_play_mpv_subtitle_preference_original_uses_latest_transcript(
-    mock_which, mock_popen, fake_output_dir
+    mock_which, mock_check_mpv, mock_popen, fake_output_dir
 ):
     mock_which.return_value = "/fake/mpv"
+    mock_check_mpv.return_value = {"installed": True, "source": "system", "path": "/fake/mpv", "version": "0.41.0"}
     _make_multi_run_folder(fake_output_dir)
 
     resp = client.post(
