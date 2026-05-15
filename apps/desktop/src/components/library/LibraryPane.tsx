@@ -1,13 +1,12 @@
 import { useMemo } from "react";
 import { RefreshCw, Search, X } from "@tamagui/lucide-icons";
-import { Input, ScrollView, XStack, YStack } from "tamagui";
+import { Input, ScrollView, Stack, XStack, YStack } from "tamagui";
 import {
   BodyMd,
   BodySm,
   Caption,
   ButtonSecondary,
   IconButton,
-  TitleLg,
 } from "@yt-subtitle-maker/ui";
 import { useLibrary } from "../../state/library";
 import { LibraryRow } from "./LibraryRow";
@@ -55,29 +54,35 @@ export function LibraryPane() {
       {/* Sticky header */}
       <YStack padding="$md" gap="$sm" borderBottomWidth={1} borderBottomColor="$borderSubtle">
         <XStack alignItems="center" justifyContent="space-between">
-          <TitleLg>Library</TitleLg>
-          <XStack gap="$xs" alignItems="center">
-            <Caption color="$textMuted">{items.length} videos</Caption>
-            <IconButton
-              size={32}
-              icon={<RefreshCw size={14} color="#a1a1a6" />}
-              aria-label="Refresh"
-              onPress={() => void fetchList()}
-            />
-          </XStack>
+          <Caption color="$textMuted">{items.length} videos</Caption>
+          <IconButton
+            size={32}
+            icon={<RefreshCw size={14} color="#a1a1a6" />}
+            aria-label="Refresh"
+            onPress={() => void fetchList()}
+          />
         </XStack>
 
         <XStack
           alignItems="center"
-          gap="$xs"
-          paddingHorizontal="$sm"
-          paddingVertical={6}
+          height={44}
           backgroundColor="$surfaceGlass"
           borderRadius="$md"
           borderWidth={1}
           borderColor="$borderSubtle"
+          hoverStyle={{ borderColor: "$borderStrong" }}
+          focusStyle={{ borderColor: "$accent", borderWidth: 2 }}
+          animation="quick"
         >
-          <Search size={14} color="#6e6e73" />
+          <Stack
+            width={36}
+            height={44}
+            alignItems="center"
+            justifyContent="center"
+            pointerEvents="none"
+          >
+            <Search size={14} color="#6e6e73" />
+          </Stack>
           <Input
             flex={1}
             unstyled
@@ -85,15 +90,18 @@ export function LibraryPane() {
             value={search}
             onChangeText={setSearch}
             color="$textPrimary"
-            paddingHorizontal="$xs"
+            paddingRight="$sm"
+            height={44}
           />
           {search ? (
-            <IconButton
-              size={32}
-              icon={<X size={12} color="#a1a1a6" />}
-              aria-label="Clear search"
-              onPress={() => setSearch("")}
-            />
+            <Stack paddingRight="$xs">
+              <IconButton
+                size={32}
+                icon={<X size={12} color="#a1a1a6" />}
+                aria-label="Clear search"
+                onPress={() => setSearch("")}
+              />
+            </Stack>
           ) : null}
         </XStack>
 
@@ -102,7 +110,8 @@ export function LibraryPane() {
             onPress={() => setView("rows")}
             aria-pressed={view === "rows"}
             backgroundColor={view === "rows" ? "$surfaceGlassMid" : undefined}
-            height={32}
+            borderColor={view === "rows" ? "$accent" : undefined}
+            height={36}
             paddingHorizontal="$sm"
           >
             ☰ Rows
@@ -111,7 +120,8 @@ export function LibraryPane() {
             onPress={() => setView("cards")}
             aria-pressed={view === "cards"}
             backgroundColor={view === "cards" ? "$surfaceGlassMid" : undefined}
-            height={32}
+            borderColor={view === "cards" ? "$accent" : undefined}
+            height={36}
             paddingHorizontal="$sm"
           >
             ⊞ Cards

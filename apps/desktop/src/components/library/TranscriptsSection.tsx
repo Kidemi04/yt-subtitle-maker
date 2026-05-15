@@ -1,5 +1,5 @@
 import { XStack, YStack } from "tamagui";
-import { ButtonSecondary, Caption, CaptionUpper } from "@yt-subtitle-maker/ui";
+import { BadgePill, ButtonSecondary, Caption, TitleSm } from "@yt-subtitle-maker/ui";
 import type { TranscribeRun } from "@yt-subtitle-maker/api-client";
 import { RunRow } from "./RunRow";
 import { useLibrary } from "../../state/library";
@@ -11,9 +11,9 @@ import { formatRelative, formatDuration } from "../../lib/format";
  * always add a fresh transcript). Each row is a `RunRow` whose
  * Re-run action opens the translate modal seeded with that transcript.
  *
- * `LabelUpper` doesn't exist in @yt-subtitle-maker/ui yet — using
- * `CaptionUpper`, which has the exact same role (11px / 600 / uppercase /
- * letter-spaced label).
+ * Section header uses `TitleSm` with uppercased + letter-spaced styling and
+ * an inline accent `BadgePill` for the count, matching the old library
+ * design language.
  */
 export interface TranscriptsSectionProps {
   videoId: string;
@@ -34,7 +34,16 @@ export function TranscriptsSection({
   return (
     <YStack gap="$sm">
       <XStack alignItems="center" justifyContent="space-between">
-        <CaptionUpper>Transcripts · {transcribes.length}</CaptionUpper>
+        <XStack gap="$xs" alignItems="center">
+          <TitleSm
+            color="$textPrimary"
+            textTransform="uppercase"
+            letterSpacing={1}
+          >
+            Transcripts
+          </TitleSm>
+          <BadgePill tone="accent">{transcribes.length}</BadgePill>
+        </XStack>
         <ButtonSecondary onPress={onReTranscribe} height={32} paddingHorizontal="$sm">
           + Re-transcribe
         </ButtonSecondary>

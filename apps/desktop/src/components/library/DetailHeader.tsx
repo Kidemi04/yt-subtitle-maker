@@ -1,6 +1,6 @@
 import { ExternalLink, Folder } from "@tamagui/lucide-icons";
 import { Stack, XStack, YStack } from "tamagui";
-import { BodySm, Caption, IconButton, TitleLg } from "@yt-subtitle-maker/ui";
+import { BodySm, Caption, DisplayMd, IconButton } from "@yt-subtitle-maker/ui";
 import type { VideoDetail } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "../../state/client";
 import { formatRelative } from "../../lib/format";
@@ -33,12 +33,16 @@ export function DetailHeader({ detail }: { detail: VideoDetail }) {
       : "audio";
 
   return (
-    <XStack gap="$md" padding="$md" alignItems="center">
+    <XStack gap="$md" alignItems="center">
       <Stack
         width={160}
         height={90}
-        borderRadius="$sm"
+        borderRadius="$md"
+        borderWidth={1}
+        borderColor="$borderSubtle"
+        overflow="hidden"
         backgroundColor="$bgElevated"
+        flexShrink={0}
         style={{
           backgroundImage: detail.thumbnailUrl
             ? `url(${detail.thumbnailUrl})`
@@ -48,7 +52,7 @@ export function DetailHeader({ detail }: { detail: VideoDetail }) {
         }}
       />
       <YStack flex={1} gap="$xs" minWidth={0}>
-        <TitleLg numberOfLines={2}>{title}</TitleLg>
+        <DisplayMd numberOfLines={2}>{title}</DisplayMd>
         {showOriginal ? (
           <BodySm color="$textSecondary" numberOfLines={1}>
             {detail.titleOriginal}
@@ -73,21 +77,21 @@ export function DetailHeader({ detail }: { detail: VideoDetail }) {
             {detail.videoId}
           </Caption>
         </XStack>
-        <XStack gap="$xs" marginTop="$xs">
-          <IconButton
-            size={32}
-            icon={<Folder size={14} color="#a1a1a6" />}
-            aria-label="Open folder"
-            onPress={handleOpenFolder}
-          />
-          <IconButton
-            size={32}
-            icon={<ExternalLink size={14} color="#a1a1a6" />}
-            aria-label="Open URL"
-            onPress={handleOpenUrl}
-          />
-        </XStack>
       </YStack>
+      <XStack gap="$xs" alignSelf="flex-start" marginLeft="auto">
+        <IconButton
+          size={36}
+          icon={<Folder size={16} color="$textSecondary" />}
+          aria-label="Open folder"
+          onPress={handleOpenFolder}
+        />
+        <IconButton
+          size={36}
+          icon={<ExternalLink size={16} color="$textSecondary" />}
+          aria-label="Open URL"
+          onPress={handleOpenUrl}
+        />
+      </XStack>
     </XStack>
   );
 }

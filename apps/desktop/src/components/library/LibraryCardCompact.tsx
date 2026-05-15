@@ -26,7 +26,7 @@ export function LibraryCardCompact({ item, selected, onPress }: LibraryCardCompa
       borderColor={selected ? "$accent" : "$borderSubtle"}
       cursor="pointer"
       onPress={onPress}
-      hoverStyle={{ borderColor: "$borderStrong" }}
+      hoverStyle={{ y: -2, borderColor: "$borderStrong" }}
       animation="quick"
     >
       <Stack

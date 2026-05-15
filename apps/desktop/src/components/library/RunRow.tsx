@@ -1,6 +1,6 @@
 import { Play, RefreshCw, Trash2 } from "@tamagui/lucide-icons";
 import { XStack, YStack } from "tamagui";
-import { IconButton, BodySm, Caption } from "@yt-subtitle-maker/ui";
+import { IconButton, BodyMd, Caption } from "@yt-subtitle-maker/ui";
 
 /**
  * RunRow — one row inside `TranscriptsSection` / `TranslationsSection`.
@@ -25,7 +25,7 @@ export interface RunRowProps {
 export function RunRow({ primary, secondary, onPlay, onReRun, onDelete, playLoading }: RunRowProps) {
   return (
     <XStack
-      paddingVertical="$xs"
+      paddingVertical="$sm"
       paddingHorizontal="$sm"
       backgroundColor="$surfaceGlass"
       borderRadius="$sm"
@@ -33,11 +33,11 @@ export function RunRow({ primary, secondary, onPlay, onReRun, onDelete, playLoad
       borderColor="$borderSubtle"
       alignItems="center"
       gap="$sm"
-      hoverStyle={{ backgroundColor: "$surfaceGlassMid", borderColor: "$borderStrong" }}
+      hoverStyle={{ y: -1, backgroundColor: "$surfaceGlassMid", borderColor: "$borderStrong" }}
       animation="quick"
     >
       <YStack flex={1} gap={2}>
-        <BodySm>{primary}</BodySm>
+        <BodyMd>{primary}</BodyMd>
         <Caption color="$textMuted">{secondary}</Caption>
       </YStack>
       <XStack gap="$xs">

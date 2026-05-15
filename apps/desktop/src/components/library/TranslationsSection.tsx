@@ -1,6 +1,6 @@
 import { AlertTriangle } from "@tamagui/lucide-icons";
 import { XStack, YStack } from "tamagui";
-import { ButtonSecondary, Caption, CaptionUpper } from "@yt-subtitle-maker/ui";
+import { BadgePill, ButtonSecondary, Caption, TitleSm } from "@yt-subtitle-maker/ui";
 import type { TranscribeRun, TranslateRun } from "@yt-subtitle-maker/api-client";
 import { RunRow } from "./RunRow";
 import { useLibrary } from "../../state/library";
@@ -44,7 +44,16 @@ export function TranslationsSection({
   return (
     <YStack gap="$sm">
       <XStack alignItems="center" justifyContent="space-between">
-        <CaptionUpper>Translations · {translations.length}</CaptionUpper>
+        <XStack gap="$xs" alignItems="center">
+          <TitleSm
+            color="$textPrimary"
+            textTransform="uppercase"
+            letterSpacing={1}
+          >
+            Translations
+          </TitleSm>
+          <BadgePill tone="accent">{translations.length}</BadgePill>
+        </XStack>
         <ButtonSecondary
           onPress={onReTranslate}
           disabled={!canReTranslate}

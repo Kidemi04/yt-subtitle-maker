@@ -36,10 +36,12 @@ export function LibraryRow({ item, selected, detail, onPress }: LibraryRowProps)
       role="button"
       onPress={onPress}
       cursor="pointer"
-      paddingVertical="$xs"
+      paddingVertical="$sm"
       paddingHorizontal="$sm"
       borderLeftWidth={selected ? 2 : 0}
       borderLeftColor="$accent"
+      borderBottomWidth={1}
+      borderBottomColor="$borderSubtle"
       backgroundColor={selected ? "$surfaceGlassMid" : "transparent"}
       hoverStyle={{ backgroundColor: "$surfaceGlass" }}
       animation="quick"
@@ -49,8 +51,11 @@ export function LibraryRow({ item, selected, detail, onPress }: LibraryRowProps)
           width={80}
           height={45}
           borderRadius="$xs"
+          borderWidth={1}
+          borderColor="$borderSubtle"
           backgroundColor="$bgElevated"
           flexShrink={0}
+          overflow="hidden"
           style={{
             backgroundImage: item.thumbnailUrl ? `url(${item.thumbnailUrl})` : undefined,
             backgroundSize: "cover",

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Trash2 } from "@tamagui/lucide-icons";
 import { ScrollView, Stack, XStack, YStack } from "tamagui";
-import { BodySm, ButtonSecondary } from "@yt-subtitle-maker/ui";
+import { BodySm, ButtonSecondary, GlassCard } from "@yt-subtitle-maker/ui";
 import { useLibrary } from "../../state/library";
 import { useDependencies } from "../../state/dependencies";
 import { apiClient } from "../../state/client";
@@ -78,10 +78,12 @@ export function DetailPane() {
 
   if (!detail && loadingDetail) {
     return (
-      <YStack flex={1} padding="$lg" gap="$md">
-        <Stack height={90} borderRadius="$sm" backgroundColor="$surfaceGlass" />
-        <Stack height={120} borderRadius="$sm" backgroundColor="$surfaceGlass" />
-        <Stack height={120} borderRadius="$sm" backgroundColor="$surfaceGlass" />
+      <YStack flex={1} padding="$lg" minWidth={0}>
+        <GlassCard variant="low" flex={1} gap="$md">
+          <Stack height={90} borderRadius="$sm" backgroundColor="$surfaceGlass" />
+          <Stack height={120} borderRadius="$sm" backgroundColor="$surfaceGlass" />
+          <Stack height={120} borderRadius="$sm" backgroundColor="$surfaceGlass" />
+        </GlassCard>
       </YStack>
     );
   }
@@ -91,60 +93,62 @@ export function DetailPane() {
   }
 
   return (
-    <YStack flex={1} minWidth={0}>
-      <DetailHeader detail={detail} />
+    <YStack flex={1} minWidth={0} padding="$lg">
+      <GlassCard variant="mid" flex={1} padding="$lg" gap="$lg" minWidth={0}>
+        <DetailHeader detail={detail} />
 
-      <ScrollView flex={1}>
-        <YStack padding="$md" gap="$lg" paddingBottom="$xl">
-          <TranscriptsSection
-            videoId={selectedId}
-            transcribes={detail.transcribes}
-            onPlayTranscript={handlePlayTranscript}
-            onReTranscribe={() => setNewTranscribeOpen(true)}
-            onReTranslateFrom={handleReTranslateFrom}
-          />
-          <TranslationsSection
-            videoId={selectedId}
-            transcribes={detail.transcribes}
-            translations={detail.translations}
-            onPlayTranslation={handlePlayTranslation}
-            onReTranslate={() => {
-              setTranslationSourceId(undefined);
-              setNewTranslationOpen(true);
-            }}
-          />
-        </YStack>
-      </ScrollView>
+        <ScrollView flex={1}>
+          <YStack gap="$lg" paddingBottom="$md">
+            <TranscriptsSection
+              videoId={selectedId}
+              transcribes={detail.transcribes}
+              onPlayTranscript={handlePlayTranscript}
+              onReTranscribe={() => setNewTranscribeOpen(true)}
+              onReTranslateFrom={handleReTranslateFrom}
+            />
+            <TranslationsSection
+              videoId={selectedId}
+              transcribes={detail.transcribes}
+              translations={detail.translations}
+              onPlayTranslation={handlePlayTranslation}
+              onReTranslate={() => {
+                setTranslationSourceId(undefined);
+                setNewTranslationOpen(true);
+              }}
+            />
+          </YStack>
+        </ScrollView>
 
-      <XStack
-        padding="$md"
-        borderTopWidth={1}
-        borderTopColor="$borderSubtle"
-        backgroundColor="$surfaceGlass"
-        justifyContent="flex-end"
-      >
-        <ButtonSecondary
-          onPress={() => {
-            if (
-              window.confirm(
-                "Delete this video and all its transcripts/translations?",
-              )
-            ) {
-              void deleteVideo(selectedId);
-            }
-          }}
-          height={32}
-          paddingHorizontal="$sm"
-          borderColor="$error"
+        <XStack
+          marginTop="$md"
+          paddingTop="$md"
+          borderTopWidth={1}
+          borderTopColor="$borderSubtle"
+          justifyContent="flex-end"
         >
-          <XStack gap="$xs" alignItems="center">
-            <Trash2 size={14} color="$error" />
-            <BodySm fontWeight="500" color="$error">
-              Delete entire video
-            </BodySm>
-          </XStack>
-        </ButtonSecondary>
-      </XStack>
+          <ButtonSecondary
+            onPress={() => {
+              if (
+                window.confirm(
+                  "Delete this video and all its transcripts/translations?",
+                )
+              ) {
+                void deleteVideo(selectedId);
+              }
+            }}
+            height={32}
+            paddingHorizontal="$sm"
+            borderColor="$error"
+          >
+            <XStack gap="$xs" alignItems="center">
+              <Trash2 size={14} color="$error" />
+              <BodySm fontWeight="500" color="$error">
+                Delete entire video
+              </BodySm>
+            </XStack>
+          </ButtonSecondary>
+        </XStack>
+      </GlassCard>
 
       <NewTranscribeModal
         open={newTranscribeOpen}
