@@ -7,16 +7,19 @@ import threading
 from typing import Any
 
 from fastapi import APIRouter, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from core.dependency_manager import (
     MODELS_URLS,
+    IntegrityError,
+    UnsupportedPlatformError,
     check_ffmpeg,
     check_mpv,
     check_mpv_status,
     check_whisper_model,
     download_whisper_model_generator,
+    install_mpv_generator,
 )
 
 router = APIRouter(prefix="/api/dependencies", tags=["dependencies"])
@@ -101,6 +104,59 @@ def install_model(req: InstallRequest):
             q.put({"status": "done", "model": req.model})
         except Exception as e:
             q.put({"status": "error", "error": str(e), "recoverable": False})
+        finally:
+            q.put(SENTINEL)
+
+    threading.Thread(target=runner, daemon=True).start()
+
+    def gen():
+        while True:
+            evt = q.get()
+            if evt is SENTINEL:
+                break
+            yield json.dumps(evt) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@router.post("/install-mpv")
+def install_mpv():
+    """Stream NDJSON events while downloading and installing the bundled mpv binary.
+
+    Event shape per line (see install_mpv_generator):
+        {"phase": "resolving", "message": str}
+        {"phase": "downloading", "bytesReceived": int, "bytesTotal": int}
+        {"phase": "verifying", "message": str}
+        {"phase": "extracting", "message": str}
+        {"phase": "done", "path": str, "version": str | None}
+        {"phase": "error", "message": str}
+
+    Returns HTTP 400 with {"supported": false, "manualUrl": ...} on unsupported platforms.
+    """
+    try:
+        # Touch the generator once to surface unsupported-platform / pre-stream errors as HTTP 400.
+        gen_iter = install_mpv_generator()
+        first = next(gen_iter)
+    except UnsupportedPlatformError:
+        return JSONResponse(
+            status_code=400,
+            content={"supported": False, "manualUrl": "https://mpv.io/installation/"},
+        )
+    except StopIteration:
+        return JSONResponse(status_code=500, content={"error": "generator yielded nothing"})
+
+    q: queue.Queue = queue.Queue()
+    SENTINEL = object()
+
+    def runner() -> None:
+        try:
+            q.put(first)
+            for evt in gen_iter:
+                q.put(evt)
+        except IntegrityError as e:
+            q.put({"phase": "error", "message": f"integrity check failed: {e}"})
+        except Exception as e:
+            q.put({"phase": "error", "message": str(e)})
         finally:
             q.put(SENTINEL)
 

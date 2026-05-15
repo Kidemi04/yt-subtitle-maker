@@ -290,3 +290,39 @@ def test_get_mpv_status_returns_typed_payload(mock_status):
     assert resp.status_code == 200
     body = resp.json()
     assert body == mock_status.return_value
+
+
+# ── Task 5: POST /api/dependencies/install-mpv streaming endpoint ─────────────
+
+
+def test_install_mpv_returns_400_on_unsupported_platform(monkeypatch):
+    from core import dependency_manager as dm
+
+    monkeypatch.setattr(dm, "_platform_key", lambda: None)
+    resp = client.post("/api/dependencies/install-mpv", json={})
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["supported"] is False
+    assert body["manualUrl"] == "https://mpv.io/installation/"
+
+
+@patch("api.routes.dependencies.install_mpv_generator")
+def test_install_mpv_streams_ndjson(mock_gen):
+    def fake_events():
+        yield {"phase": "resolving", "message": "using darwin-arm64"}
+        yield {"phase": "downloading", "bytesReceived": 100, "bytesTotal": 1000}
+        yield {"phase": "downloading", "bytesReceived": 1000, "bytesTotal": 1000}
+        yield {"phase": "verifying", "message": "sha-256 ok"}
+        yield {"phase": "extracting", "message": "unpacking tar.gz"}
+        yield {"phase": "done", "path": "/Users/u/.yt_subtitle_tool/bin/mpv", "version": "0.40.0"}
+    mock_gen.side_effect = fake_events
+
+    resp = client.post("/api/dependencies/install-mpv", json={})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/x-ndjson")
+
+    import json as _json
+    lines = [_json.loads(line) for line in resp.text.strip().split("\n") if line.strip()]
+    phases = [e["phase"] for e in lines]
+    assert phases == ["resolving", "downloading", "downloading", "verifying", "extracting", "done"]
+    assert lines[-1]["path"].endswith("mpv")
