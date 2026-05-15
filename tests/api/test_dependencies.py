@@ -228,14 +228,13 @@ def test_install_mpv_generator_streams_events(tmp_path, monkeypatch):
     monkeypatch.setattr(dm.requests, "get", lambda *a, **kw: FakeResponse())
 
     # Mock the extract step so we don't try to untar fake bytes.
-    extracted_binary = tmp_path / "extracted" / "mpv.app" / "Contents" / "MacOS" / "mpv"
-    extracted_binary.parent.mkdir(parents=True)
-    extracted_binary.write_text("#!/bin/sh\necho mpv 0.40.0\n")
-    monkeypatch.setattr(
-        dm,
-        "_extract_archive",
-        lambda archive_path, dest, archive_kind: extracted_binary,
-    )
+    def fake_extract(archive_path, dest, archive_kind):
+        binary = dest / "mpv.app" / "Contents" / "MacOS" / "mpv"
+        binary.parent.mkdir(parents=True, exist_ok=True)
+        binary.write_text("#!/bin/sh\necho mpv 0.40.0\n")
+        return dest
+
+    monkeypatch.setattr(dm, "_extract_archive", fake_extract)
 
     events = list(dm.install_mpv_generator())
     phases = [e["phase"] for e in events]

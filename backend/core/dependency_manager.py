@@ -330,10 +330,8 @@ def install_mpv_generator():
 
         yield {"phase": "extracting", "message": f"unpacking {entry['archive']}"}
         extract_dest = tmp_root / f"mpv-extract-{os.getpid()}"
-        extracted = _extract_archive(archive_path, extract_dest, entry["archive"])
-        # _extract_archive normally returns the dest dir; allow tests to return
-        # the inner-binary path directly (file path).
-        inner = extracted if extracted.is_file() else extracted / entry["inner_binary"]
+        _extract_archive(archive_path, extract_dest, entry["archive"])
+        inner = extract_dest / entry["inner_binary"]
         if not inner.exists():
             raise FileNotFoundError(f"expected binary at {inner} after extracting")
 
