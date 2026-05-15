@@ -1,6 +1,10 @@
+import hashlib
 import subprocess
 from unittest.mock import patch
+
+import pytest
 from fastapi.testclient import TestClient
+
 from api.main import app
 
 client = TestClient(app)
@@ -61,10 +65,6 @@ def test_dependencies_install_streams_progress(mock_gen):
     assert "percent" in progress_events[0]   # 1024/100000 * 100 ≈ 1.024
     assert progress_events[-1]["percent"] == pytest.approx(100.0, rel=0.01)
     assert len(done_events) == 1
-
-
-# pytest needs to be importable at module level for the approx import above
-import pytest
 
 
 # ── Task 4: engine param tests ────────────────────────────────────────────────
@@ -179,3 +179,97 @@ def test_check_mpv_status_returns_not_installed_when_neither(tmp_path, monkeypat
 
     status = dm.check_mpv_status()
     assert status == {"installed": False, "source": None, "path": None, "version": None}
+
+
+# ── Task 3: install_mpv_generator() download + verify + extract pipeline ──────
+
+
+def test_install_mpv_generator_unsupported_platform(monkeypatch):
+    """Raises with a clear marker for Linux / unknown platforms."""
+    from core import dependency_manager as dm
+
+    monkeypatch.setattr(dm, "_platform_key", lambda: None)
+
+    events = []
+    with pytest.raises(dm.UnsupportedPlatformError):
+        for evt in dm.install_mpv_generator():
+            events.append(evt)
+    assert events == []  # nothing yielded before raising
+
+
+def test_install_mpv_generator_streams_events(tmp_path, monkeypatch):
+    """Happy-path: yields resolving → downloading* → verifying → extracting → done."""
+    from core import dependency_manager as dm
+
+    monkeypatch.setattr(dm, "_platform_key", lambda: "darwin-arm64")
+    monkeypatch.setattr(dm, "_app_data_dir", lambda: tmp_path)
+
+    # Fake URL → mock requests.get to stream fake bytes.
+    fake_content = b"\x00" * 10000
+    fake_sha = hashlib.sha256(fake_content).hexdigest()
+
+    class FakeResponse:
+        headers = {"content-length": str(len(fake_content))}
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size):
+            for i in range(0, len(fake_content), chunk_size):
+                yield fake_content[i : i + chunk_size]
+
+    monkeypatch.setitem(dm.MPV_BINARIES, "darwin-arm64", {
+        "url": "https://fake.test/mpv.tar.gz",
+        "sha256": fake_sha,
+        "archive": "tar.gz",
+        "inner_binary": "mpv.app/Contents/MacOS/mpv",
+    })
+    monkeypatch.setattr(dm.requests, "get", lambda *a, **kw: FakeResponse())
+
+    # Mock the extract step so we don't try to untar fake bytes.
+    extracted_binary = tmp_path / "extracted" / "mpv.app" / "Contents" / "MacOS" / "mpv"
+    extracted_binary.parent.mkdir(parents=True)
+    extracted_binary.write_text("#!/bin/sh\necho mpv 0.40.0\n")
+    monkeypatch.setattr(
+        dm,
+        "_extract_archive",
+        lambda archive_path, dest, archive_kind: extracted_binary,
+    )
+
+    events = list(dm.install_mpv_generator())
+    phases = [e["phase"] for e in events]
+    assert phases[0] == "resolving"
+    assert "downloading" in phases
+    assert phases[-2] == "verifying" or phases[-3] == "verifying"
+    assert phases[-1] == "done"
+
+    final = events[-1]
+    assert final["path"].endswith("mpv") or final["path"].endswith("mpv.exe")
+    assert (tmp_path / "bin" / "mpv").exists()  # binary copied into place
+
+
+def test_install_mpv_generator_sha_mismatch(tmp_path, monkeypatch):
+    """SHA-256 verification failure raises before extraction."""
+    from core import dependency_manager as dm
+
+    monkeypatch.setattr(dm, "_platform_key", lambda: "darwin-arm64")
+    monkeypatch.setattr(dm, "_app_data_dir", lambda: tmp_path)
+    monkeypatch.setitem(dm.MPV_BINARIES, "darwin-arm64", {
+        "url": "https://fake.test/mpv.tar.gz",
+        "sha256": "0" * 64,  # will not match
+        "archive": "tar.gz",
+        "inner_binary": "mpv.app/Contents/MacOS/mpv",
+    })
+
+    class FakeResponse:
+        headers = {"content-length": "5"}
+        status_code = 200
+        def raise_for_status(self): pass
+        def iter_content(self, chunk_size):
+            yield b"hello"
+
+    monkeypatch.setattr(dm.requests, "get", lambda *a, **kw: FakeResponse())
+
+    with pytest.raises(dm.IntegrityError):
+        list(dm.install_mpv_generator())

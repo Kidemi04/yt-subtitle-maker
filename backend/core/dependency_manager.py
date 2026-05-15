@@ -1,8 +1,12 @@
+import hashlib
 import os
 import platform
 import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
+import zipfile
 from pathlib import Path
 from typing import TypedDict
 
@@ -237,5 +241,111 @@ def download_whisper_model_generator(model_name: str):
                 speed = downloaded / elapsed if elapsed > 0 else 0
                 
                 yield (downloaded, total_size, speed)
-                
+
     print(f"Download complete: {file_path}")
+
+
+class UnsupportedPlatformError(RuntimeError):
+    """Raised when install_mpv_generator is called on a platform without a pinned binary."""
+
+
+class IntegrityError(RuntimeError):
+    """Raised when the downloaded archive's SHA-256 does not match the pinned value."""
+
+
+def _extract_archive(archive_path: Path, dest: Path, archive_kind: str) -> Path:
+    """Extract archive_path into dest. Returns the dest directory.
+
+    Caller joins MPV_BINARIES[key]["inner_binary"] to the returned dir to
+    locate the actual mpv executable.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    if archive_kind == "tar.gz":
+        with tarfile.open(archive_path, "r:gz") as tf:
+            tf.extractall(dest)  # noqa: S202 — pinned archives only
+    elif archive_kind == "zip":
+        with zipfile.ZipFile(archive_path) as zf:
+            zf.extractall(dest)
+    else:
+        raise ValueError(f"unknown archive kind: {archive_kind!r}")
+    return dest
+
+
+def install_mpv_generator():
+    """Yield NDJSON-friendly dict events while downloading + installing mpv.
+
+    Event shape:
+        {"phase": "resolving", "message": str}
+        {"phase": "downloading", "bytesReceived": int, "bytesTotal": int}
+        {"phase": "verifying", "message": str}
+        {"phase": "extracting", "message": str}
+        {"phase": "done", "path": str, "version": str | None}
+
+    Raises:
+        UnsupportedPlatformError — current platform not in MPV_BINARIES.
+        IntegrityError — SHA-256 mismatch.
+        requests.RequestException — network failure.
+    """
+    key = _platform_key()
+    if key is None:
+        raise UnsupportedPlatformError(
+            f"no pinned mpv binary for {sys.platform}/{platform.machine()}"
+        )
+
+    entry = MPV_BINARIES[key]
+    yield {"phase": "resolving", "message": f"using {key} build from {entry['url']}"}
+
+    tmp_root = _app_data_dir() / ".tmp"
+    tmp_root.mkdir(parents=True, exist_ok=True)
+    suffix = ".tar.gz" if entry["archive"] == "tar.gz" else ".zip"
+    archive_path = Path(tempfile.mkstemp(prefix="mpv-", suffix=suffix, dir=tmp_root)[1])
+
+    extract_dest: Path | None = None
+    try:
+        response = requests.get(entry["url"], stream=True, timeout=30)
+        response.raise_for_status()
+        total = int(response.headers.get("content-length", 0))
+        received = 0
+        hasher = hashlib.sha256()
+
+        with open(archive_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if not chunk:
+                    continue
+                f.write(chunk)
+                hasher.update(chunk)
+                received += len(chunk)
+                yield {
+                    "phase": "downloading",
+                    "bytesReceived": received,
+                    "bytesTotal": total,
+                }
+
+        yield {"phase": "verifying", "message": "checking sha-256"}
+        actual = hasher.hexdigest()
+        if entry["sha256"] != "PIN_AT_RELEASE_TIME" and actual != entry["sha256"]:
+            raise IntegrityError(
+                f"sha-256 mismatch for {key}: expected {entry['sha256']}, got {actual}"
+            )
+
+        yield {"phase": "extracting", "message": f"unpacking {entry['archive']}"}
+        extract_dest = tmp_root / f"mpv-extract-{os.getpid()}"
+        extracted = _extract_archive(archive_path, extract_dest, entry["archive"])
+        # _extract_archive normally returns the dest dir; allow tests to return
+        # the inner-binary path directly (file path).
+        inner = extracted if extracted.is_file() else extracted / entry["inner_binary"]
+        if not inner.exists():
+            raise FileNotFoundError(f"expected binary at {inner} after extracting")
+
+        target = _bundled_mpv_path()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(inner, target)
+        if sys.platform != "win32":
+            target.chmod(0o755)
+
+        version = _read_mpv_version(str(target))
+        yield {"phase": "done", "path": str(target), "version": version}
+    finally:
+        archive_path.unlink(missing_ok=True)
+        if extract_dest is not None and extract_dest.exists():
+            shutil.rmtree(extract_dest, ignore_errors=True)
