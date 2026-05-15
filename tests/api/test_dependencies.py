@@ -272,3 +272,21 @@ def test_install_mpv_generator_sha_mismatch(tmp_path, monkeypatch):
 
     with pytest.raises(dm.IntegrityError):
         list(dm.install_mpv_generator())
+
+
+# ── Task 4: GET /api/dependencies/mpv-status endpoint ────────────────────────
+
+
+@patch("api.routes.dependencies.check_mpv_status")
+def test_get_mpv_status_returns_typed_payload(mock_status):
+    mock_status.return_value = {
+        "installed": True,
+        "source": "system",
+        "path": "/opt/homebrew/bin/mpv",
+        "version": "0.40.0",
+    }
+
+    resp = client.get("/api/dependencies/mpv-status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == mock_status.return_value

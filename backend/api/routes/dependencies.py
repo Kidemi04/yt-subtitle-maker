@@ -14,6 +14,7 @@ from core.dependency_manager import (
     MODELS_URLS,
     check_ffmpeg,
     check_mpv,
+    check_mpv_status,
     check_whisper_model,
     download_whisper_model_generator,
 )
@@ -46,7 +47,14 @@ def get_dependencies(engine: str | None = Query(default=None)) -> dict[str, Any]
         "models": {name: check_whisper_model(name) for name in MODELS_URLS},
         "ffmpegAvailable": check_ffmpeg(),
         "mpvAvailable": check_mpv(),
+        "mpvStatus": check_mpv_status(),
     }
+
+
+@router.get("/mpv-status")
+def get_mpv_status() -> dict[str, Any]:
+    """Return only the mpv detection block — cheaper than /api/dependencies for polling."""
+    return check_mpv_status()
 
 
 @router.post("/install")
