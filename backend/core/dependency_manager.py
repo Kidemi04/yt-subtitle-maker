@@ -1,8 +1,76 @@
 import os
+import platform
 import shutil
 import sys
+from pathlib import Path
+from typing import TypedDict
 
 import requests
+
+
+class MpvStatus(TypedDict):
+    installed: bool
+    source: str | None  # "system" | "bundled" | None
+    path: str | None
+    version: str | None
+
+
+class MpvBinaryEntry(TypedDict):
+    url: str
+    sha256: str
+    archive: str  # "tar.gz" | "zip"
+    inner_binary: str  # path inside the archive to the mpv executable
+
+
+# Pinned binary sources. URL + SHA-256 must be updated together when a release is bumped.
+# To pin a new release:
+#   1. Visit https://mpv.io/installation/ and pick the stable binary for each platform.
+#   2. Download once locally and run `shasum -a 256 <file>`.
+#   3. Update both the URL and the sha256 in this table.
+# Linux remains unmapped — the install endpoint returns {supported: false} for it.
+MPV_BINARIES: dict[str, MpvBinaryEntry] = {
+    "darwin-arm64": {
+        "url": "https://laboratory.stolendata.net/~djinn/mpv_osx/mpv-0.40.0-arm64.tar.gz",
+        "sha256": "PIN_AT_RELEASE_TIME",  # see comment above
+        "archive": "tar.gz",
+        "inner_binary": "mpv.app/Contents/MacOS/mpv",
+    },
+    "darwin-x86_64": {
+        "url": "https://laboratory.stolendata.net/~djinn/mpv_osx/mpv-0.40.0-x86_64.tar.gz",
+        "sha256": "PIN_AT_RELEASE_TIME",
+        "archive": "tar.gz",
+        "inner_binary": "mpv.app/Contents/MacOS/mpv",
+    },
+    "win32-x86_64": {
+        "url": "https://downloads.sourceforge.net/project/mpv-player-windows/64bit/mpv-x86_64-20240623-git-9c1bba0.zip",
+        "sha256": "PIN_AT_RELEASE_TIME",
+        "archive": "zip",
+        "inner_binary": "mpv.exe",
+    },
+}
+
+
+def _platform_key() -> str | None:
+    """Return the MPV_BINARIES key for the current platform, or None if unsupported."""
+    sys_name = sys.platform  # "darwin" | "win32" | "linux"
+    machine = platform.machine().lower()
+    if sys_name == "darwin":
+        return "darwin-arm64" if machine in {"arm64", "aarch64"} else "darwin-x86_64"
+    if sys_name == "win32":
+        return "win32-x86_64"
+    return None
+
+
+def _app_data_dir() -> Path:
+    """User-writable data dir, same as core/config.py's resolution."""
+    return Path.home() / ".yt_subtitle_tool"
+
+
+def _bundled_mpv_path() -> Path:
+    """Where install_mpv_generator places the binary."""
+    suffix = ".exe" if sys.platform == "win32" else ""
+    return _app_data_dir() / "bin" / f"mpv{suffix}"
+
 
 # Whisper model URLs.
 #
