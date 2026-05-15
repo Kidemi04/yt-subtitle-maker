@@ -7,7 +7,9 @@ import {
   Caption,
   ButtonSecondary,
   IconButton,
+  SegmentedControl,
 } from "@yt-subtitle-maker/ui";
+import type { LibraryView } from "../../state/library";
 import { useLibrary } from "../../state/library";
 import { LibraryRow } from "./LibraryRow";
 import { LibraryCardCompact } from "./LibraryCardCompact";
@@ -105,28 +107,14 @@ export function LibraryPane() {
           ) : null}
         </XStack>
 
-        <XStack gap={4}>
-          <ButtonSecondary
-            onPress={() => setView("rows")}
-            aria-pressed={view === "rows"}
-            backgroundColor={view === "rows" ? "$surfaceGlassMid" : undefined}
-            borderColor={view === "rows" ? "$accent" : undefined}
-            height={36}
-            paddingHorizontal="$sm"
-          >
-            ☰ Rows
-          </ButtonSecondary>
-          <ButtonSecondary
-            onPress={() => setView("cards")}
-            aria-pressed={view === "cards"}
-            backgroundColor={view === "cards" ? "$surfaceGlassMid" : undefined}
-            borderColor={view === "cards" ? "$accent" : undefined}
-            height={36}
-            paddingHorizontal="$sm"
-          >
-            ⊞ Cards
-          </ButtonSecondary>
-        </XStack>
+        <SegmentedControl<LibraryView>
+          options={[
+            { label: "Rows", value: "rows" },
+            { label: "Cards", value: "cards" },
+          ]}
+          value={view}
+          onValueChange={setView}
+        />
       </YStack>
 
       {error ? (

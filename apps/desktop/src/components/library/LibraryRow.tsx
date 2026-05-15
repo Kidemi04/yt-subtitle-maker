@@ -40,8 +40,6 @@ export function LibraryRow({ item, selected, detail, onPress }: LibraryRowProps)
       paddingHorizontal="$sm"
       borderLeftWidth={selected ? 2 : 0}
       borderLeftColor="$accent"
-      borderBottomWidth={1}
-      borderBottomColor="$borderSubtle"
       backgroundColor={selected ? "$surfaceGlassMid" : "transparent"}
       hoverStyle={{ backgroundColor: "$surfaceGlass" }}
       animation="quick"
