@@ -92,7 +92,11 @@ export function TranslationsSection({
                     primary={`${tr.targetLang.toUpperCase()} · ${tr.translator} · ${tr.segmentCount} segs`}
                     secondary={formatRelative(tr.createdAt)}
                     onPlay={() => onPlayTranslation(tr.id)}
-                    onDelete={() => void deleteTranslation(tr.id)}
+                    onDelete={() => {
+                      if (typeof window !== "undefined" && window.confirm("Delete this translation?")) {
+                        void deleteTranslation(tr.id);
+                      }
+                    }}
                   />
                 ))}
               </YStack>

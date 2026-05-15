@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "@tamagui/lucide-icons";
 import { useFocusEffect } from "expo-router";
 import { XStack, YStack, Stack } from "tamagui";
@@ -31,9 +31,11 @@ export default function LibraryRoute() {
   const selectVideo = useLibrary((s) => s.selectVideo);
   const isNarrow = useViewportIsNarrow();
 
-  useFocusEffect(() => {
-    void fetchList();
-  });
+  useFocusEffect(
+    useCallback(() => {
+      void fetchList();
+    }, [fetchList]),
+  );
 
   useMpvStatusPolling();
   useLibraryKeyboardNav();

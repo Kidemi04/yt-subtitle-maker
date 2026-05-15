@@ -63,7 +63,11 @@ export function TranscriptsSection({
                 secondary={formatRelative(t.createdAt)}
                 onPlay={() => onPlayTranscript(t.id)}
                 onReRun={() => onReTranslateFrom(t.id)}
-                onDelete={() => void deleteTranscript(t.id)}
+                onDelete={() => {
+                  if (typeof window !== "undefined" && window.confirm("Delete this transcript? Its translations will be deleted too.")) {
+                    void deleteTranscript(t.id);
+                  }
+                }}
               />
             );
           })}
