@@ -5,4 +5,4 @@
  * Used by apps/desktop today; apps/mobile (V2) will reuse identically.
  */
 export * from "./types";
-export { ApiClient } from "./client";
+export { ApiClient, InstallMpvUnsupportedError } from "./client";

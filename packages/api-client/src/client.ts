@@ -5,10 +5,13 @@ import type {
   EngineDescriptor,
   HistoryItem,
   InstallEvent,
+  InstallMpvEvent,
+  InstallMpvUnsupported,
   LibraryItem,
   LibraryRunEvent,
   LibraryTranscribeRequest,
   LibraryTranslateRequest,
+  MpvStatus,
   ProcessEvent,
   ProcessRequest,
   SystemReport,
@@ -21,6 +24,14 @@ import type {
   CheckFsRequest,
   CheckFsResult,
 } from "./types";
+
+export class InstallMpvUnsupportedError extends Error {
+  manualUrl: string;
+  constructor(manualUrl: string) {
+    super(`mpv auto-install is not supported on this platform. Download from ${manualUrl}`);
+    this.manualUrl = manualUrl;
+  }
+}
 
 /**
  * ApiClient — the single HTTP / NDJSON-stream client used by the desktop
@@ -366,6 +377,56 @@ export class ApiClient {
       engine ? { model, engine } : { model },
       signal,
     );
+  }
+
+  async fetchMpvStatus(signal?: AbortSignal): Promise<MpvStatus> {
+    const response = await fetch(`${this.baseUrl}/api/dependencies/mpv-status`, {
+      headers: this.headers(),
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`mpv-status ${response.status}: ${await response.text()}`);
+    }
+    return (await response.json()) as MpvStatus;
+  }
+
+  async *installMpv(signal?: AbortSignal): AsyncIterable<InstallMpvEvent> {
+    // Pre-flight to surface the unsupported-platform 400 as a typed error.
+    const preflight = await fetch(`${this.baseUrl}/api/dependencies/install-mpv`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({}),
+      signal,
+    });
+    if (preflight.status === 400) {
+      const body = (await preflight.json()) as InstallMpvUnsupported;
+      throw new InstallMpvUnsupportedError(body.manualUrl);
+    }
+    if (!preflight.ok || !preflight.body) {
+      throw new Error(`install-mpv ${preflight.status}: ${await preflight.text()}`);
+    }
+    // Stream the rest of this same response (we already have the body).
+    const reader = preflight.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          yield JSON.parse(trimmed) as InstallMpvEvent;
+        }
+      }
+      const tail = buffer.trim();
+      if (tail) yield JSON.parse(tail) as InstallMpvEvent;
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   // ─── Filesystem path check ────────────────────────────────────────────

@@ -328,6 +328,27 @@ export interface BackendCapabilities {
   jsRuntime: string | null;
 }
 
+export interface MpvStatus {
+  installed: boolean;
+  source: "system" | "bundled" | null;
+  path: string | null;
+  version: string | null;
+}
+
+export type InstallMpvEvent =
+  | { phase: "resolving"; message: string }
+  | { phase: "downloading"; bytesReceived: number; bytesTotal: number }
+  | { phase: "verifying"; message: string }
+  | { phase: "extracting"; message: string }
+  | { phase: "done"; path: string; version: string | null }
+  | { phase: "error"; message: string };
+
+/** Returned (HTTP 400) when the current platform has no pinned binary. */
+export interface InstallMpvUnsupported {
+  supported: false;
+  manualUrl: string;
+}
+
 /**
  * Backend ships per-model install state plus ffmpeg / mpv probe results.
  * Shape matches backend/api/routes/dependencies.py::get_dependencies.
@@ -336,6 +357,7 @@ export interface DependencyStatus {
   models: Partial<Record<WhisperModel, boolean>>;
   ffmpegAvailable: boolean;
   mpvAvailable: boolean;
+  mpvStatus: MpvStatus;
 }
 
 /** True if at least one Whisper model is installed. */
