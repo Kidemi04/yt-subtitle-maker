@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { LayoutGrid, List, RefreshCw, Search, X } from "@tamagui/lucide-icons";
-import { Input, ScrollView, Stack, XStack, YStack } from "tamagui";
+import { RefreshCw, Search, X } from "@tamagui/lucide-icons";
+import { Input, ScrollView, XStack, YStack } from "tamagui";
 import {
   BodyMd,
   BodySm,
