@@ -37,7 +37,6 @@ import {
 } from "@tamagui/lucide-icons";
 import {
   SidebarItem,
-  StatusDot,
   IconButton,
   Dropdown,
   DisplaySm,
@@ -93,10 +92,11 @@ function Sidebar() {
 
   return (
     <YStack
-      width={240}
+      width={232}
       height="100%"
-      paddingHorizontal="$sm"
-      paddingVertical="$lg"
+      paddingHorizontal={12}
+      paddingTop="$lg"
+      paddingBottom="$md"
       gap="$xs"
       backgroundColor="$bgElevated"
       borderRightWidth={1}
@@ -106,17 +106,33 @@ function Sidebar() {
         WebkitBackdropFilter: glassRecipes.glassMid.backdropFilter,
       }}
     >
-      <YStack paddingHorizontal="$md" paddingBottom="$lg" gap={4}>
-        {/* Wordmark — Fraunces with relaxed tracking; the locked -0.5 from
-            the display scale makes the lowercase characters touch at this
-            size, so we override to 0.2 for breathing room. */}
-        <DisplaySm fontSize={20} lineHeight={26} letterSpacing={0.2}>
-          yt·subtitle
-        </DisplaySm>
-        <CaptionUpper>v2.0 · alpha</CaptionUpper>
+      <YStack paddingHorizontal={14} paddingBottom="$lg" gap={4}>
+        <XStack alignItems="baseline" gap={8}>
+          <DisplaySm fontSize={22} lineHeight={26} letterSpacing={-0.4}>
+            Translator
+          </DisplaySm>
+          <Text
+            fontFamily="$mono"
+            fontSize={10}
+            color="$accent"
+            letterSpacing={0.5}
+            style={{ transform: "translateY(-1px)" }}
+          >
+            v2.2
+          </Text>
+        </XStack>
+        <CaptionUpper letterSpacing={1.8} fontSize={9} opacity={0.55}>
+          Subtitle Studio
+        </CaptionUpper>
       </YStack>
 
-      <YStack flex={1} gap="$sm">
+      <YStack paddingLeft={14} paddingBottom={6}>
+        <CaptionUpper letterSpacing={1.5} fontSize={9} opacity={0.5}>
+          Workspace
+        </CaptionUpper>
+      </YStack>
+
+      <YStack flex={1} gap={2}>
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -124,7 +140,7 @@ function Sidebar() {
             <SidebarItem
               key={item.href}
               icon={
-                <Icon size={16} color={active ? "$accent" : "$textSecondary"} />
+                <Icon size={15} color={active ? "$accent" : "$textSecondary"} />
               }
               label={item.label}
               active={active}
@@ -134,17 +150,6 @@ function Sidebar() {
         })}
       </YStack>
 
-      <XStack
-        alignItems="center"
-        gap="$sm"
-        paddingHorizontal="$md"
-        paddingVertical="$sm"
-        borderTopWidth={1}
-        borderTopColor="$borderSubtle"
-      >
-        <StatusDot status="ok" size={8} />
-        <Caption>Backend · 127.0.0.1:8000</Caption>
-      </XStack>
     </YStack>
   );
 }
