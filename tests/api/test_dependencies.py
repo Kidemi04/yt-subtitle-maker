@@ -1,3 +1,4 @@
+import subprocess
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from api.main import app
@@ -121,3 +122,60 @@ def test_dependencies_install_planned_engine_returns_error():
     body = resp.json()
     assert body["ok"] is False
     assert "faster-whisper" in body["error"]
+
+
+# ── Task 2: check_mpv_status() lookup-order priority ──────────────────────────
+
+
+def test_check_mpv_status_prefers_bundled(tmp_path, monkeypatch):
+    """Bundled binary at ~/.yt_subtitle_tool/bin/mpv wins over system PATH."""
+    from core import dependency_manager as dm
+
+    fake_bundled = tmp_path / "bin" / "mpv"
+    fake_bundled.parent.mkdir(parents=True)
+    fake_bundled.write_text("#!/bin/sh\necho 'mpv 0.40.0'\n")
+    fake_bundled.chmod(0o755)
+
+    monkeypatch.setattr(dm, "_bundled_mpv_path", lambda: fake_bundled)
+    monkeypatch.setattr(dm.shutil, "which", lambda name: "/usr/local/bin/mpv")
+    monkeypatch.setattr(
+        dm.subprocess,
+        "run",
+        lambda *a, **kw: subprocess.CompletedProcess(a, 0, stdout="mpv 0.40.0\n", stderr=""),
+    )
+
+    status = dm.check_mpv_status()
+    assert status["installed"] is True
+    assert status["source"] == "bundled"
+    assert status["path"] == str(fake_bundled)
+    assert status["version"] == "0.40.0"
+
+
+def test_check_mpv_status_falls_back_to_system(tmp_path, monkeypatch):
+    from core import dependency_manager as dm
+
+    missing = tmp_path / "bin" / "mpv"  # does not exist
+    monkeypatch.setattr(dm, "_bundled_mpv_path", lambda: missing)
+    monkeypatch.setattr(dm.shutil, "which", lambda name: "/opt/homebrew/bin/mpv")
+    monkeypatch.setattr(
+        dm.subprocess,
+        "run",
+        lambda *a, **kw: subprocess.CompletedProcess(a, 0, stdout="mpv 0.39.0\n", stderr=""),
+    )
+
+    status = dm.check_mpv_status()
+    assert status["installed"] is True
+    assert status["source"] == "system"
+    assert status["path"] == "/opt/homebrew/bin/mpv"
+    assert status["version"] == "0.39.0"
+
+
+def test_check_mpv_status_returns_not_installed_when_neither(tmp_path, monkeypatch):
+    from core import dependency_manager as dm
+
+    missing = tmp_path / "bin" / "mpv"
+    monkeypatch.setattr(dm, "_bundled_mpv_path", lambda: missing)
+    monkeypatch.setattr(dm.shutil, "which", lambda name: None)
+
+    status = dm.check_mpv_status()
+    assert status == {"installed": False, "source": None, "path": None, "version": None}

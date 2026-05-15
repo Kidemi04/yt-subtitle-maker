@@ -1,6 +1,7 @@
 import os
 import platform
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import TypedDict
@@ -154,6 +155,51 @@ def check_ffmpeg() -> bool:
 def check_mpv() -> bool:
     """Checks if mpv is available in PATH."""
     return shutil.which("mpv") is not None
+
+
+def _read_mpv_version(binary: str) -> str | None:
+    """Run `mpv --version` and parse the first token of the second word.
+
+    Output looks like:  mpv 0.40.0+git-3a4b5c (C) ...
+    """
+    try:
+        result = subprocess.run(
+            [binary, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        first_line = (result.stdout or "").strip().splitlines()[0] if result.stdout else ""
+        # "mpv 0.40.0+git-..." → "0.40.0+git-..."
+        parts = first_line.split()
+        return parts[1] if len(parts) >= 2 else None
+    except (OSError, subprocess.TimeoutExpired, IndexError):
+        return None
+
+
+def check_mpv_status() -> MpvStatus:
+    """Detect mpv with priority: bundled → system PATH → none.
+
+    Returns the typed `MpvStatus` dict; safe to JSON-serialise.
+    """
+    bundled = _bundled_mpv_path()
+    if bundled.exists() and os.access(bundled, os.X_OK):
+        return {
+            "installed": True,
+            "source": "bundled",
+            "path": str(bundled),
+            "version": _read_mpv_version(str(bundled)),
+        }
+    system = shutil.which("mpv")
+    if system:
+        return {
+            "installed": True,
+            "source": "system",
+            "path": system,
+            "version": _read_mpv_version(system),
+        }
+    return {"installed": False, "source": None, "path": None, "version": None}
 
 def download_whisper_model_generator(model_name: str):
     """
