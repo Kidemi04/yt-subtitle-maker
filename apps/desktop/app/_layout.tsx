@@ -429,23 +429,29 @@ export default function RootLayout() {
             <Sidebar />
             <YStack flex={1}>
               <Topbar />
-              <ScrollView
-                flex={1}
-                contentContainerStyle={{
-                  flexGrow: 1,
-                  paddingHorizontal: 32,
-                  paddingVertical: 32,
-                }}
-              >
-                <YStack
-                  width="100%"
-                  maxWidth={960}
-                  gap="$lg"
-                  alignSelf="center"
-                >
+              {pathname === "/library" ? (
+                <YStack flex={1}>
                   <Slot />
                 </YStack>
-              </ScrollView>
+              ) : (
+                <ScrollView
+                  flex={1}
+                  contentContainerStyle={{
+                    flexGrow: 1,
+                    paddingHorizontal: 32,
+                    paddingVertical: 32,
+                  }}
+                >
+                  <YStack
+                    width="100%"
+                    maxWidth={960}
+                    gap="$lg"
+                    alignSelf="center"
+                  >
+                    <Slot />
+                  </YStack>
+                </ScrollView>
+              )}
             </YStack>
           </XStack>
           <LogsDrawer />
