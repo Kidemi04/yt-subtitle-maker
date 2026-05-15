@@ -47,3 +47,6 @@ models/
 apps/desktop/src-tauri/backend-dist/*
 !apps/desktop/src-tauri/backend-dist/.gitkeep
 apps/desktop/src-tauri/.pyinstaller-work/
+
+# Superpowers brainstorming/companion artifacts
+.superpowers/
