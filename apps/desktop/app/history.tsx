@@ -26,7 +26,7 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { apiClient } from "../src/state/client";
 import { useGenerate } from "../src/state/generate";
-import { VideoDetailModal } from "../src/components/VideoDetailModal";
+import { useLibrary } from "../src/state/library";
 import type { HistoryItem } from "@yt-subtitle-maker/api-client";
 
 type TimeFilter = "all" | "today" | "week" | "month";
@@ -78,12 +78,12 @@ function withinTime(item: HistoryItem, range: TimeFilter): boolean {
 
 export default function History() {
   const router = useRouter();
+  const selectVideo = useLibrary((s) => s.selectVideo);
   const [items, setItems] = React.useState<HistoryItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>();
   const [time, setTime] = React.useState<TimeFilter>("all");
   const [sort, setSort] = React.useState<SortOrder>("recent");
-  const [openItem, setOpenItem] = React.useState<HistoryItem | undefined>();
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -211,28 +211,13 @@ export default function History() {
             <HistoryRow
               key={item.videoId + item.createdAt}
               item={item}
-              onOpenDetail={() => setOpenItem(item)}
+              onOpenDetail={() => {
+                selectVideo(item.videoId);
+                router.push("/library");
+              }}
             />
           ))}
         </YStack>
-      ) : null}
-
-      {openItem ? (
-        <VideoDetailModal
-          open={!!openItem}
-          onOpenChange={(open) => {
-            if (!open) setOpenItem(undefined);
-          }}
-          videoId={openItem.videoId}
-          fallbackTitle={openItem.titleTranslated ?? openItem.titleOriginal}
-          fallbackThumbnailUrl={openItem.thumbnailUrl}
-          fallbackUrl={openItem.url}
-          fallbackCreatedAt={openItem.createdAt}
-          onDeleted={() => {
-            setOpenItem(undefined);
-            refresh();
-          }}
-        />
       ) : null}
     </YStack>
   );
