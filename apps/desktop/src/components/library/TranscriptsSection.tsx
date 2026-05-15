@@ -1,19 +1,21 @@
 import { XStack, YStack } from "tamagui";
-import { BadgePill, ButtonSecondary, Caption, TitleSm } from "@yt-subtitle-maker/ui";
+import {
+  ButtonSecondary,
+  Caption,
+  DisplayMd,
+} from "@yt-subtitle-maker/ui";
 import type { TranscribeRun } from "@yt-subtitle-maker/api-client";
 import { RunRow } from "./RunRow";
 import { useLibrary } from "../../state/library";
 import { formatRelative, formatDuration } from "../../lib/format";
 
 /**
- * TranscriptsSection — the "Transcripts · N" group inside the right-pane
- * DetailPane. Header has a "Re-transcribe" CTA (always enabled — you can
- * always add a fresh transcript). Each row is a `RunRow` whose
- * Re-run action opens the translate modal seeded with that transcript.
+ * TranscriptsSection — editorial "Transcripts" group inside the right pane.
  *
- * Section header uses `TitleSm` with uppercased + letter-spaced styling and
- * an inline accent `BadgePill` for the count, matching the old library
- * design language.
+ * Header is a Fraunces `DisplayMd` label with a quiet `01 / 02`-style count
+ * next to it (no badge). The Re-transcribe CTA on the right keeps the
+ * existing `ButtonSecondary` but with a tightened sizing + a softer
+ * `$borderSubtle` to avoid competing with the title.
  */
 export interface TranscriptsSectionProps {
   videoId: string;
@@ -31,49 +33,56 @@ export function TranscriptsSection({
 }: TranscriptsSectionProps) {
   const deleteTranscript = useLibrary((s) => s.deleteTranscript);
 
+  const total = transcribes.length;
+  const countLabel =
+    total === 0 ? "no versions" : total === 1 ? "1 version" : `${total} versions`;
+
   return (
     <YStack gap="$sm">
-      <XStack alignItems="center" justifyContent="space-between">
-        <XStack gap="$xs" alignItems="center">
-          <TitleSm
-            color="$textPrimary"
-            textTransform="uppercase"
-            letterSpacing={1}
-          >
-            Transcripts
-          </TitleSm>
-          <BadgePill tone="accent">{transcribes.length}</BadgePill>
+      <XStack alignItems="baseline" justifyContent="space-between">
+        <XStack alignItems="baseline" gap="$sm">
+          <DisplayMd>Transcripts</DisplayMd>
+          <Caption color="$textMuted">{countLabel}</Caption>
         </XStack>
-        <ButtonSecondary onPress={onReTranscribe} height={32} paddingHorizontal="$sm">
+        <ButtonSecondary
+          onPress={onReTranscribe}
+          height={32}
+          paddingHorizontal="$sm"
+          borderColor="$borderSubtle"
+        >
           + Re-transcribe
         </ButtonSecondary>
       </XStack>
 
       {transcribes.length === 0 ? (
-        <YStack
-          paddingVertical="$md"
-          paddingHorizontal="$sm"
-          borderRadius="$sm"
-          borderWidth={1}
-          borderColor="$borderSubtle"
-          borderStyle="dashed"
-        >
-          <Caption color="$textMuted">No transcripts yet — Re-transcribe to add one.</Caption>
+        <YStack paddingVertical="$sm" paddingHorizontal="$sm">
+          <Caption color="$textMuted" fontStyle="italic">
+            No transcripts yet — Re-transcribe to add one.
+          </Caption>
         </YStack>
       ) : (
-        <YStack gap="$xs">
+        <YStack>
           {transcribes.map((t) => {
-            const engineLabel = t.engine === "yt_captions" ? "yt-captions" : t.model ?? t.engine;
-            const primary = `${t.language.toUpperCase()} · ${engineLabel} · ${t.segmentCount} segs · ${formatDuration(t.durationMs)}`;
+            const engineLabel =
+              t.engine === "yt_captions" ? "yt-captions" : (t.model ?? t.engine);
+            const secondary = `${t.segmentCount} segs · ${formatDuration(
+              t.durationMs,
+            )} · ${formatRelative(t.createdAt)}`;
             return (
               <RunRow
                 key={t.id}
-                primary={primary}
-                secondary={formatRelative(t.createdAt)}
+                primaryLang={t.language.toUpperCase()}
+                primaryEngine={engineLabel}
+                secondary={secondary}
                 onPlay={() => onPlayTranscript(t.id)}
                 onReRun={() => onReTranslateFrom(t.id)}
                 onDelete={() => {
-                  if (typeof window !== "undefined" && window.confirm("Delete this transcript? Its translations will be deleted too.")) {
+                  if (
+                    typeof window !== "undefined" &&
+                    window.confirm(
+                      "Delete this transcript? Its translations will be deleted too.",
+                    )
+                  ) {
                     void deleteTranscript(t.id);
                   }
                 }}

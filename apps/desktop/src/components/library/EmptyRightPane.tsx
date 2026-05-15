@@ -1,30 +1,23 @@
 import { Library as LibraryIconLucide } from "@tamagui/lucide-icons";
 import { Stack, YStack } from "tamagui";
-import { BodyMd, DisplayMd, HeroCard } from "@yt-subtitle-maker/ui";
+import { BodyMd, DisplayLg, HeroCard } from "@yt-subtitle-maker/ui";
 
 /**
- * EmptyRightPane — placeholder shown in the right pane when either:
- *   - the whole library is empty (libraryEmpty=true), or
- *   - nothing is selected yet on the left list.
+ * EmptyRightPane — editorial empty state for the right pane.
  *
- * Visual: a HeroCard with a 120x120 glass tile (and a soft $accentSoft halo
- * behind the icon) hosting the Library glyph, a DisplayMd headline, and one
- * helper line of body copy. No CTA — the user navigates from the left pane
- * (or the Generate tab).
+ * A `HeroCard` with a compact 96x96 icon well (down from 120 — the previous
+ * version felt overstated). Headline uses `DisplayLg` (Fraunces) and the
+ * body line is italicised `BodyMd` to lean into the magazine feel. A soft
+ * `$accentSoft` halo sits behind the icon for warmth.
  */
 export function EmptyRightPane({ libraryEmpty }: { libraryEmpty: boolean }) {
   return (
-    <YStack
-      flex={1}
-      alignItems="center"
-      justifyContent="center"
-      padding="$lg"
-    >
+    <YStack flex={1} alignItems="center" justifyContent="center" padding="$lg">
       <HeroCard variant="mid">
         <YStack alignItems="center" gap="$md" paddingVertical="$lg">
           <Stack
-            width={120}
-            height={120}
+            width={96}
+            height={96}
             borderRadius="$xl"
             alignItems="center"
             justifyContent="center"
@@ -42,13 +35,17 @@ export function EmptyRightPane({ libraryEmpty }: { libraryEmpty: boolean }) {
               opacity={0.6}
               style={{ filter: "blur(12px)" }}
             />
-            <LibraryIconLucide size={48} color="$textMuted" />
+            <LibraryIconLucide size={40} color="$textMuted" />
           </Stack>
-          <YStack alignItems="center" gap="$xs" maxWidth={360}>
-            <DisplayMd textAlign="center">
+          <YStack alignItems="center" gap="$xs" maxWidth={400}>
+            <DisplayLg textAlign="center">
               {libraryEmpty ? "Your library is empty" : "Pick a video"}
-            </DisplayMd>
-            <BodyMd color="$textSecondary" textAlign="center">
+            </DisplayLg>
+            <BodyMd
+              color="$textSecondary"
+              textAlign="center"
+              fontStyle="italic"
+            >
               {libraryEmpty
                 ? "Generate some subtitles and they'll show up here."
                 : "Select a video on the left to see transcripts and translations."}

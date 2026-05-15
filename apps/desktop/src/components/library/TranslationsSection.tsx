@@ -1,19 +1,22 @@
 import { AlertTriangle } from "@tamagui/lucide-icons";
-import { XStack, YStack } from "tamagui";
-import { BadgePill, ButtonSecondary, Caption, TitleSm } from "@yt-subtitle-maker/ui";
+import { Stack, XStack, YStack } from "tamagui";
+import {
+  ButtonSecondary,
+  Caption,
+  DisplayMd,
+} from "@yt-subtitle-maker/ui";
 import type { TranscribeRun, TranslateRun } from "@yt-subtitle-maker/api-client";
 import { RunRow } from "./RunRow";
 import { useLibrary } from "../../state/library";
 import { formatRelative } from "../../lib/format";
 
 /**
- * TranslationsSection — the "Translations · N" group inside the right-pane
- * DetailPane. Translations are grouped by their `sourceTranscribeId` so users
- * can see which transcript each one was derived from; runs whose source has
- * since been deleted ("orphans") get bucketed under a warning-iconed header.
+ * TranslationsSection — editorial "Translations" group inside the right pane.
  *
- * The "Re-translate" CTA is disabled when there are no transcripts to pick
- * from — translation always requires a source transcript.
+ * Same header treatment as TranscriptsSection (Fraunces `DisplayMd` + quiet
+ * count). Translations are grouped by their source transcript and rendered
+ * under a thin `From — VI · whisper-large` label row with a hairline divider
+ * above (no pill, no badge — just a discreet caption).
  */
 export interface TranslationsSectionProps {
   videoId: string;
@@ -32,50 +35,49 @@ export function TranslationsSection({
   const deleteTranslation = useLibrary((s) => s.deleteTranslation);
   const canReTranslate = transcribes.length > 0;
 
-  const byTranscriptId = new Map<string, TranscribeRun>(transcribes.map((t) => [t.id, t]));
-  // Preserve insertion order so groups appear in a stable order on each render.
+  const total = translations.length;
+  const countLabel =
+    total === 0 ? "no versions" : total === 1 ? "1 version" : `${total} versions`;
+
+  const byTranscriptId = new Map<string, TranscribeRun>(
+    transcribes.map((t) => [t.id, t]),
+  );
   const groups = new Map<string | null, TranslateRun[]>();
   for (const tr of translations) {
-    const key = byTranscriptId.has(tr.sourceTranscribeId) ? tr.sourceTranscribeId : null;
+    const key = byTranscriptId.has(tr.sourceTranscribeId)
+      ? tr.sourceTranscribeId
+      : null;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(tr);
   }
 
   return (
     <YStack gap="$sm">
-      <XStack alignItems="center" justifyContent="space-between">
-        <XStack gap="$xs" alignItems="center">
-          <TitleSm
-            color="$textPrimary"
-            textTransform="uppercase"
-            letterSpacing={1}
-          >
-            Translations
-          </TitleSm>
-          <BadgePill tone="accent">{translations.length}</BadgePill>
+      <XStack alignItems="baseline" justifyContent="space-between">
+        <XStack alignItems="baseline" gap="$sm">
+          <DisplayMd>Translations</DisplayMd>
+          <Caption color="$textMuted">{countLabel}</Caption>
         </XStack>
         <ButtonSecondary
           onPress={onReTranslate}
           disabled={!canReTranslate}
           aria-disabled={!canReTranslate}
-          aria-label={canReTranslate ? undefined : "Re-translate (disabled — add a transcript first)"}
+          aria-label={
+            canReTranslate
+              ? undefined
+              : "Re-translate (disabled — add a transcript first)"
+          }
           height={32}
           paddingHorizontal="$sm"
+          borderColor="$borderSubtle"
         >
           + Re-translate
         </ButtonSecondary>
       </XStack>
 
       {translations.length === 0 ? (
-        <YStack
-          paddingVertical="$md"
-          paddingHorizontal="$sm"
-          borderRadius="$sm"
-          borderWidth={1}
-          borderColor="$borderSubtle"
-          borderStyle="dashed"
-        >
-          <Caption color="$textMuted">
+        <YStack paddingVertical="$sm" paddingHorizontal="$sm">
+          <Caption color="$textMuted" fontStyle="italic">
             {canReTranslate
               ? "No translations yet — Re-translate to add one."
               : "Add a transcript first, then you can translate it."}
@@ -86,23 +88,42 @@ export function TranslationsSection({
           {Array.from(groups.entries()).map(([transcriptId, runs]) => {
             const orphan = transcriptId === null;
             const source = transcriptId ? byTranscriptId.get(transcriptId) : null;
-            const header = orphan
+            const sourceLabel = orphan
               ? "Orphans (source transcript deleted)"
-              : `From: ${source?.language.toUpperCase()} · ${source?.model ?? source?.engine}`;
+              : `From — ${source?.language.toUpperCase()} · ${
+                  source?.model ?? source?.engine
+                }`;
             return (
-              <YStack key={transcriptId ?? "orphan"} gap="$xs">
-                <XStack gap="$xs" alignItems="center">
-                  {orphan ? <AlertTriangle size={12} color="#e8a55a" /> : null}
-                  <Caption color="$textSecondary">{header}</Caption>
-                </XStack>
+              <YStack key={transcriptId ?? "orphan"}>
+                <Stack
+                  borderTopWidth={1}
+                  borderTopColor="$borderSubtle"
+                  paddingTop="$xs"
+                  paddingHorizontal="$sm"
+                  marginBottom="$xxs"
+                >
+                  <XStack gap="$xs" alignItems="center">
+                    {orphan ? <AlertTriangle size={12} color="#e8a55a" /> : null}
+                    <Caption
+                      color="$textMuted"
+                      fontStyle={orphan ? undefined : "italic"}
+                    >
+                      {sourceLabel}
+                    </Caption>
+                  </XStack>
+                </Stack>
                 {runs.map((tr) => (
                   <RunRow
                     key={tr.id}
-                    primary={`${tr.targetLang.toUpperCase()} · ${tr.translator} · ${tr.segmentCount} segs`}
+                    primaryLang={tr.targetLang.toUpperCase()}
+                    primaryEngine={`${tr.translator} · ${tr.segmentCount} segs`}
                     secondary={formatRelative(tr.createdAt)}
                     onPlay={() => onPlayTranslation(tr.id)}
                     onDelete={() => {
-                      if (typeof window !== "undefined" && window.confirm("Delete this translation?")) {
+                      if (
+                        typeof window !== "undefined" &&
+                        window.confirm("Delete this translation?")
+                      ) {
                         void deleteTranslation(tr.id);
                       }
                     }}
