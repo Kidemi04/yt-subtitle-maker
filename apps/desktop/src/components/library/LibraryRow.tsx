@@ -43,7 +43,18 @@ export function LibraryRow({ item, selected, detail, onPress }: LibraryRowProps)
       backgroundColor={selected ? "$surfaceGlassMid" : "transparent"}
       hoverStyle={{ backgroundColor: "$surfaceGlass" }}
       animation="quick"
+      position="relative"
     >
+      {/* Engraved divider — darker than $bgElevated, inset by $md on each side */}
+      <Stack
+        position="absolute"
+        bottom={0}
+        left="$md"
+        right="$md"
+        height={1}
+        backgroundColor="$bgBase"
+        pointerEvents="none"
+      />
       <XStack gap="$sm" alignItems="flex-start">
         <Stack
           width={80}
