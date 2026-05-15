@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Stack, XStack, YStack } from "tamagui";
+import { Input, Stack, XStack, YStack } from "tamagui";
 import {
   RefreshCcw,
   Search,
@@ -8,7 +8,6 @@ import {
 import {
   GlassCard,
   HeroCard,
-  TextInput,
   IconButton,
   FilterChip,
   BadgePill,
@@ -138,16 +137,53 @@ export default function Library() {
               </FilterChip>
             ))}
           </XStack>
-          <XStack flex={1} minWidth={240} alignItems="center" position="relative">
-            <Stack position="absolute" left={14} zIndex={1}>
+          <XStack
+            flex={1}
+            minWidth={240}
+            height={44}
+            alignItems="center"
+            borderWidth={1}
+            borderColor="$borderSubtle"
+            borderRadius="$md"
+            backgroundColor="rgba(255,255,255,0.04)"
+            focusStyle={{
+              borderColor: "$accent",
+              borderWidth: 2,
+            }}
+            hoverStyle={{
+              borderColor: "$borderStrong",
+            }}
+          >
+            <Stack
+              width={36}
+              alignItems="center"
+              justifyContent="center"
+              pointerEvents="none"
+            >
               <Search size={14} color="$textMuted" />
             </Stack>
-            <TextInput
+            <Input
+              unstyled
               flex={1}
-              paddingLeft={36}
+              height="100%"
+              paddingLeft={0}
+              paddingRight={16}
+              fontFamily="$body"
+              fontSize={14}
+              color="$textPrimary"
+              placeholderTextColor="$textMuted"
+              borderWidth={0}
+              backgroundColor="transparent"
               value={search}
               onChangeText={setSearch}
               placeholder="Search title or video id"
+              style={
+                {
+                  color: "#f5f5f7",
+                  caretColor: "#fb923c",
+                  outline: "none",
+                } as React.CSSProperties as never
+              }
             />
           </XStack>
         </XStack>

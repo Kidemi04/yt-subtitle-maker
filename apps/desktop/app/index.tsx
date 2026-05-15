@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Stack, XStack, YStack } from "tamagui";
+import { Input, Stack, XStack, YStack } from "tamagui";
 import {
   Link2,
   ChevronDown,
@@ -16,7 +16,6 @@ import {
 import {
   HeroCard,
   GlassCard,
-  TextInput,
   ButtonPrimary,
   ButtonSecondary,
   ButtonGhost,
@@ -489,18 +488,53 @@ export default function Generate() {
           </YStack>
 
           <XStack gap="$sm" alignItems="center">
-            <XStack flex={1} alignItems="center" position="relative">
-              <Stack position="absolute" left={18} zIndex={1}>
+            <XStack
+              flex={1}
+              height={52}
+              alignItems="center"
+              borderWidth={1}
+              borderColor="$borderSubtle"
+              borderRadius="$md"
+              backgroundColor="rgba(255,255,255,0.04)"
+              focusStyle={{
+                borderColor: "$accent",
+                borderWidth: 2,
+              }}
+              hoverStyle={{
+                borderColor: "$borderStrong",
+              }}
+            >
+              <Stack
+                width={44}
+                alignItems="center"
+                justifyContent="center"
+                pointerEvents="none"
+              >
                 <Link2 size={16} color="$textMuted" />
               </Stack>
-              <TextInput
+              <Input
+                unstyled
                 flex={1}
-                paddingLeft={44}
-                height={52}
+                height="100%"
+                paddingLeft={0}
+                paddingRight={16}
+                fontFamily="$body"
+                fontSize={14}
+                color="$textPrimary"
+                placeholderTextColor="$textMuted"
+                borderWidth={0}
+                backgroundColor="transparent"
                 value={url}
                 onChangeText={setUrl}
                 placeholder="https://www.youtube.com/watch?v=..."
                 onSubmitEditing={loadMetadata}
+                style={
+                  {
+                    color: "#f5f5f7",
+                    caretColor: "#fb923c",
+                    outline: "none",
+                  } as React.CSSProperties as never
+                }
               />
             </XStack>
             <ButtonPrimary

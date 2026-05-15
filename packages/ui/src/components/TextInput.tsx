@@ -30,7 +30,8 @@ export function TextInput({ style, ...rest }: TextInputProps) {
       unstyled
       height={44}
       borderRadius="$md"
-      paddingHorizontal="$md"
+      paddingLeft="$md"
+      paddingRight="$md"
       backgroundColor={glassRecipes.glassLow.bg}
       borderWidth={1}
       borderColor="$borderSubtle"
