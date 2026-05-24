@@ -13,20 +13,20 @@
 
 export const glassRecipes = {
   glassLow: {
-    bg: "rgba(255,255,255,0.04)",
-    border: "rgba(255,255,255,0.06)",
-    backdropFilter: "blur(24px) saturate(180%)",
+    bg: "#fff8f6",
+    border: "#e6dfd8",
+    backdropFilter: "none",
   },
   glassMid: {
-    bg: "rgba(255,255,255,0.06)",
-    border: "rgba(255,255,255,0.08)",
-    backdropFilter: "blur(40px) saturate(180%)",
+    bg: "#fff8f6",
+    border: "#e6dfd8",
+    backdropFilter: "none",
   },
   glassHigh: {
-    bg: "rgba(255,255,255,0.08)",
-    border: "rgba(255,255,255,0.12)",
-    backdropFilter: "blur(60px) saturate(200%)",
-    boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
+    bg: "#fff8f6",
+    border: "#dac1ba",
+    backdropFilter: "none",
+    boxShadow: "0 24px 48px rgba(33,26,24,0.10)",
   },
 } as const;
 

@@ -42,8 +42,8 @@ const INTER_600 = "Inter_600SemiBold" as const;
 export const DisplayXl = (p: Props) => (
   <Text
     fontFamily="$display"
-    fontSize={56}
-    lineHeight={59}
+    fontSize={72}
+    lineHeight={76}
     letterSpacing={-1.5}
     color="$textPrimary"
     {...p}
@@ -53,8 +53,8 @@ export const DisplayXl = (p: Props) => (
 export const DisplayLg = (p: Props) => (
   <Text
     fontFamily="$display"
-    fontSize={40}
-    lineHeight={44}
+    fontSize={56}
+    lineHeight={63}
     letterSpacing={-1}
     color="$textPrimary"
     {...p}
@@ -64,8 +64,8 @@ export const DisplayLg = (p: Props) => (
 export const DisplayMd = (p: Props) => (
   <Text
     fontFamily="$display"
-    fontSize={28}
-    lineHeight={34}
+    fontSize={44}
+    lineHeight={51}
     letterSpacing={-0.5}
     color="$textPrimary"
     {...p}
@@ -75,8 +75,8 @@ export const DisplayMd = (p: Props) => (
 export const DisplaySm = (p: Props) => (
   <Text
     fontFamily="$display"
-    fontSize={22}
-    lineHeight={29}
+    fontSize={34}
+    lineHeight={41}
     letterSpacing={-0.3}
     color="$textPrimary"
     {...p}
@@ -88,8 +88,8 @@ export const DisplaySm = (p: Props) => (
 export const TitleLg = (p: Props) => (
   <Text
     fontFamily={INTER_600}
-    fontSize={18}
-    lineHeight={25}
+    fontSize={26}
+    lineHeight={34}
     fontWeight="600"
     color="$textPrimary"
     {...p}
@@ -99,8 +99,8 @@ export const TitleLg = (p: Props) => (
 export const TitleMd = (p: Props) => (
   <Text
     fontFamily={INTER_600}
-    fontSize={15}
-    lineHeight={21}
+    fontSize={22}
+    lineHeight={30}
     fontWeight="600"
     color="$textPrimary"
     {...p}
@@ -110,8 +110,8 @@ export const TitleMd = (p: Props) => (
 export const TitleSm = (p: Props) => (
   <Text
     fontFamily={INTER_600}
-    fontSize={13}
-    lineHeight={18}
+    fontSize={18}
+    lineHeight={25}
     fontWeight="600"
     color="$textPrimary"
     {...p}
@@ -123,8 +123,8 @@ export const TitleSm = (p: Props) => (
 export const BodyMd = (p: Props) => (
   <Text
     fontFamily="$body"
-    fontSize={14}
-    lineHeight={22}
+    fontSize={19}
+    lineHeight={29}
     color="$textPrimary"
     {...p}
   />
@@ -133,8 +133,8 @@ export const BodyMd = (p: Props) => (
 export const BodySm = (p: Props) => (
   <Text
     fontFamily="$body"
-    fontSize={13}
-    lineHeight={20}
+    fontSize={17}
+    lineHeight={26}
     color="$textPrimary"
     {...p}
   />
@@ -145,8 +145,8 @@ export const BodySm = (p: Props) => (
 export const Caption = (p: Props) => (
   <Text
     fontFamily={INTER_500}
-    fontSize={12}
-    lineHeight={17}
+    fontSize={15}
+    lineHeight={22}
     fontWeight="500"
     color="$textMuted"
     {...p}
@@ -156,8 +156,8 @@ export const Caption = (p: Props) => (
 export const CaptionUpper = (p: Props) => (
   <Text
     fontFamily={INTER_600}
-    fontSize={11}
-    lineHeight={15}
+    fontSize={14}
+    lineHeight={20}
     fontWeight="600"
     letterSpacing={1.5}
     textTransform="uppercase"
@@ -177,8 +177,8 @@ const TNUM_STYLE = { fontFeatureSettings: "'tnum'" } as const;
 export const Timestamp = ({ style, ...rest }: Props) => (
   <Text
     fontFamily="JetBrainsMono_500Medium"
-    fontSize={11}
-    lineHeight={15}
+    fontSize={14}
+    lineHeight={20}
     fontWeight="500"
     color="$textMuted"
     style={{ ...TNUM_STYLE, ...(style as object) }}
@@ -189,8 +189,8 @@ export const Timestamp = ({ style, ...rest }: Props) => (
 export const Code = (p: Props) => (
   <Text
     fontFamily="$mono"
-    fontSize={12}
-    lineHeight={19}
+    fontSize={16}
+    lineHeight={25}
     color="$textPrimary"
     {...p}
   />

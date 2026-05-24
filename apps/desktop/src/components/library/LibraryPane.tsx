@@ -58,8 +58,8 @@ export function LibraryPane() {
         <XStack alignItems="center" justifyContent="space-between">
           <Caption color="$textMuted">{items.length} videos</Caption>
           <IconButton
-            size={32}
-            icon={<RefreshCw size={14} color="#a1a1a6" />}
+            size={44}
+            icon={<RefreshCw size={14} color="#6c6a64" />}
             aria-label="Refresh"
             onPress={() => void fetchList()}
           />
@@ -98,8 +98,8 @@ export function LibraryPane() {
           {search ? (
             <Stack paddingRight="$xs">
               <IconButton
-                size={32}
-                icon={<X size={12} color="#a1a1a6" />}
+                size={44}
+                icon={<X size={12} color="#6c6a64" />}
                 aria-label="Clear search"
                 onPress={() => setSearch("")}
               />

@@ -40,20 +40,20 @@ export function SidebarItem({
       tag="button"
       role="button"
       position="relative"
-      height={40}
+      height={58}
       borderRadius="$sm"
       paddingLeft={14}
       paddingRight="$sm"
       paddingVertical="$xs"
       borderWidth={0}
       outlineWidth={0}
-      backgroundColor={active ? "rgba(251,146,60,0.06)" : "transparent"}
+      backgroundColor={active ? "$surfaceGlassMid" : "transparent"}
       hoverStyle={
         active
-          ? { backgroundColor: "rgba(251,146,60,0.09)" }
-          : { backgroundColor: "rgba(255,255,255,0.035)" }
+          ? { backgroundColor: "$surfaceGlassHigh" }
+          : { backgroundColor: "$accentSoft" }
       }
-      pressStyle={{ backgroundColor: "rgba(251,146,60,0.12)" }}
+      pressStyle={{ backgroundColor: "$accentDim" }}
       animation="quick"
       cursor="pointer"
       onPress={onPress}
@@ -62,6 +62,7 @@ export function SidebarItem({
       style={{
         WebkitTapHighlightColor: "transparent",
         appearance: "none",
+        outline: "none",
         textAlign: "left",
       }}
       {...rest}
@@ -72,21 +73,20 @@ export function SidebarItem({
           position="absolute"
           left={0}
           top="50%"
-          width={3}
-          height={16}
-          marginTop={-8}
+          width={4}
+          height={22}
+          marginTop={-11}
           borderTopRightRadius={2}
           borderBottomRightRadius={2}
           backgroundColor="$accent"
-          style={{ boxShadow: "0 0 12px rgba(251,146,60,0.45)" }}
         />
       ) : null}
 
-      <XStack flex={1} alignItems="center" gap={10}>
+      <XStack flex={1} alignItems="center" gap={14}>
         {icon}
         <Text
           fontFamily="$body"
-          fontSize={13}
+          fontSize={18}
           fontWeight={active ? "600" : "500"}
           letterSpacing={0.1}
           color={active ? "$accent" : "$textSecondary"}

@@ -71,8 +71,8 @@ export function BadgePill({
 
   return (
     <Stack
-      paddingVertical="$xs"
-      paddingHorizontal="$sm"
+      paddingVertical="$sm"
+      paddingHorizontal="$md"
       borderRadius="$pill"
       borderWidth={1}
       backgroundColor={visual.bg}
@@ -83,7 +83,7 @@ export function BadgePill({
     >
       <Text
         fontFamily="$body"
-        fontSize={11}
+        fontSize={14}
         fontWeight="600"
         color={visual.color}
       >

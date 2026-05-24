@@ -108,7 +108,7 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: AddProviderModalPro
           {step === "form" ? (
             <IconButton
               icon={<ChevronLeft size={16} color="$textSecondary" />}
-              size={32}
+              size={44}
               aria-label="Back to provider list"
               onPress={handleBack}
             />
@@ -122,7 +122,7 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: AddProviderModalPro
 
           <IconButton
             icon={<X size={16} color="$textSecondary" />}
-            size={32}
+            size={44}
             aria-label="Close"
             onPress={onClose}
           />

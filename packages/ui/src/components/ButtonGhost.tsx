@@ -29,7 +29,7 @@ export function ButtonGhost({
     <Stack
       tag="button"
       role="button"
-      height={44}
+      height={58}
       borderRadius="$md"
       paddingHorizontal="$md"
       alignItems="center"
@@ -48,7 +48,7 @@ export function ButtonGhost({
     >
       <Text
         fontFamily="$body"
-        fontSize={13}
+        fontSize={18}
         fontWeight="500"
         color="$textSecondary"
       >

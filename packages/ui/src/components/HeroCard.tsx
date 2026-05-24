@@ -13,7 +13,7 @@ export type HeroCardProps = GlassCardProps;
 
 export function HeroCard({ children, ...rest }: HeroCardProps) {
   return (
-    <GlassCard borderRadius="$xl" padding="$xl" {...rest}>
+    <GlassCard borderRadius="$xl" padding="$xxl" {...rest}>
       {children}
     </GlassCard>
   );

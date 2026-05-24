@@ -38,34 +38,38 @@ export { glassRecipes, EASING, DURATION } from "@yt-subtitle-maker/ui";
 
 // ─── Color tokens (15) ──────────────────────────────────────────────────────
 const color = {
-  bgBase: "#0a0a0c",
-  bgElevated: "#111114",
-  surfaceGlass: "rgba(255,255,255,0.05)",
-  surfaceGlassMid: "rgba(255,255,255,0.06)",
-  surfaceGlassHigh: "rgba(255,255,255,0.08)",
-  borderSubtle: "rgba(255,255,255,0.06)",
-  borderStrong: "rgba(255,255,255,0.12)",
-  textPrimary: "#f5f5f7",
-  textSecondary: "#a1a1a6",
-  textMuted: "#6e6e73",
-  accent: "#fb923c",
-  accentSoft: "rgba(251,146,60,0.15)",
-  accentDim: "rgba(251,146,60,0.25)",
+  bgBase: "#faf9f5",
+  bgElevated: "#f5f0e8",
+  surfaceGlass: "#fff8f6",
+  surfaceGlassMid: "#efe9de",
+  surfaceGlassHigh: "#e8e0d2",
+  borderSubtle: "#e6dfd8",
+  borderStrong: "#dac1ba",
+  textPrimary: "#141413",
+  textSecondary: "#54433e",
+  textMuted: "#6c6a64",
+  accent: "#a9583e",
+  accentSoft: "#fff1ed",
+  accentDim: "#ffdbd0",
   success: "#5db872",
-  warning: "#e8a55a",
-  error: "#ff5a5f",
+  warning: "#d4a017",
+  error: "#c64545",
+  surfaceDark: "#181715",
+  surfaceDarkElevated: "#252320",
+  onAccent: "#ffffff",
+  onDark: "#faf9f5",
 } as const;
 
 // ─── Spacing (8) — mirrored as size (Tamagui requires both) ────────────────
 const spaceMap = {
-  xxs: 4,
-  xs: 8,
-  sm: 12,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
-  section: 64,
+  xxs: 6,
+  xs: 10,
+  sm: 16,
+  md: 22,
+  lg: 32,
+  xl: 44,
+  xxl: 64,
+  section: 120,
 } as const;
 
 // `true` alias is what Tamagui falls back to when a `space` prop has no key.
@@ -81,12 +85,12 @@ const size = {
 // ─── Radius (6) ─────────────────────────────────────────────────────────────
 const radius = {
   xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 20,
-  xl: 28,
+  sm: 6,
+  md: 8,
+  lg: 12,
+  xl: 16,
   pill: 9999,
-  true: 12, // default radius alias
+  true: 8, // default radius alias
 } as const;
 
 // ─── zIndex layers (basic) ──────────────────────────────────────────────────
@@ -127,16 +131,16 @@ const tokens = createTokens({
 const displayFont = createFont({
   family: "Fraunces_400Regular",
   size: {
-    sm: 22,
-    md: 28,
-    lg: 40,
-    xl: 56,
+    sm: 34,
+    md: 44,
+    lg: 56,
+    xl: 72,
   },
   lineHeight: {
-    sm: Math.round(22 * 1.3),
-    md: Math.round(28 * 1.2),
-    lg: Math.round(40 * 1.1),
-    xl: Math.round(56 * 1.05),
+    sm: Math.round(34 * 1.2),
+    md: Math.round(44 * 1.15),
+    lg: Math.round(56 * 1.12),
+    xl: Math.round(72 * 1.06),
   },
   weight: {
     sm: "400",
@@ -155,22 +159,22 @@ const displayFont = createFont({
 const bodyFont = createFont({
   family: "Inter_400Regular",
   size: {
-    captionUpper: 11,
-    caption: 12,
-    bodySm: 13,
-    titleSm: 13,
-    bodyMd: 14,
-    titleMd: 15,
-    titleLg: 18,
+    captionUpper: 14,
+    caption: 15,
+    bodySm: 17,
+    titleSm: 18,
+    bodyMd: 19,
+    titleMd: 22,
+    titleLg: 26,
   },
   lineHeight: {
-    captionUpper: Math.round(11 * 1.4),
-    caption: Math.round(12 * 1.4),
-    bodySm: Math.round(13 * 1.55),
-    titleSm: Math.round(13 * 1.4),
-    bodyMd: Math.round(14 * 1.55),
-    titleMd: Math.round(15 * 1.4),
-    titleLg: Math.round(18 * 1.4),
+    captionUpper: Math.round(14 * 1.4),
+    caption: Math.round(15 * 1.45),
+    bodySm: Math.round(17 * 1.5),
+    titleSm: Math.round(18 * 1.4),
+    bodyMd: Math.round(19 * 1.5),
+    titleMd: Math.round(22 * 1.35),
+    titleLg: Math.round(26 * 1.3),
   },
   weight: {
     captionUpper: "600",
@@ -281,8 +285,8 @@ const dark = {
   borderColorPress: tokens.color.borderStrong,
   borderColorFocus: tokens.color.borderStrong,
   placeholderColor: tokens.color.textMuted,
-  shadowColor: "rgba(0,0,0,0.4)",
-  shadowColorHover: "rgba(0,0,0,0.5)",
+  shadowColor: "rgba(33,26,24,0.10)",
+  shadowColorHover: "rgba(33,26,24,0.16)",
 
   // Full token set re-exposed by name so `$accent`, `$textPrimary`, etc work.
   bgBase: tokens.color.bgBase,
@@ -301,6 +305,10 @@ const dark = {
   success: tokens.color.success,
   warning: tokens.color.warning,
   error: tokens.color.error,
+  surfaceDark: tokens.color.surfaceDark,
+  surfaceDarkElevated: tokens.color.surfaceDarkElevated,
+  onAccent: tokens.color.onAccent,
+  onDark: tokens.color.onDark,
 };
 
 const themes = {

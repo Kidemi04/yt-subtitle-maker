@@ -28,7 +28,7 @@ export function TextInput({ style, ...rest }: TextInputProps) {
   return (
     <Input
       unstyled
-      height={44}
+      height={58}
       borderRadius="$md"
       paddingLeft="$md"
       paddingRight="$md"
@@ -36,7 +36,7 @@ export function TextInput({ style, ...rest }: TextInputProps) {
       borderWidth={1}
       borderColor="$borderSubtle"
       fontFamily="$body"
-      fontSize={14}
+      fontSize={19}
       color="$textPrimary"
       placeholderTextColor="$textMuted"
       animation="quick"
@@ -60,8 +60,8 @@ export function TextInput({ style, ...rest }: TextInputProps) {
       // the type without losing the rest of the inline style.
       style={
         {
-          color: "#f5f5f7",
-          caretColor: "#fb923c",
+          color: "#141413",
+          caretColor: "#a9583e",
           ...((style as object) ?? {}),
         } as unknown as TextInputProps["style"]
       }

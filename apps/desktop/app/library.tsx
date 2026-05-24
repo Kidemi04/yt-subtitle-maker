@@ -47,8 +47,8 @@ export default function LibraryRoute() {
           <YStack flex={1}>
             <XStack padding="$sm" borderBottomWidth={1} borderBottomColor="$borderSubtle">
               <IconButton
-                size={32}
-                icon={<ArrowLeft size={16} color="#a1a1a6" />}
+                size={44}
+                icon={<ArrowLeft size={16} color="#6c6a64" />}
                 aria-label="Back to library"
                 onPress={() => selectVideo(null)}
               />

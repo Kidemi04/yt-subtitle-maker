@@ -36,7 +36,7 @@ export function FilterChip({
       tag="button"
       role="button"
       aria-pressed={active}
-      paddingVertical="$xs"
+      paddingVertical="$sm"
       paddingHorizontal="$md"
       borderRadius="$pill"
       borderWidth={1}
@@ -59,7 +59,7 @@ export function FilterChip({
     >
       <Text
         fontFamily="$body"
-        fontSize={13}
+        fontSize={18}
         fontWeight="500"
         color={active ? "$accent" : "$textSecondary"}
       >

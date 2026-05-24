@@ -91,8 +91,8 @@ export function Toast({
         </Text>
         {onClose ? (
           <IconButton
-            size={32}
-            icon={<X size={14} color="#a1a1a6" />}
+            size={44}
+            icon={<X size={14} color="#6c6a64" />}
             aria-label="Dismiss notification"
             onPress={onClose}
           />

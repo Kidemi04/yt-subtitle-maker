@@ -53,7 +53,7 @@ export function Modal({
             opacity={1}
             enterStyle={{ opacity: 0 }}
             exitStyle={{ opacity: 0 }}
-            backgroundColor="rgba(10,10,12,0.75)"
+            backgroundColor="rgba(20,20,19,0.28)"
             style={{
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
@@ -84,7 +84,7 @@ export function Modal({
             // black backdrop. We use the Library Detail Modal's opaque-glass
             // value (~95% alpha on a slightly brightened bgElevated) so the
             // modal reads as a distinct surface above the overlay.
-            backgroundColor="rgba(36,36,40,0.96)"
+            backgroundColor="$surfaceGlass"
             borderWidth={1}
             borderColor="$borderStrong"
             // overflow: auto scrolls the inner card when the run list grows.
@@ -92,7 +92,7 @@ export function Modal({
               overflow: "auto",
               backdropFilter: glassRecipes.glassHigh.backdropFilter,
               WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
-              boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
+              boxShadow: "0 24px 48px rgba(33,26,24,0.16)",
             }}
             // Block "click outside content" auto-close. Without this,
             // any pointer-down that the Dialog can't trace back to its
@@ -122,8 +122,8 @@ export function Modal({
                 </Text>
               </Dialog.Title>
               <IconButton
-                size={32}
-                icon={<X size={16} color="#a1a1a6" />}
+                size={44}
+                icon={<X size={16} color="#6c6a64" />}
                 aria-label="Close"
                 onPress={() => onOpenChange(false)}
               />
@@ -146,8 +146,8 @@ export function Modal({
               </Dialog.Title>
               <Stack position="absolute" top="$md" right="$md" zIndex={1}>
                 <IconButton
-                  size={32}
-                  icon={<X size={16} color="#a1a1a6" />}
+                  size={44}
+                  icon={<X size={16} color="#6c6a64" />}
                   aria-label="Close"
                   onPress={() => onOpenChange(false)}
                 />

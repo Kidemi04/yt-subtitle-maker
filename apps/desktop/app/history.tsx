@@ -310,7 +310,7 @@ function HistoryRow({
           style={{
             backgroundImage: item.thumbnailUrl
               ? `url(${item.thumbnailUrl})`
-              : "linear-gradient(135deg, #1a1a1d 0%, #0a0a0c 100%)",
+              : "linear-gradient(135deg, #efe9de 0%, #e8e0d2 100%)",
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
@@ -344,25 +344,25 @@ function HistoryRow({
         <IconButton
           icon={<Info size={14} color="$textSecondary" />}
           aria-label="Open detail"
-          size={32}
+          size={44}
           onPress={onOpenDetail}
         />
         <IconButton
           icon={<PlayCircle size={14} color="$accent" />}
           aria-label="Play with mpv"
-          size={32}
+          size={44}
           onPress={onPlay}
         />
         <IconButton
           icon={<RotateCcw size={14} color="$textSecondary" />}
           aria-label="Re-run in Generate (pre-fills URL so you can change model + re-translate or re-transcribe)"
-          size={32}
+          size={44}
           onPress={onReload}
         />
         <IconButton
           icon={<MoreHorizontal size={14} color="$textSecondary" />}
           aria-label="Open folder"
-          size={32}
+          size={44}
           onPress={onOpenFolder}
         />
       </XStack>

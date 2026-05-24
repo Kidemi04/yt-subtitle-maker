@@ -41,7 +41,7 @@ export function NumberStepper({
       <IconButton
         icon={<Minus size={14} color="$textSecondary" />}
         aria-label={`${ariaLabel ?? "value"} minus`}
-        size={32}
+        size={44}
         onPress={() => bump(-step)}
       />
       <TextInput
@@ -62,7 +62,7 @@ export function NumberStepper({
       <IconButton
         icon={<Plus size={14} color="$textSecondary" />}
         aria-label={`${ariaLabel ?? "value"} plus`}
-        size={32}
+        size={44}
         onPress={() => bump(step)}
       />
     </XStack>

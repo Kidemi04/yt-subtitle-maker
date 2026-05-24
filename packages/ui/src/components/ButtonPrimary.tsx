@@ -7,9 +7,9 @@ import { Stack, Text, type StackProps } from "tamagui";
  * Spec: docs/superpowers/design-handoff/README.md → Component Inventory.
  *   height       : 56
  *   borderRadius : $md (12px)
- *   background   : sunset-orange gradient (#fb923c → #f97316, vertical)
- *   text         : Inter 15px / 600 / $textPrimary
- *   shadow       : 0 4px 20px rgba(251,146,60,0.4) (accent glow)
+ *   background   : warm coral from the Stitch design system
+ *   text         : Inter 14px / 500 / $onAccent
+ *   shadow       : soft warm editorial lift
  *   press        : scale 0.97, 150ms (Tamagui `quick` animation)
  *   disabled     : opacity 0.4, cursor not-allowed
  *
@@ -33,7 +33,7 @@ export function ButtonPrimary({
     <Stack
       tag="button"
       role="button"
-      height={56}
+      height={68}
       borderRadius="$md"
       paddingHorizontal="$lg"
       alignItems="center"
@@ -44,9 +44,10 @@ export function ButtonPrimary({
       pressStyle={disabled ? undefined : { scale: 0.97 }}
       animation="quick"
       cursor={disabled ? "not-allowed" : "pointer"}
+      backgroundColor="$accent"
+      hoverStyle={disabled ? undefined : { backgroundColor: "#924a31" }}
       style={{
-        backgroundImage: "linear-gradient(180deg, #fb923c 0%, #f97316 100%)",
-        boxShadow: "0 4px 20px rgba(251,146,60,0.4)",
+        boxShadow: "0 8px 18px rgba(146,74,49,0.18)",
         border: "none",
         ...(style as object | null | undefined),
       }}
@@ -54,9 +55,9 @@ export function ButtonPrimary({
     >
       <Text
         fontFamily="$body"
-        fontSize={15}
-        fontWeight="600"
-        color="$textPrimary"
+        fontSize={18}
+        fontWeight="500"
+        color="$onAccent"
       >
         {children}
       </Text>

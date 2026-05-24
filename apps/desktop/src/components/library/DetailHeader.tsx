@@ -73,7 +73,7 @@ export function DetailHeader({ detail }: { detail: VideoDetail }) {
             : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4)",
+          boxShadow: "inset 0 0 0 1px rgba(33,26,24,0.14)",
         }}
       >
         {!detail.thumbnailUrl ? (
@@ -117,13 +117,13 @@ export function DetailHeader({ detail }: { detail: VideoDetail }) {
         right={0}
       >
         <IconButton
-          size={32}
+          size={44}
           icon={<Folder size={14} color="$textMuted" />}
           aria-label="Open folder"
           onPress={handleOpenFolder}
         />
         <IconButton
-          size={32}
+          size={44}
           icon={<ExternalLink size={14} color="$textMuted" />}
           aria-label="Open URL"
           onPress={handleOpenUrl}

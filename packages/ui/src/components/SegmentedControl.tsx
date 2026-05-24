@@ -55,7 +55,7 @@ export function SegmentedControl<T extends string = string>({
             tag="button"
             role="button"
             aria-pressed={active}
-            paddingVertical="$xs"
+            paddingVertical="$sm"
             paddingHorizontal="$md"
             borderRadius="$sm"
             borderWidth={0}
@@ -75,7 +75,7 @@ export function SegmentedControl<T extends string = string>({
           >
             <Text
               fontFamily="$body"
-              fontSize={13}
+              fontSize={18}
               fontWeight="500"
               color={active ? "$accent" : "$textSecondary"}
             >

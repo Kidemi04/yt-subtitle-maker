@@ -46,7 +46,7 @@ export function ActionSheet({ open, onOpenChange, actions }: ActionSheetProps) {
         animation="quick"
         enterStyle={{ opacity: 0 }}
         exitStyle={{ opacity: 0 }}
-        backgroundColor="rgba(10,10,12,0.5)"
+        backgroundColor="rgba(20,20,19,0.28)"
       />
       <Sheet.Frame
         unstyled
@@ -56,11 +56,9 @@ export function ActionSheet({ open, onOpenChange, actions }: ActionSheetProps) {
         borderRadius="$lg"
         borderWidth={1}
         borderColor="$borderStrong"
-        backgroundColor="rgba(30,30,34,0.92)"
+        backgroundColor="$surfaceGlass"
         style={{
-          backdropFilter: "blur(40px) saturate(180%)",
-          WebkitBackdropFilter: "blur(40px) saturate(180%)",
-          boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
+          boxShadow: "0 24px 48px rgba(33,26,24,0.16)",
         }}
       >
         <Sheet.Handle backgroundColor="$borderStrong" />

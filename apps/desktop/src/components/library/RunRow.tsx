@@ -104,7 +104,7 @@ export function RunRow({
       <XStack gap="$xxs" opacity={0.7} animation="quick">
         {onReRun ? (
           <IconButton
-            size={32}
+            size={44}
             icon={<RefreshCw size={13} color="$textMuted" />}
             aria-label="Re-translate"
             onPress={onReRun}
@@ -113,7 +113,7 @@ export function RunRow({
           />
         ) : null}
         <IconButton
-          size={32}
+          size={44}
           icon={<Trash2 size={13} color="$textMuted" />}
           aria-label="Delete"
           onPress={onDelete}

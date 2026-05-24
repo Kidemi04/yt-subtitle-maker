@@ -246,7 +246,7 @@ export function ProviderRow({
         <Stack position="relative">
           <IconButton
             icon={<MoreHorizontal size={16} color="$textSecondary" />}
-            size={32}
+            size={44}
             aria-label="More actions"
             onPress={() => setKebabOpen((v) => !v)}
           />

@@ -15,14 +15,14 @@ import { glassRecipes } from "../tokens";
  *   press  : scale 0.95
  *
  * The caller passes a sized lucide icon as `icon`, e.g.
- *   <IconButton icon={<X size={16} color="#a1a1a6" />} aria-label="Close" />
+ *   <IconButton icon={<X size={16} color="$textSecondary" />} aria-label="Close" />
  *
  * `aria-label` is required (TS-enforced) — every IconButton speaks to a11y
  * users via this attribute since there's no visible text.
  */
 export type IconButtonProps = {
   icon: React.ReactNode;
-  size?: 32 | 36;
+  size?: 36 | 44 | 52;
   onPress?: () => void;
   disabled?: boolean;
   "aria-label": string;
@@ -30,7 +30,7 @@ export type IconButtonProps = {
 
 export function IconButton({
   icon,
-  size = 36,
+  size = 44,
   onPress,
   disabled,
   "aria-label": ariaLabel,

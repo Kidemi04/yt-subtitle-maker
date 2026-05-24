@@ -44,6 +44,12 @@ export function LibraryRow({ item, selected, detail, onPress }: LibraryRowProps)
       hoverStyle={{ backgroundColor: "$surfaceGlass" }}
       animation="quick"
       position="relative"
+      borderWidth={0}
+      outlineWidth={0}
+      style={{
+        appearance: "none",
+        textAlign: "left",
+      }}
     >
       {/* Engraved divider — darker than $bgElevated, inset by $md on each side */}
       <Stack

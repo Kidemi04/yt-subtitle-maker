@@ -51,7 +51,7 @@ export function Dropdown({
       <Select.Trigger
         unstyled
         width={width}
-        height={44}
+        height={58}
         borderRadius="$md"
         paddingHorizontal="$md"
         backgroundColor={glassRecipes.glassLow.bg}
@@ -73,10 +73,10 @@ export function Dropdown({
         <Select.Value
           placeholder={placeholder}
           fontFamily="$body"
-          fontSize={14}
+          fontSize={18}
           color={value ? "$textPrimary" : "$textMuted"}
         />
-        <ChevronDown size={16} color="#a1a1a6" />
+        <ChevronDown size={16} color="#6c6a64" />
       </Select.Trigger>
 
       <Select.Content zIndex={2000}>
@@ -97,7 +97,7 @@ export function Dropdown({
             style={{
               backdropFilter: glassRecipes.glassMid.backdropFilter,
               WebkitBackdropFilter: glassRecipes.glassMid.backdropFilter,
-              boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
+              boxShadow: "0 18px 36px rgba(33,26,24,0.12)",
             }}
           >
             <Select.Group>
@@ -120,7 +120,7 @@ export function Dropdown({
                     >
                       <Select.ItemText
                         fontFamily="$body"
-                        fontSize={14}
+                        fontSize={18}
                         color={
                           opt.value === value ? "$accent" : "$textPrimary"
                         }
@@ -141,4 +141,3 @@ export function Dropdown({
     </Select>
   );
 }
-

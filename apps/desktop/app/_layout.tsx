@@ -34,6 +34,9 @@ import {
   Terminal,
   X as XIcon,
   Trash2,
+  Plus,
+  HelpCircle,
+  Search,
 } from "@tamagui/lucide-icons";
 import {
   SidebarItem,
@@ -51,6 +54,7 @@ import { config } from "../tamagui.config";
 import { useLogs, type LogLevel } from "../src/state/logs";
 import { apiClient } from "../src/state/client";
 import { anyModelInstalled } from "@yt-subtitle-maker/api-client";
+import { useGenerate } from "../src/state/generate";
 
 type NavRoute = "/" | "/library" | "/history" | "/settings" | "/about";
 
@@ -87,47 +91,62 @@ const ROUTE_SUBTITLES: Record<string, string> = {
 function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const resetGenerate = useGenerate((s) => s.reset);
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
     <YStack
-      width={232}
+      width={300}
       height="100%"
-      paddingHorizontal={12}
+      paddingHorizontal="$md"
       paddingTop="$lg"
       paddingBottom="$md"
       gap="$xs"
-      backgroundColor="$bgElevated"
+      backgroundColor="$bgBase"
       borderRightWidth={1}
       borderRightColor="$borderSubtle"
-      style={{
-        backdropFilter: glassRecipes.glassMid.backdropFilter,
-        WebkitBackdropFilter: glassRecipes.glassMid.backdropFilter,
-      }}
     >
-      <YStack paddingHorizontal={14} paddingBottom="$lg" gap={4}>
-        <XStack alignItems="baseline" gap={8}>
-          <DisplaySm fontSize={22} lineHeight={26} letterSpacing={-0.4}>
-            Translator
-          </DisplaySm>
-          <Text
-            fontFamily="$mono"
-            fontSize={10}
-            color="$accent"
-            letterSpacing={0.5}
-            style={{ transform: "translateY(-1px)" }}
-          >
-            v2.2
-          </Text>
-        </XStack>
-        <CaptionUpper letterSpacing={1.8} fontSize={9} opacity={0.55}>
-          Subtitle Studio
-        </CaptionUpper>
+      <YStack paddingHorizontal={2} paddingBottom="$lg" gap="$md">
+        <YStack paddingHorizontal="$xs" gap={2}>
+          <TitleMd fontSize={20} lineHeight={28}>
+            Translator Subtitle Studio
+          </TitleMd>
+          <CaptionUpper letterSpacing={1.2} fontSize={13}>
+            Workspace Beta
+          </CaptionUpper>
+        </YStack>
+
+        <Stack
+          tag="button"
+          role="button"
+          height={52}
+          borderRadius="$md"
+          backgroundColor="$accent"
+          alignItems="center"
+          justifyContent="center"
+          cursor="pointer"
+          pressStyle={{ scale: 0.98 }}
+          onPress={() => {
+            resetGenerate();
+            router.push("/");
+          }}
+          style={{
+            border: "none",
+            boxShadow: "0 8px 18px rgba(146,74,49,0.14)",
+          }}
+        >
+          <XStack alignItems="center" gap="$xs">
+            <Plus size={18} color="#ffffff" />
+            <Text fontFamily="$body" fontSize={18} fontWeight="500" color="$onAccent">
+              New Project
+            </Text>
+          </XStack>
+        </Stack>
       </YStack>
 
       <YStack paddingLeft={14} paddingBottom={6}>
-        <CaptionUpper letterSpacing={1.5} fontSize={9} opacity={0.5}>
+        <CaptionUpper letterSpacing={1.5} fontSize={13} opacity={0.65}>
           Workspace
         </CaptionUpper>
       </YStack>
@@ -140,7 +159,7 @@ function Sidebar() {
             <SidebarItem
               key={item.href}
               icon={
-                <Icon size={15} color={active ? "$accent" : "$textSecondary"} />
+                <Icon size={20} color={active ? "$accent" : "$textSecondary"} />
               }
               label={item.label}
               active={active}
@@ -150,6 +169,16 @@ function Sidebar() {
         })}
       </YStack>
 
+      <XStack
+        alignItems="center"
+        gap="$xs"
+        paddingHorizontal="$xs"
+        paddingVertical="$xs"
+        borderRadius="$sm"
+      >
+        <HelpCircle size={18} color="$textMuted" />
+        <Caption>Help Support</Caption>
+      </XStack>
     </YStack>
   );
 }
@@ -159,34 +188,48 @@ function Topbar() {
   const title = ROUTE_TITLES[pathname] ?? "";
   const subtitle = ROUTE_SUBTITLES[pathname];
   const toggleDrawer = useLogs((s) => s.toggleDrawer);
+  const showRouteTitle = pathname !== "/";
 
   return (
     <XStack
-      height={64}
+      height={82}
       paddingHorizontal="$lg"
       alignItems="center"
       justifyContent="space-between"
       borderBottomWidth={1}
       borderBottomColor="$borderSubtle"
-      style={{
-        backdropFilter: glassRecipes.glassHigh.backdropFilter,
-        WebkitBackdropFilter: glassRecipes.glassHigh.backdropFilter,
-      }}
+      backgroundColor="$bgBase"
     >
-      <YStack gap={2}>
-        <TitleLg fontSize={20}>{title}</TitleLg>
-        {subtitle ? <Caption>{subtitle}</Caption> : null}
-      </YStack>
+      {showRouteTitle ? (
+        <YStack gap={2}>
+          <TitleLg>{title}</TitleLg>
+          {subtitle ? <Caption>{subtitle}</Caption> : null}
+        </YStack>
+      ) : (
+        <Stack />
+      )}
       <XStack gap="$sm" alignItems="center">
+        <XStack
+          width={300}
+          height={40}
+          alignItems="center"
+          gap="$xs"
+          paddingHorizontal="$sm"
+          borderRadius="$pill"
+          backgroundColor="$accentSoft"
+        >
+          <Search size={16} color="$textMuted" />
+          <Caption fontSize={15}>Search projects...</Caption>
+        </XStack>
         <IconButton
-          icon={<Bell size={16} color="$textSecondary" />}
+          icon={<Bell size={22} color="$textSecondary" />}
           aria-label="Notifications"
-          size={32}
+          size={44}
         />
         <IconButton
-          icon={<Terminal size={16} color="$textSecondary" />}
+          icon={<Terminal size={22} color="$textSecondary" />}
           aria-label="Toggle logs (⌘L)"
-          size={32}
+          size={44}
           onPress={toggleDrawer}
         />
       </XStack>
@@ -280,13 +323,13 @@ function LogsDrawer() {
           <IconButton
             icon={<Trash2 size={14} color="$textSecondary" />}
             aria-label="Clear logs"
-            size={32}
+            size={44}
             onPress={clear}
           />
           <IconButton
             icon={<XIcon size={14} color="$textSecondary" />}
             aria-label="Close logs"
-            size={32}
+            size={44}
             onPress={close}
           />
         </XStack>
@@ -408,6 +451,10 @@ export default function RootLayout() {
 
   if (!frauncesLoaded || !interLoaded || !monoLoaded) return null;
 
+  if (typeof document !== "undefined") {
+    document.body.style.backgroundColor = "#faf9f5";
+  }
+
   // Init runs without sidebar / topbar.
   if (pathname === "/init") {
     return (
@@ -438,13 +485,13 @@ export default function RootLayout() {
                   flex={1}
                   contentContainerStyle={{
                     flexGrow: 1,
-                    paddingHorizontal: 32,
-                    paddingVertical: 32,
+                    paddingHorizontal: 48,
+                    paddingVertical: 44,
                   }}
                 >
                   <YStack
                     width="100%"
-                    maxWidth={960}
+                    maxWidth={1120}
                     gap="$lg"
                     alignSelf="center"
                   >

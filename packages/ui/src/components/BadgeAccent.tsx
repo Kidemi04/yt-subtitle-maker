@@ -19,8 +19,8 @@ export type BadgeAccentProps = {
 export function BadgeAccent({ children, ...rest }: BadgeAccentProps) {
   return (
     <Stack
-      paddingVertical="$xs"
-      paddingHorizontal="$sm"
+      paddingVertical="$sm"
+      paddingHorizontal="$md"
       borderRadius="$pill"
       backgroundColor="$accentSoft"
       alignItems="center"
@@ -29,7 +29,7 @@ export function BadgeAccent({ children, ...rest }: BadgeAccentProps) {
     >
       <Text
         fontFamily="$body"
-        fontSize={11}
+        fontSize={14}
         fontWeight="600"
         letterSpacing={1.5}
         textTransform="uppercase"

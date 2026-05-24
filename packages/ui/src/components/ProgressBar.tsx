@@ -10,8 +10,7 @@ import { ensureKeyframes } from "./keyframes";
  *   height        : 6
  *   shape         : $pill radius
  *   track         : glassRecipes.glassLow.bg (0.04 alpha)
- *   fill          : linear-gradient(90deg, #fb923c, #f97316)
- *                   + box-shadow 0 0 8px rgba(251,146,60,0.4)
+ *   fill          : warm coral gradient with a low-opacity glow
  *   determinate   : width = value * 100%, transitions on change
  *   indeterminate : a 33%-wide segment slides L→R via @keyframes
  *
@@ -23,8 +22,8 @@ export type ProgressBarProps = {
   indeterminate?: boolean;
 } & Omit<StackProps, "value">;
 
-const FILL_GRADIENT = "linear-gradient(90deg, #fb923c, #f97316)";
-const FILL_GLOW = "0 0 8px rgba(251,146,60,0.4)";
+const FILL_GRADIENT = "linear-gradient(90deg, #cc785c, #a9583e)";
+const FILL_GLOW = "0 0 8px rgba(146,74,49,0.24)";
 const TRANSITION = "width 250ms cubic-bezier(0.4, 0, 0.2, 1)";
 
 export function ProgressBar({

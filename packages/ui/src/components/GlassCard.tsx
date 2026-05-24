@@ -55,12 +55,17 @@ export function GlassCard({
       borderColor={recipe.border}
       borderWidth={1}
       borderRadius="$lg"
-      padding="$lg"
+      padding="$xl"
       style={{
         backdropFilter: recipe.backdropFilter,
         // RN-Web also recognises `WebkitBackdropFilter` for Safari < 18.
         WebkitBackdropFilter: recipe.backdropFilter,
         ...(boxShadow ? { boxShadow } : null),
+        backgroundImage:
+          variant === "mid"
+            ? "radial-gradient(circle at 1px 1px, rgba(20,20,19,0.055) 1px, transparent 0)"
+            : undefined,
+        backgroundSize: variant === "mid" ? "18px 18px" : undefined,
         ...(style as object | null | undefined),
       }}
       {...rest}

@@ -71,29 +71,51 @@ function formatDuration(seconds: number | undefined): string {
  * Faded skeleton row used on the idle Generate screen to telegraph the
  * coming steps (Video preview → Configure → Generate). Inert, no real data.
  */
-function FlowPlaceholder({ label, hint }: { label: string; hint: string }) {
+function FlowPlaceholder({
+  index,
+  label,
+  hint,
+  active = false,
+}: {
+  index: number;
+  label: string;
+  hint: string;
+  active?: boolean;
+}) {
   return (
     <XStack
       alignItems="center"
-      gap="$md"
+      justifyContent="space-between"
+      gap="$lg"
       paddingHorizontal="$lg"
       paddingVertical="$md"
       borderRadius="$lg"
       backgroundColor="$surfaceGlass"
       borderColor="$borderSubtle"
       borderWidth={1}
+      opacity={active ? 1 : 0.6}
     >
-      <Stack
-        width={6}
-        height={6}
-        borderRadius="$pill"
-        backgroundColor="$textMuted"
-      />
-      <YStack gap={2} flex={1}>
-        <TitleSm color="$textSecondary">{label}</TitleSm>
-        <Caption>{hint}</Caption>
-      </YStack>
-      <ChevronRight size={14} color="$textMuted" />
+      <XStack alignItems="center" gap="$xl" flex={1}>
+        <Stack
+          width={56}
+          height={56}
+          borderRadius="$pill"
+          backgroundColor={active ? "$accent" : "$surfaceGlassMid"}
+          borderWidth={1}
+          borderColor="$borderSubtle"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <TitleSm color={active ? "$onAccent" : "$textSecondary"}>
+            {index}
+          </TitleSm>
+        </Stack>
+        <YStack gap={2} flex={1}>
+          <TitleMd color={active ? "$accent" : "$textPrimary"}>{label}</TitleMd>
+          <BodySm color="$textMuted">{hint}</BodySm>
+        </YStack>
+      </XStack>
+      <ChevronRight size={22} color="$textMuted" />
     </XStack>
   );
 }
@@ -126,7 +148,7 @@ function Waveform({ active }: { active: boolean }) {
     <XStack
       height={64}
       borderRadius="$md"
-      backgroundColor="rgba(0,0,0,0.2)"
+      backgroundColor="$surfaceDark"
       paddingHorizontal="$md"
       paddingVertical="$sm"
       alignItems="center"
@@ -145,13 +167,13 @@ function Waveform({ active }: { active: boolean }) {
             backgroundColor={
               isCenter
                 ? undefined
-                : "rgba(255,255,255,0.10)"
+                : "rgba(250,249,245,0.14)"
             }
             style={
               isCenter
                 ? {
                     backgroundImage:
-                      "linear-gradient(180deg, #fb923c 0%, #f97316 100%)",
+                      "linear-gradient(180deg, #cc785c 0%, #a9583e 100%)",
                     transformOrigin: "center",
                     animation: active
                       ? `yt-ui-wave 1s ease-in-out ${i * 40}ms infinite`
@@ -477,25 +499,51 @@ export default function Generate() {
 
   return (
     <YStack gap="$lg">
+      <YStack gap="$xxs">
+        <DisplayMd>Generate</DisplayMd>
+        <BodyMd color="$textSecondary">Drop a YouTube link</BodyMd>
+      </YStack>
+
       {/* HERO: URL input */}
-      <HeroCard variant="mid">
-        <YStack gap="$md">
-          <YStack gap="$xs">
-            <DisplayMd>What are we transcribing today?</DisplayMd>
-            <BodyMd color="$textSecondary">
-              Drop a YouTube link to get started.
+      <HeroCard variant="mid" padding="$xl">
+        <YStack
+          gap="$xl"
+          alignItems="center"
+          paddingVertical="$xxl"
+          position="relative"
+          zIndex={1}
+        >
+          <YStack gap="$sm" alignItems="center" maxWidth={720}>
+            <DisplayMd textAlign="center">
+              What are we transcribing today?
+            </DisplayMd>
+            <BodyMd color="$textMuted" textAlign="center">
+              Enter a valid YouTube URL to begin the automated subtitle generation
+              process using local transcription and AI translation.
             </BodyMd>
           </YStack>
 
-          <XStack gap="$sm" alignItems="center">
+          <XStack
+            gap="$xs"
+            alignItems="center"
+            width="100%"
+            maxWidth={760}
+            padding="$xs"
+            borderRadius="$xl"
+            backgroundColor="$bgBase"
+            borderWidth={1}
+            borderColor="$borderSubtle"
+            style={{
+              boxShadow: "0 10px 24px rgba(33,26,24,0.06)",
+            }}
+          >
             <XStack
               flex={1}
-              height={52}
+              height={68}
               alignItems="center"
-              borderWidth={1}
-              borderColor="$borderSubtle"
-              borderRadius="$md"
-              backgroundColor="rgba(255,255,255,0.04)"
+              borderWidth={0}
+              borderRadius="$lg"
+              backgroundColor="transparent"
               focusStyle={{
                 borderColor: "$accent",
                 borderWidth: 2,
@@ -505,12 +553,12 @@ export default function Generate() {
               }}
             >
               <Stack
-                width={44}
+                width={64}
                 alignItems="center"
                 justifyContent="center"
                 pointerEvents="none"
               >
-                <Link2 size={16} color="$textMuted" />
+                <Link2 size={22} color="$textMuted" />
               </Stack>
               <Input
                 unstyled
@@ -519,7 +567,7 @@ export default function Generate() {
                 paddingLeft={0}
                 paddingRight={16}
                 fontFamily="$body"
-                fontSize={14}
+                fontSize={20}
                 color="$textPrimary"
                 placeholderTextColor="$textMuted"
                 borderWidth={0}
@@ -530,8 +578,8 @@ export default function Generate() {
                 onSubmitEditing={loadMetadata}
                 style={
                   {
-                    color: "#f5f5f7",
-                    caretColor: "#fb923c",
+                    color: "#141413",
+                    caretColor: "#a9583e",
                     outline: "none",
                   } as React.CSSProperties as never
                 }
@@ -540,7 +588,8 @@ export default function Generate() {
             <ButtonPrimary
               onPress={loadMetadata}
               disabled={!url.trim() || status === "loading-meta"}
-              height={52}
+              height={68}
+              borderRadius="$lg"
             >
               {status === "loading-meta" ? "Loading…" : "Load"}
             </ButtonPrimary>
@@ -557,10 +606,23 @@ export default function Generate() {
           loaded. They fade out the moment metadata arrives. (Spec: design
           handoff §"Generate — Idle".) */}
       {!showVideoPreview && status !== "loading-meta" ? (
-        <YStack gap="$sm" opacity={0.35} pointerEvents="none">
-          <FlowPlaceholder label="Video preview" hint="Title, channel, thumbnail" />
-          <FlowPlaceholder label="Configure" hint="Source · language · engine" />
-          <FlowPlaceholder label="Generate" hint="One click to start" />
+        <YStack gap="$md" pointerEvents="none">
+          <FlowPlaceholder
+            index={1}
+            active
+            label="Video preview"
+            hint="Review the title, channel, and thumbnail of your content."
+          />
+          <FlowPlaceholder
+            index={2}
+            label="Configure"
+            hint="Set source language, target dialects, and transcription engine."
+          />
+          <FlowPlaceholder
+            index={3}
+            label="Generate"
+            hint="Process the request and finalize your subtitles."
+          />
         </YStack>
       ) : null}
 
@@ -577,7 +639,7 @@ export default function Generate() {
               style={{
                 backgroundImage: metadata.thumbnailUrl
                   ? `url(${metadata.thumbnailUrl})`
-                  : "linear-gradient(135deg, #1a1a1d 0%, #0a0a0c 100%)",
+                  : "linear-gradient(135deg, #efe9de 0%, #e8e0d2 100%)",
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }}
@@ -896,8 +958,8 @@ export default function Generate() {
       {showVideoPreview && !isProcessing && !isDone ? (
         <ButtonPrimary onPress={onGenerate} disabled={!metadata?.ok}>
           <XStack gap="$xs" alignItems="center">
-            <Sparkles size={16} color="$textPrimary" />
-            <TitleMd>
+            <Sparkles size={16} color="#ffffff" />
+            <TitleMd color="$onAccent">
               {downloadOnly ? "Download only" : "Generate Subtitles"}
             </TitleMd>
           </XStack>
@@ -912,7 +974,7 @@ export default function Generate() {
               <IconButton
                 icon={<X size={14} color="$textSecondary" />}
                 aria-label="Cancel"
-                size={32}
+                size={44}
                 onPress={cancel}
               />
             </XStack>
@@ -1035,7 +1097,7 @@ export default function Generate() {
 
             {result.previewSegments.length > 0 ? (
               <Stack
-                backgroundColor="rgba(0,0,0,0.25)"
+                backgroundColor="$surfaceDark"
                 borderRadius="$md"
                 paddingHorizontal="$md"
                 paddingVertical="$sm"
@@ -1052,10 +1114,10 @@ export default function Generate() {
                     }
                     borderBottomColor="$borderSubtle"
                   >
-                    <Timestamp>
+                    <Timestamp color="$onDark">
                       {formatTimestamp(seg.start)} → {formatTimestamp(seg.end)}
                     </Timestamp>
-                    <BodySm>{seg.text}</BodySm>
+                    <BodySm color="$onDark">{seg.text}</BodySm>
                     {seg.translated ? (
                       <BodySm color="$accent">{seg.translated}</BodySm>
                     ) : null}
@@ -1121,8 +1183,8 @@ export default function Generate() {
                 }}
               >
                 <XStack gap="$xs" alignItems="center">
-                  <PlayCircle size={14} color="$textPrimary" />
-                  <TitleMd>
+                  <PlayCircle size={14} color="#ffffff" />
+                  <TitleMd color="$onAccent">
                     {mpvBusy ? "Opening mpv…" : "Play with MPV"}
                   </TitleMd>
                 </XStack>

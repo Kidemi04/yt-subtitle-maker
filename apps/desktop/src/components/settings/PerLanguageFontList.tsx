@@ -135,7 +135,7 @@ export function PerLanguageFontList({
           </YStack>
           <IconButton
             icon={<Trash2 size={14} color="$textSecondary" />}
-            size={32}
+            size={44}
             aria-label="Remove language override"
             onPress={() => removeRow(row.uid)}
           />

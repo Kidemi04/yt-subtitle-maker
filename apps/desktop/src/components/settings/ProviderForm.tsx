@@ -248,7 +248,7 @@ export function ProviderForm({
                   )
                 }
                 aria-label="Toggle key visibility"
-                size={32}
+                size={44}
                 onPress={() => setShowKey((v) => !v)}
               />
             </Stack>
@@ -282,7 +282,7 @@ export function ProviderForm({
           <IconButton
             icon={<RefreshCcw size={14} color="$textSecondary" />}
             aria-label="Fetch models from this endpoint"
-            size={32}
+            size={44}
             onPress={handleFetchModels}
             disabled={modelsBusy}
           />
