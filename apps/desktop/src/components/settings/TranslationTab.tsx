@@ -9,7 +9,6 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { LanguagePicker } from "./LanguagePicker";
 import type {
-  AppConfig,
   TranslatorProfile,
 } from "@yt-subtitle-maker/api-client";
 import { useSettings } from "./SettingsContext";
@@ -31,28 +30,6 @@ function activeProfileId(activeTranslator: string | undefined): string {
   return activeTranslator; // "gemini" | "local_openai"
 }
 
-// ─── Built-in profile shapes (derived from draft) ───────────────────────────
-
-function geminiProfile(draft: AppConfig) {
-  return {
-    profileId: "gemini",
-    name: "Gemini",
-    baseUrl: "https://generativelanguage.googleapis.com",
-    model: draft.geminiModel ?? "",
-    apiKeyMasked: isMasked(draft.geminiApiKey),
-  };
-}
-
-function localOpenaiProfile(draft: AppConfig) {
-  return {
-    profileId: "local_openai",
-    name: "Local AI (LM Studio / Ollama)",
-    baseUrl: draft.localOpenaiBaseUrl ?? "",
-    model: draft.localOpenaiModel ?? "",
-    apiKeyMasked: isMasked(draft.localOpenaiApiKey),
-  };
-}
-
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function TranslationTab() {
@@ -63,7 +40,6 @@ export function TranslationTab() {
     activeTranslator,
     lastTestResult,
     testProfile,
-    testAdhoc,
     setActiveTranslator,
     addCustomTranslator,
     removeCustomTranslator,
@@ -83,28 +59,6 @@ export function TranslationTab() {
   // Safety banner: active profile's last test failed
   const activeLastTest = lastTestResult[currentProfileId];
   const showBanner = activeLastTest && !activeLastTest.ok;
-
-  // ── Built-in row handlers ──────────────────────────────────────────────
-
-  const handleSaveGemini = (patch: ProviderRowSavePayload) => {
-    // Only apiKey + model are editable for Gemini built-in; name + baseUrl
-    // are ignored (Gemini has a fixed endpoint).
-    if (patch.apiKey !== "***") {
-      // The user replaced the key (or cleared it).
-      update("geminiApiKey", patch.apiKey);
-    }
-    update("geminiModel", patch.model);
-    setEditingId(null);
-  };
-
-  const handleSaveLocalOpenai = (patch: ProviderRowSavePayload) => {
-    update("localOpenaiBaseUrl", patch.baseUrl);
-    update("localOpenaiModel", patch.model);
-    if (patch.apiKey !== "***") {
-      update("localOpenaiApiKey", patch.apiKey);
-    }
-    setEditingId(null);
-  };
 
   // ── Custom profile handlers ────────────────────────────────────────────
 
@@ -165,63 +119,10 @@ export function TranslationTab() {
         {/* Provider list */}
         <Section
           title="Translation provider"
-          subtitle="Choose which service translates your subtitles. Built-in providers can't be deleted."
+          subtitle="Choose which custom provider translates your subtitles."
         />
 
         <YStack gap="$sm">
-          {/* Gemini (built-in) */}
-          <ProviderRow
-            {...geminiProfile(draft)}
-            formProvider="gemini"
-            targetLang={draft.defaultTargetLang}
-            isActive={currentProfileId === "gemini"}
-            isBuiltIn
-            isEditing={editingId === "gemini"}
-            lastTest={lastTestResult["gemini"]}
-            onActivate={() => setActiveTranslator("gemini")}
-            onTest={async () => {
-              await testAdhoc({
-                provider: "gemini",
-                apiKey: draft.geminiApiKey,
-                model: draft.geminiModel,
-                targetLang: draft.defaultTargetLang,
-              });
-            }}
-            onEditToggle={() =>
-              setEditingId((v) => (v === "gemini" ? null : "gemini"))
-            }
-            onSave={handleSaveGemini}
-            onCancelEdit={() => setEditingId(null)}
-          />
-
-          {/* Local AI (built-in) */}
-          <ProviderRow
-            {...localOpenaiProfile(draft)}
-            formProvider="local_openai"
-            targetLang={draft.defaultTargetLang}
-            isActive={currentProfileId === "local_openai"}
-            isBuiltIn
-            isEditing={editingId === "local_openai"}
-            lastTest={lastTestResult["local_openai"]}
-            onActivate={() => setActiveTranslator("local_openai")}
-            onTest={async () => {
-              await testAdhoc({
-                provider: "local_openai",
-                baseUrl: draft.localOpenaiBaseUrl,
-                apiKey: draft.localOpenaiApiKey,
-                model: draft.localOpenaiModel,
-                targetLang: draft.defaultTargetLang,
-              });
-            }}
-            onEditToggle={() =>
-              setEditingId((v) =>
-                v === "local_openai" ? null : "local_openai",
-              )
-            }
-            onSave={handleSaveLocalOpenai}
-            onCancelEdit={() => setEditingId(null)}
-          />
-
           {/* Custom profiles */}
           {profiles.map((profile) => (
             <YStack key={profile.id} gap="$xs">

@@ -13,3 +13,5 @@ def test_version_endpoint_returns_capabilities():
     assert "cudaAvailable" in body
     assert "installedSttEngines" in body
     assert "openai-whisper" in body["installedSttEngines"]
+    assert "faster-whisper" in body["installedSttEngines"]
+    assert "mlx-whisper" in body["installedSttEngines"]

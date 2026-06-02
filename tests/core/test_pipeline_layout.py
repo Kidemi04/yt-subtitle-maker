@@ -40,6 +40,9 @@ class _FakeTranslator:
         if progress:
             progress(1.0)
 
+    def translate_title(self, title, target_lang):
+        return f"[{target_lang}] {title}"
+
 
 def test_pipeline_writes_to_subdirs_and_appends_sidecar(tmp_path):
     out = tmp_path / "output"
@@ -109,6 +112,7 @@ def test_pipeline_writes_to_subdirs_and_appends_sidecar(tmp_path):
     sidecar = json.loads((folder / "_history.json").read_text(encoding="utf-8"))
     assert sidecar["videoId"] == "abcDEFghIJK"
     assert sidecar["titleOriginal"] == "Hello Video"
+    assert sidecar["titleTranslated"] == "[zh] Hello Video"
     assert sidecar["channel"] == "Some Channel"
     assert sidecar["durationSeconds"] == 120
     assert sidecar["thumbnailUrl"] == "https://example/thumb.jpg"

@@ -134,7 +134,7 @@ const PERFORMANCE_FALLBACKS: Record<string, EnginePerformanceProfile> = {
   "insanely-fast-whisper": {
     speed: "Very fast on Apple Silicon",
     bestFor: "Mac M-series users who want maximum local speed",
-    tradeoff: "Narrow platform target; not useful on this Windows machine",
+    tradeoff: "Narrow platform target; useful only on supported Apple Silicon setups",
     hardware: "Built for Apple MPS on macOS arm64.",
   },
   "whisper-cpp": {
@@ -539,6 +539,112 @@ function AddonEngineDetails({
   );
 }
 
+function EnginePackageInstaller({
+  engine,
+  refreshEngines,
+}: {
+  engine: EngineDescriptor;
+  refreshEngines: () => Promise<void>;
+}) {
+  const [installState, setInstallState] =
+    React.useState<AddonInstallState>("idle");
+  const [progressMessage, setProgressMessage] = React.useState<string>();
+  const [installError, setInstallError] = React.useState<string>();
+  const abortRef = React.useRef<AbortController | null>(null);
+  const installed = Boolean(engine.installed) || installState === "done";
+
+  React.useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  if (!engine.installable || installed) return null;
+
+  const startInstall = async () => {
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setInstallState("installing");
+    setInstallError(undefined);
+    setProgressMessage("Starting engine install...");
+
+    try {
+      for await (const ev of apiClient.installEngine(engine.id, ctrl.signal)) {
+        if (ctrl.signal.aborted) return;
+        if (ev.status === "resolving" || ev.status === "installing") {
+          setProgressMessage(ev.message);
+        }
+        if (ev.status === "done") {
+          setProgressMessage(`${ev.packageName} installed`);
+          setInstallState("done");
+          await refreshEngines();
+          return;
+        }
+        if (ev.status === "error") {
+          setInstallError(ev.error);
+          setInstallState("error");
+          return;
+        }
+      }
+    } catch (err) {
+      if (ctrl.signal.aborted) {
+        setInstallState("idle");
+        setProgressMessage(undefined);
+        return;
+      }
+      setInstallError(err instanceof Error ? err.message : String(err));
+      setInstallState("error");
+    }
+  };
+
+  const cancelInstall = () => {
+    abortRef.current?.abort();
+    setInstallState("idle");
+    setProgressMessage(undefined);
+  };
+
+  return (
+    <YStack
+      gap="$xs"
+      padding="$sm"
+      borderRadius="$md"
+      borderWidth={1}
+      borderColor="$warning"
+      backgroundColor="$bgBase"
+    >
+      <XStack alignItems="center" justifyContent="space-between" gap="$sm" flexWrap="wrap">
+        <YStack flex={1} minWidth={220} gap={2}>
+          <TitleSm>Install {engine.label} package</TitleSm>
+          <Caption color="$textSecondary">
+            {engine.packageName ?? engine.id} is required before Generate can use this engine.
+          </Caption>
+        </YStack>
+        <XStack gap="$xs">
+          {installState === "installing" ? (
+            <ButtonGhost onPress={cancelInstall} height={42}>
+              Cancel
+            </ButtonGhost>
+          ) : null}
+          {installState !== "installing" ? (
+            <ButtonSecondary onPress={startInstall} height={42}>
+              {installState === "error" ? "Retry install" : "Install package"}
+            </ButtonSecondary>
+          ) : null}
+        </XStack>
+      </XStack>
+      {installState === "installing" ? (
+        <YStack gap="$xs">
+          <ProgressBar value={0.35} />
+          <Caption color="$textSecondary" numberOfLines={2}>
+            {progressMessage ?? "Installing..."}
+          </Caption>
+        </YStack>
+      ) : null}
+      {installError ? <Caption color="$error">{installError}</Caption> : null}
+    </YStack>
+  );
+}
+
 export function EnginePicker({
   engines,
   system,
@@ -548,11 +654,16 @@ export function EnginePicker({
   update,
   refreshEngines,
 }: Props) {
-  const best = bestEngine(engines, system);
-  const availableEngines = engines.filter((engine) => engine.available);
+  const selectableEngines = engines.filter(
+    (engine) => engine.available && engine.selectable !== false,
+  );
+  const plannedEngines = engines.filter(
+    (engine) => !engine.available || engine.selectable === false,
+  );
+  const best = bestEngine(selectableEngines, system);
   const selectedEngine =
-    availableEngines.find((engine) => engine.id === selectedEngineId) ??
-    availableEngines[0];
+    selectableEngines.find((engine) => engine.id === selectedEngineId) ??
+    selectableEngines[0];
   const [previewEngineId, setPreviewEngineId] =
     React.useState(selectedEngineId);
   const [previewVariants, setPreviewVariants] = React.useState<
@@ -566,7 +677,7 @@ export function EnginePicker({
   }, [engines, selectedEngineId]);
 
   const previewEngine =
-    engines.find((engine) => engine.id === previewEngineId) ??
+    [...selectableEngines, ...plannedEngines].find((engine) => engine.id === previewEngineId) ??
     selectedEngine ??
     engines[0];
   const selectedModel = selectedEngine?.models.find(
@@ -584,7 +695,7 @@ export function EnginePicker({
 
   const handleChooseEngine = (engine: EngineDescriptor) => {
     setPreviewEngineId(engine.id);
-    if (!engine.available) return;
+    if (!engine.available || engine.selectable === false) return;
 
     onSelectEngine(engine.id);
     const currentModel = engine.models.find(
@@ -662,7 +773,7 @@ export function EnginePicker({
         </XStack>
       </XStack>
 
-      {availableEngines.length === 0 ? <EmptyEngineState /> : null}
+      {selectableEngines.length === 0 ? <EmptyEngineState /> : null}
 
       {engines.length > 0 ? (
         <YStack gap="$sm">
@@ -686,7 +797,7 @@ export function EnginePicker({
           </XStack>
 
           <XStack gap="$xs" flexWrap="wrap" role="radiogroup">
-            {engines.map((engine) => (
+            {selectableEngines.map((engine) => (
               <EngineChoiceCard
                 key={engine.id}
                 engine={engine}
@@ -697,6 +808,27 @@ export function EnginePicker({
               />
             ))}
           </XStack>
+
+          {plannedEngines.length > 0 ? (
+            <YStack gap="$xs">
+              <XStack alignItems="center" gap="$xs" flexWrap="wrap">
+                <CaptionUpper>Planned engines</CaptionUpper>
+                <BadgePill tone="neutral">{plannedEngines.length}</BadgePill>
+              </XStack>
+              <XStack gap="$xs" flexWrap="wrap">
+                {plannedEngines.map((engine) => (
+                  <EngineChoiceCard
+                    key={engine.id}
+                    engine={engine}
+                    system={system}
+                    selected={engine.id === previewEngine?.id}
+                    configuredDefault={false}
+                    onPress={() => handleChooseEngine(engine)}
+                  />
+                ))}
+              </XStack>
+            </YStack>
+          ) : null}
         </YStack>
       ) : null}
 
@@ -734,6 +866,11 @@ export function EnginePicker({
               </Caption>
             </XStack>
           </XStack>
+
+          <EnginePackageInstaller
+            engine={previewEngine}
+            refreshEngines={refreshEngines}
+          />
 
           <YStack gap="$xs">
             {previewEngine.models.map((model) => (

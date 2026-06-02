@@ -341,6 +341,11 @@ def run_pipeline(
             progress=_tx_progress,
         )
         _check_cancel(cancel_event)
+
+        if cfg.auto_translate_title and title:
+            title_translated = translator.translate_title(title, request["targetLang"])
+            library_runs.update_metadata(folder, title_translated=title_translated)
+
         translate_duration_ms = int((time.monotonic() - translate_started) * 1000)
 
         translator_provider = _resolved_translator_provider(request, cfg)

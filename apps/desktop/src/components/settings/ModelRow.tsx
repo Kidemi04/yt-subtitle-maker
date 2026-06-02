@@ -32,17 +32,17 @@ function formatSize(mb: number): string {
 function modelHint(name: string): string {
   switch (name) {
     case "tiny":
-      return "Fastest smoke tests and rough drafts.";
+      return "Fastest. Good for quick tests.";
     case "base":
-      return "Quick drafts with better accuracy than tiny.";
+      return "Very quick. Better than Tiny.";
     case "small":
-      return "Good everyday balance for longer videos.";
+      return "Light daily option. CPU friendly.";
     case "medium":
-      return "Higher accuracy, slower on CPU.";
+      return "More accurate. Slower on CPU.";
     case "large-v3":
-      return "Best accuracy, largest local download.";
+      return "Best quality. Slowest and largest.";
     case "turbo":
-      return "Recommended when you want speed with strong accuracy.";
+      return "Recommended default. Strong speed and quality balance.";
     default:
       return "Whisper model checkpoint.";
   }
@@ -98,6 +98,8 @@ export function ModelRow({
                 ? `, ${(ev.speed / 1024 / 1024).toFixed(1)} MB/s`
                 : "";
             setProgressMsg(`${dlMb} / ${totMb} MB${speedPart}`);
+          } else {
+            setProgressMsg("Downloading...");
           }
         }
 
@@ -135,6 +137,7 @@ export function ModelRow({
 
   const isDownloaded = model.downloaded || dlState === "done";
   const canSelect = isDownloaded && dlState !== "downloading";
+  const hasMeasuredProgress = progress > 0 || Boolean(progressMsg?.includes("/"));
 
   return (
     <YStack
@@ -236,7 +239,9 @@ export function ModelRow({
             <Caption color="$textSecondary">
               {progressMsg ?? "Downloading..."}
             </Caption>
-            <Caption color="$textMuted">{Math.round(progress * 100)}%</Caption>
+            <Caption color="$textMuted">
+              {hasMeasuredProgress ? `${Math.round(progress * 100)}%` : "Working"}
+            </Caption>
           </XStack>
         </YStack>
       ) : null}

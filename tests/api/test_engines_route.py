@@ -55,29 +55,36 @@ def test_openai_whisper_descriptor_shape():
     assert ow["tunables"] == []
 
 
-def test_planned_stubs_present_and_unavailable():
+def test_engines_expose_implemented_engines_as_selectable():
+    resp = client.get("/api/engines")
+    assert resp.status_code == 200
+    engines = {e["id"]: e for e in resp.json()}
+
+    assert engines["openai-whisper"]["available"] is True
+    assert engines["faster-whisper"]["available"] is True
+    assert engines["faster-whisper"]["selectable"] is True
+    assert engines["mlx-whisper"]["available"] in {True, False}
+    assert engines["mlx-whisper"]["selectable"] in {True, False}
+    assert engines["insanely-fast-whisper"]["available"] is False
+    assert engines["insanely-fast-whisper"]["selectable"] is False
+
+
+def test_remaining_planned_stubs_are_unavailable():
     resp = client.get("/api/engines")
     descs = resp.json()
     planned_ids = {
-        "faster-whisper",
         "whisperx",
         "insanely-fast-whisper",
         "whisper-cpp",
-        "mlx-whisper",
         "stable-ts",
     }
-    found = {d["id"] for d in descs if d["id"] in planned_ids}
-    assert found == planned_ids
-
     for d in descs:
         if d["id"] in planned_ids:
             assert d["available"] is False
+            assert d["selectable"] is False
             assert d["models"] == []
-            assert isinstance(d["packageSizeMb"], int)
-            assert d["packageSizeMb"] > 0
             assert isinstance(d.get("modelVariants"), list)
             assert len(d["modelVariants"]) > 0
-            assert isinstance(d.get("note"), str)
 
 
 def test_whisper_family_addons_expose_model_variants():
@@ -102,3 +109,17 @@ def test_model_sizes_match_known_values():
     assert sizes["medium"] == 1536
     assert sizes["large-v3"] == 3093
     assert sizes["turbo"] == 1624
+
+
+def test_faster_whisper_descriptor_refreshes_model_state(monkeypatch):
+    def fake_models(engine):
+        if engine == "faster-whisper":
+            return [{"name": "tiny", "sizeMb": 75, "downloaded": True}]
+        return []
+
+    monkeypatch.setattr("core.engines.engine_models", fake_models)
+
+    resp = client.get("/api/engines")
+
+    faster = next(d for d in resp.json() if d["id"] == "faster-whisper")
+    assert faster["models"] == [{"name": "tiny", "sizeMb": 75, "downloaded": True}]

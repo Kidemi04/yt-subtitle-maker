@@ -13,14 +13,16 @@ from core.stt.base import (
     TranscriptionResult,
     TranscriptionSegment,
 )
+from core.stt.faster_whisper import FasterWhisperProvider
+from core.stt.mlx_whisper import MlxWhisperProvider
 from core.stt.whisper_local import WhisperLocalProvider
 from core.stt.yt_captions import YtCaptionsProvider
 
 _REGISTRY: dict[str, type] = {
     "openai-whisper": WhisperLocalProvider,
+    "faster-whisper": FasterWhisperProvider,
+    "mlx-whisper": MlxWhisperProvider,
     "yt_captions": YtCaptionsProvider,
-    # V1.1+:
-    # "faster-whisper": FasterWhisperProvider,
     # "whisperx": WhisperXProvider,
     # "insanely-fast-whisper": InsanelyFastWhisperProvider,
 }

@@ -11,19 +11,17 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from core.dependency_manager import (
-    MODELS_URLS,
-    IntegrityError,
     STT_ENGINE_ADDONS,
+    IntegrityError,
     UnsupportedPlatformError,
     check_ffmpeg,
     check_mpv,
     check_mpv_status,
     check_stt_engine_addon,
-    check_whisper_model,
-    download_whisper_model_generator,
-    install_stt_engine_addon_generator,
     install_mpv_generator,
+    install_stt_engine_addon_generator,
 )
+from core.stt import model_catalog
 
 router = APIRouter(prefix="/api/dependencies", tags=["dependencies"])
 
@@ -45,16 +43,13 @@ def get_dependencies(engine: str | None = Query(default=None)) -> dict[str, Any]
     behaviour. Any planned-but-not-yet-available engine → ``{"ok": False, ...}``.
     Unknown engine values are also rejected with the same error style.
     """
-    if engine is not None and engine != "openai-whisper":
-        return {
-            "ok": False,
-            "error": (
-                f"engine {engine!r} is not yet available on this installation. "
-                "Only 'openai-whisper' models can be checked or downloaded right now."
-            ),
-        }
+    engine_id = engine or "openai-whisper"
+    try:
+        models = model_catalog.engine_model_state(engine_id)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
     return {
-        "models": {name: check_whisper_model(name) for name in MODELS_URLS},
+        "models": models,
         "ffmpegAvailable": check_ffmpeg(),
         "mpvAvailable": check_mpv(),
         "mpvStatus": check_mpv_status(),
@@ -79,19 +74,14 @@ def install_model(req: InstallRequest):
       {"status": "done", "model": str, "path": str}
       {"status": "error", "error": str, "recoverable": false}
     """
-    if req.engine is not None and req.engine != "openai-whisper":
-        return {
-            "ok": False,
-            "error": (
-                f"engine {req.engine!r} is not yet available on this installation. "
-                "Only 'openai-whisper' models can be downloaded right now."
-            ),
-        }
+    engine_id = req.engine or "openai-whisper"
+    if engine_id not in model_catalog.IMPLEMENTED_ENGINES:
+        return {"ok": False, "error": f"unknown engine: {engine_id!r}"}
 
-    if req.model not in MODELS_URLS:
+    if req.model not in model_catalog.MODEL_VARIETIES:
         return {
             "ok": False,
-            "error": f"Unknown model: {req.model!r}. Known: {list(MODELS_URLS.keys())}",
+            "error": f"Unknown model: {req.model!r}. Known: {model_catalog.MODEL_VARIETIES}",
         }
 
     q: queue.Queue = queue.Queue()
@@ -99,7 +89,12 @@ def install_model(req: InstallRequest):
 
     def runner() -> None:
         try:
-            for downloaded, total, speed in download_whisper_model_generator(req.model):
+            last_path = None
+            for downloaded, total, speed, path in model_catalog.download_engine_model_generator(
+                engine_id,
+                req.model,
+            ):
+                last_path = path
                 percent = (downloaded / total * 100.0) if total > 0 else 0.0
                 q.put({
                     "status": "downloading",
@@ -108,7 +103,10 @@ def install_model(req: InstallRequest):
                     "speed": speed,
                     "percent": percent,
                 })
-            q.put({"status": "done", "model": req.model})
+            done = {"status": "done", "model": req.model, "engine": engine_id}
+            if last_path:
+                done["path"] = str(last_path)
+            q.put(done)
         except Exception as e:
             q.put({"status": "error", "error": str(e), "recoverable": False})
         finally:

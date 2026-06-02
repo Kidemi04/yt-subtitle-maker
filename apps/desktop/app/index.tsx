@@ -328,8 +328,10 @@ export default function Generate() {
   // when available, with a graceful fallback to the static WHISPER_MODELS
   // list (only the installed subset) if engines hasn't loaded yet.
   const whisperEngine = React.useMemo(
-    () => engines?.find((e) => e.id === "openai-whisper"),
-    [engines],
+    () =>
+      engines?.find((e) => e.id === sttEngine) ??
+      engines?.find((e) => e.id === "openai-whisper"),
+    [engines, sttEngine],
   );
   const whisperModelOptions = React.useMemo(() => {
     if (whisperEngine) {
@@ -351,20 +353,25 @@ export default function Generate() {
     return engineVerdict(whisperEngine, system);
   }, [whisperEngine, system]);
 
-  // Build the dropdown options from the live profile list. Built-ins first
-  // (Gemini, Local AI), then every entry in `customTranslators` by its
-  // display name. If `customTranslators` hasn't loaded yet we still show
-  // the two built-ins so the screen renders.
+  // Build the dropdown options from the live custom profile list. Built-in
+  // providers stay supported by the backend for compatibility, but are not
+  // shown in the normal Generate picker.
   const translatorOptions = React.useMemo(() => {
-    const opts: { label: string; value: string }[] = [
-      { label: "Gemini", value: "gemini" },
-      { label: "Local AI", value: "local_openai" },
-    ];
+    const opts: { label: string; value: string }[] = [];
     for (const p of customTranslators ?? []) {
       opts.push({ label: p.name || "(unnamed)", value: `custom:${p.id}` });
     }
+    if (opts.length === 0 && translatorProvider) {
+      opts.push({
+        label:
+          translatorProvider in BUILTIN_TRANSLATOR_LABELS
+            ? BUILTIN_TRANSLATOR_LABELS[translatorProvider]
+            : translatorProvider,
+        value: translatorProvider,
+      });
+    }
     return opts;
-  }, [customTranslators]);
+  }, [customTranslators, translatorProvider]);
 
   // Human-readable label for whatever is selected — used in the
   // "Translate subtitles · Using {label}" caption.
@@ -380,8 +387,20 @@ export default function Generate() {
     return translatorProvider;
   }, [translatorProvider, customTranslators]);
 
-  const sttEngineLabel =
-    sttEngine === "openai-whisper" ? "OpenAI Whisper" : sttEngine;
+  const sttEngineLabel = whisperEngine?.label ?? (
+    sttEngine === "openai-whisper" ? "OpenAI Whisper" : sttEngine
+  );
+  const selectedEngineModel = whisperEngine?.models.find(
+    (model) => model.name === whisperModel,
+  );
+  const selectedEnginePackageMissing =
+    !downloadOnly &&
+    sttSource !== "yt_captions" &&
+    Boolean(whisperEngine?.installable && !whisperEngine.installed);
+  const localModelMissing =
+    !downloadOnly &&
+    sttSource !== "yt_captions" &&
+    Boolean(selectedEngineModel && !selectedEngineModel.downloaded);
 
   // MPV launch feedback — tells the user the click did something even when
   // the mpv window pops up behind/off-screen, and surfaces backend errors
@@ -689,9 +708,9 @@ export default function Generate() {
                     value={sttSource}
                     onValueChange={(v) => setJobField("sttSource", v as SttSource)}
                     options={[
-                      { label: "Auto", value: "auto" },
+                      { label: "Local transcription", value: "whisper" },
+                      { label: "Auto fallback", value: "auto" },
                       { label: "YouTube captions only", value: "yt_captions" },
-                      { label: "Whisper only", value: "whisper" },
                     ]}
                     aria-label="Subtitle source"
                   />
@@ -700,7 +719,7 @@ export default function Generate() {
                       ? "Try YouTube auto-captions first, fall back to Whisper."
                       : sttSource === "yt_captions"
                       ? "Free + instant, but unavailable on many videos."
-                      : "Skip YT captions, run Whisper directly on the audio."}
+                      : "Run local Whisper directly on the audio."}
                   </Caption>
                 </YStack>
 
@@ -952,9 +971,33 @@ export default function Generate() {
         </BadgePill>
       ) : null}
 
+      {showVideoPreview && selectedEnginePackageMissing ? (
+        <BadgePill tone="warning">
+          <Caption>
+            Install {whisperEngine?.packageName ?? sttEngineLabel} in Settings before running {sttEngineLabel}.
+          </Caption>
+        </BadgePill>
+      ) : null}
+
+      {showVideoPreview && localModelMissing ? (
+        <BadgePill tone="warning">
+          <Caption>
+            Download {whisperModel} for {sttEngineLabel} before running local transcription.
+          </Caption>
+        </BadgePill>
+      ) : null}
+
       {/* GENERATE button OR processing card */}
       {showVideoPreview && !isProcessing && !isDone ? (
-        <ButtonPrimary onPress={onGenerate} disabled={!metadata?.ok || dirtyTranslatorMissing}>
+        <ButtonPrimary
+          onPress={onGenerate}
+          disabled={
+            !metadata?.ok ||
+            dirtyTranslatorMissing ||
+            selectedEnginePackageMissing ||
+            localModelMissing
+          }
+        >
           <XStack gap="$xs" alignItems="center">
             <Sparkles size={16} color="#ffffff" />
             <TitleMd color="$onAccent">

@@ -11,7 +11,6 @@ import { Stack, XStack, YStack } from "tamagui";
 import {
   Modal,
   Dropdown,
-  SegmentedControl,
   ProgressBar,
   StepPill,
   ButtonPrimary,
@@ -23,17 +22,10 @@ import {
 import { LanguagePicker } from "./settings/LanguagePicker";
 import type {
   TranscribeRun,
-  TranslatorProvider,
 } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "../state/client";
 
 type Phase = "idle" | "translating" | "done" | "error";
-
-const TRANSLATOR_OPTIONS: { label: string; value: TranslatorProvider }[] = [
-  { label: "Gemini", value: "gemini" },
-  { label: "Local AI", value: "local_openai" },
-  { label: "OpenAI", value: "openai" },
-];
 
 export function NewTranslationModal({
   open,
@@ -60,8 +52,11 @@ export function NewTranslationModal({
   const [sourceTranscribeId, setSourceTranscribeId] = React.useState<string>(
     initialSourceTranscribeId ?? transcribes[0]?.id ?? "",
   );
-  const [translator, setTranslator] = React.useState<TranslatorProvider>("gemini");
+  const [translator, setTranslator] = React.useState("gemini");
   const [targetLang, setTargetLang] = React.useState("zh");
+  const [translatorOptions, setTranslatorOptions] = React.useState<
+    { label: string; value: string }[]
+  >([{ label: "Gemini", value: "gemini" }]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -75,7 +70,18 @@ export function NewTranslationModal({
     let cancelled = false;
     apiClient.fetchConfig().then((cfg) => {
       if (cancelled) return;
-      if (cfg.translatorProvider) setTranslator(cfg.translatorProvider);
+      const active = cfg.activeTranslator || cfg.translatorProvider || "gemini";
+      const customOptions = (cfg.customTranslators ?? []).map((profile) => ({
+        label: profile.name || "(unnamed)",
+        value: `custom:${profile.id}`,
+      }));
+      const selected = customOptions.some((option) => option.value === active)
+        ? active
+        : customOptions[0]?.value ?? active;
+      setTranslatorOptions(
+        customOptions.length > 0 ? customOptions : [{ label: active, value: active }],
+      );
+      setTranslator(selected);
       if (cfg.defaultTargetLang) setTargetLang(cfg.defaultTargetLang);
     }).catch(() => undefined);
     return () => {
@@ -169,10 +175,12 @@ export function NewTranslationModal({
 
         <YStack gap="$xs">
           <CaptionUpper>Translator</CaptionUpper>
-          <SegmentedControl
+          <Dropdown
             value={translator}
-            onValueChange={(v) => setTranslator(v as TranslatorProvider)}
-            options={TRANSLATOR_OPTIONS}
+            onValueChange={setTranslator}
+            options={translatorOptions}
+            width="100%"
+            aria-label="Translator profile"
             disabled={phase === "translating"}
           />
           <Caption color="$textMuted">

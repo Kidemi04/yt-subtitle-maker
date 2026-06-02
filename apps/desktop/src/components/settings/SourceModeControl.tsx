@@ -4,7 +4,7 @@
 //
 // Config mapping (documented in the 4c-frontend plan, judgment call #1):
 //   Auto             → ytCaptionsFirst = true   (defaultSttEngine unchanged)
-//   Whisper only     → ytCaptionsFirst = false  (defaultSttEngine unchanged)
+//   Local transcription → ytCaptionsFirst = false  (defaultSttEngine unchanged)
 //   YouTube captions → defaultSttEngine = "yt_captions" (ytCaptionsFirst unchanged)
 //
 // Reading the current value:
@@ -22,8 +22,8 @@ import { SettingRow } from "./shared";
 type SourceMode = "auto" | "whisper" | "yt_captions";
 
 const SOURCE_OPTIONS: ReadonlyArray<SegmentedControlOption<SourceMode>> = [
-  { label: "Auto", value: "auto" },
-  { label: "Whisper only", value: "whisper" },
+  { label: "Local transcription", value: "whisper" },
+  { label: "Auto fallback", value: "auto" },
   { label: "YouTube captions only", value: "yt_captions" },
 ];
 
@@ -61,7 +61,7 @@ export function SourceModeControl({ draft, update, prevWhisperEngine }: Props) {
     <SettingRow
       id="transcription.source-mode"
       label="Source"
-      helper="Auto uses YouTube's captions if available, then falls back to the selected Whisper engine. Default for new jobs — change per-job on the Generate screen."
+      helper="Local transcription is the default. Auto fallback tries YouTube captions first; YouTube captions only is explicit opt-in."
     >
       <SegmentedControl
         options={SOURCE_OPTIONS}

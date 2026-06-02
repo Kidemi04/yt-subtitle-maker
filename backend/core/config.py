@@ -37,7 +37,7 @@ class AppConfig:
     default_whisper_model: str = "turbo"
     default_whisper_device: str = "auto"
     default_source_lang: str = "en"      # NOT 'auto' — see spec §14 #6
-    yt_captions_first: bool = True
+    yt_captions_first: bool = False
     vad_enabled: bool = True
     ffmpeg_resample_16k: bool = True
 

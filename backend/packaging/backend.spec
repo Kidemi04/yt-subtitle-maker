@@ -20,6 +20,15 @@ for pkg in ("whisper", "torch", "yt_dlp", "uvicorn", "openai", "google", "google
     binaries += b
     hiddenimports += h
 
+for pkg in ("faster_whisper", "ctranslate2", "mlx_whisper", "mlx", "huggingface_hub"):
+    try:
+        d, b, h = collect_all(pkg)
+    except Exception:
+        continue
+    datas += d
+    binaries += b
+    hiddenimports += h
+
 hiddenimports += collect_submodules("uvicorn")
 hiddenimports += [
     "api.main",

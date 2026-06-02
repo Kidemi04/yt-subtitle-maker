@@ -41,10 +41,10 @@ export type SttSource = "auto" | "yt_captions" | "whisper";
 export type SttEngine =
   | "openai-whisper"
   | "faster-whisper"
+  | "mlx-whisper"
   | "whisperx"
   | "insanely-fast-whisper"
   | "whisper-cpp"
-  | "mlx-whisper"
   | "stable-ts";
 export type WhisperModel =
   | "tiny"
@@ -446,6 +446,7 @@ export interface EngineDescriptor {
   id: string;
   label: string;
   available: boolean;
+  selectable?: boolean;
   installable?: boolean;
   installed?: boolean;
   packageName?: string | null;

@@ -11,7 +11,7 @@ from api.main import app
 client = TestClient(app)
 
 
-@patch("api.routes.dependencies.check_whisper_model")
+@patch("api.routes.dependencies.model_catalog.check_whisper_model")
 @patch("api.routes.dependencies.check_ffmpeg")
 @patch("api.routes.dependencies.check_mpv")
 def test_dependencies_get_returns_status(mock_mpv, mock_ffmpeg, mock_model):
@@ -38,13 +38,14 @@ def test_dependencies_install_rejects_unknown_model():
     assert resp.status_code < 500
 
 
-@patch("api.routes.dependencies.download_whisper_model_generator")
+@patch("api.routes.dependencies.model_catalog.download_engine_model_generator")
 def test_dependencies_install_streams_progress(mock_gen):
     # Fake 3-chunk download
-    def fake_progress(name):
-        yield (1024, 100000, 5000.0)
-        yield (50000, 100000, 12500.0)
-        yield (100000, 100000, 25000.0)
+    def fake_progress(engine, name):
+        assert engine == "openai-whisper"
+        yield (1024, 100000, 5000.0, None)
+        yield (50000, 100000, 12500.0, None)
+        yield (100000, 100000, 25000.0, None)
     mock_gen.side_effect = fake_progress
 
     resp = client.post("/api/dependencies/install", json={"model": "tiny"})
@@ -87,13 +88,26 @@ def test_dependencies_get_openai_whisper_engine_same_as_no_param():
     assert "ffmpegAvailable" in body
 
 
-def test_dependencies_get_planned_engine_returns_error():
-    """?engine=faster-whisper returns {"ok": false, ...} — not 4xx."""
+def test_dependencies_support_faster_whisper_models(monkeypatch):
+    from core.stt import model_catalog
+
+    monkeypatch.setattr(
+        model_catalog,
+        "engine_model_state",
+        lambda engine: {
+            "tiny": True,
+            "base": False,
+            "small": False,
+            "medium": False,
+            "turbo": False,
+            "large-v3": False,
+        },
+    )
+
     resp = client.get("/api/dependencies?engine=faster-whisper")
+
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["ok"] is False
-    assert "faster-whisper" in body["error"]
+    assert resp.json()["models"]["tiny"] is True
 
 
 def test_dependencies_install_no_engine_still_works():
@@ -113,16 +127,35 @@ def test_dependencies_install_openai_whisper_engine_accepted():
     assert resp.status_code < 500
 
 
-def test_dependencies_install_planned_engine_returns_error():
-    """POST /install with engine=faster-whisper returns {"ok": false, ...}."""
+def test_dependencies_install_supports_faster_whisper_models(monkeypatch):
+    from pathlib import Path
+
+    from core.stt import model_catalog
+
+    def fake_download(engine, model):
+        assert engine == "faster-whisper"
+        assert model == "tiny"
+        yield 10, 10, 0.0, Path("/tmp/faster-whisper/tiny")
+
+    monkeypatch.setattr(model_catalog, "download_engine_model_generator", fake_download)
+
     resp = client.post(
         "/api/dependencies/install",
         json={"model": "tiny", "engine": "faster-whisper"},
     )
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/x-ndjson")
+    assert '"status": "done"' in resp.text
+
+
+def test_dependencies_reject_unknown_engine():
+    resp = client.get("/api/dependencies?engine=not-real")
+
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is False
-    assert "faster-whisper" in body["error"]
+    assert "unknown engine" in body["error"]
 
 
 def test_install_engine_rejects_unknown_addon():

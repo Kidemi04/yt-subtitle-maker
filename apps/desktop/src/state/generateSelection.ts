@@ -32,7 +32,7 @@ function isBuiltinTranslator(provider: string): boolean {
 }
 
 export const FALLBACK_SELECTION: GenerateSelectionFields = {
-  sttSource: "auto",
+  sttSource: "whisper",
   sttEngine: "openai-whisper",
   whisperModel: "turbo",
   whisperDevice: "auto",
