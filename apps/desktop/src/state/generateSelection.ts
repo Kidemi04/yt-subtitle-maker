@@ -106,6 +106,7 @@ export function selectionDefaultsFromConfig(
     installedEngines?: string[];
     deps?: DependencyStatus;
     engines?: EngineDescriptor[];
+    vadSupported?: boolean;
   } = {},
 ): GenerateSelectionFields {
   const sttEngine = resolveSttEngine(config, options.installedEngines);
@@ -114,7 +115,10 @@ export function selectionDefaultsFromConfig(
     sttEngine,
     whisperModel: resolveWhisperModel(config, options.deps, options.engines, sttEngine),
     whisperDevice: (config?.defaultWhisperDevice || FALLBACK_SELECTION.whisperDevice) as WhisperDevice,
-    vadEnabled: config?.vadEnabled ?? FALLBACK_SELECTION.vadEnabled,
+    vadEnabled:
+      options.vadSupported === true
+        ? config?.vadEnabled ?? FALLBACK_SELECTION.vadEnabled
+        : false,
     sourceLang: config?.defaultSourceLang || FALLBACK_SELECTION.sourceLang,
     enableTranslation: config?.enableTranslation ?? FALLBACK_SELECTION.enableTranslation,
     targetLang: config?.defaultTargetLang || FALLBACK_SELECTION.targetLang,
