@@ -50,3 +50,9 @@ apps/desktop/src-tauri/.pyinstaller-work/
 
 # Superpowers brainstorming/companion artifacts
 .superpowers/
+
+# Agent skills (local only)
+.agents/
+
+# Temp files
+actia.txt
