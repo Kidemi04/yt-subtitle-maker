@@ -100,6 +100,16 @@ export function defaultTranslatorFromConfig(config: AppConfig | undefined): stri
   return config?.activeTranslator || config?.translatorProvider || FALLBACK_SELECTION.translatorProvider;
 }
 
+export function isTranslatorProviderAvailable(
+  provider: string,
+  config: AppConfig | undefined,
+): boolean {
+  if (BUILTIN_TRANSLATORS.has(provider)) return true;
+  if (!provider.startsWith("custom:")) return false;
+  const id = provider.slice("custom:".length);
+  return Boolean(config?.customTranslators?.some((profile) => profile.id === id));
+}
+
 export function selectionDefaultsFromConfig(
   config: AppConfig | undefined,
   options: {

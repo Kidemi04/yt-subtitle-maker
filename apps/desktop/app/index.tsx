@@ -42,6 +42,7 @@ import {
   type GenerateSelectionDirty,
   type GenerateSelectionFields,
   type GenerateSelectionOverrides,
+  isTranslatorProviderAvailable,
   mergeGenerateSelection,
   selectionDefaultsFromConfig,
   setGenerateSelectionField,
@@ -314,6 +315,12 @@ export default function Generate() {
     translatorProvider,
     downloadOnly,
   } = selection;
+
+  const dirtyTranslatorMissing =
+    Boolean(selectionDirty.translatorProvider) &&
+    enableTranslation &&
+    !downloadOnly &&
+    !isTranslatorProviderAvailable(translatorProvider, draft);
 
   // Whisper model options enriched to match Settings → Transcription →
   // EnginePicker's per-model rows: each label shows the size in GB/MB and a
@@ -795,6 +802,13 @@ export default function Generate() {
                           </XStack>
                         ) : null}
                       </XStack>
+                      {dirtyTranslatorMissing ? (
+                        <BadgePill tone="warning">
+                          <Caption>
+                            This provider no longer exists in Settings. Choose an available provider before generating.
+                          </Caption>
+                        </BadgePill>
+                      ) : null}
                     </YStack>
                   ) : null}
 
@@ -922,7 +936,7 @@ export default function Generate() {
 
       {/* GENERATE button OR processing card */}
       {showVideoPreview && !isProcessing && !isDone ? (
-        <ButtonPrimary onPress={onGenerate} disabled={!metadata?.ok}>
+        <ButtonPrimary onPress={onGenerate} disabled={!metadata?.ok || dirtyTranslatorMissing}>
           <XStack gap="$xs" alignItems="center">
             <Sparkles size={16} color="#ffffff" />
             <TitleMd color="$onAccent">
