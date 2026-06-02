@@ -25,7 +25,11 @@ export type GenerateSelectionFields = {
 export type GenerateSelectionOverrides = Partial<GenerateSelectionFields>;
 export type GenerateSelectionDirty = Partial<Record<keyof GenerateSelectionFields, boolean>>;
 
-export const BUILTIN_TRANSLATORS = new Set(["gemini", "local_openai", "openai"]);
+const BUILTIN_TRANSLATORS = ["gemini", "local_openai", "openai"] as const;
+
+function isBuiltinTranslator(provider: string): boolean {
+  return (BUILTIN_TRANSLATORS as readonly string[]).includes(provider);
+}
 
 export const FALLBACK_SELECTION: GenerateSelectionFields = {
   sttSource: "auto",
@@ -104,7 +108,7 @@ export function isTranslatorProviderAvailable(
   provider: string,
   config: AppConfig | undefined,
 ): boolean {
-  if (BUILTIN_TRANSLATORS.has(provider)) return true;
+  if (isBuiltinTranslator(provider)) return true;
   if (!provider.startsWith("custom:")) return false;
   const id = provider.slice("custom:".length);
   return Boolean(config?.customTranslators?.some((profile) => profile.id === id));

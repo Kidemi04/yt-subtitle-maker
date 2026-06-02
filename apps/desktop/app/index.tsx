@@ -934,6 +934,14 @@ export default function Generate() {
         </GlassCard>
       ) : null}
 
+      {showVideoPreview && dirtyTranslatorMissing ? (
+        <BadgePill tone="warning">
+          <Caption>
+            This provider no longer exists in Settings. Choose an available provider before generating.
+          </Caption>
+        </BadgePill>
+      ) : null}
+
       {/* GENERATE button OR processing card */}
       {showVideoPreview && !isProcessing && !isDone ? (
         <ButtonPrimary onPress={onGenerate} disabled={!metadata?.ok || dirtyTranslatorMissing}>
