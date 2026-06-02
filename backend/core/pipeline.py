@@ -124,11 +124,21 @@ def _make_translator(request: dict, cfg: AppConfig):
             # the saved credentials. Override on a shallow copy so cfg itself
             # isn't mutated.
             profile_id = override_provider[len("custom:"):]
-            if not any(e.get("id") == profile_id for e in cfg.custom_translators):
+            matching_profile = next(
+                (e for e in cfg.custom_translators if e.get("id") == profile_id),
+                None,
+            )
+            if matching_profile is None:
                 raise ValueError(
                     f"unknown custom translator profile: {profile_id!r}"
                 )
             tmp_cfg = copy.copy(cfg)
+            tmp_cfg.custom_translators = [dict(e) for e in cfg.custom_translators]
+            if request.get("translatorModel"):
+                for entry in tmp_cfg.custom_translators:
+                    if entry.get("id") == profile_id:
+                        entry["model"] = request["translatorModel"]
+                        break
             tmp_cfg.active_translator = override_provider
             return get_active_translator(tmp_cfg)
         raise ValueError(f"unknown translator provider: {override_provider!r}")
@@ -402,7 +412,7 @@ def _resolved_translator_provider(request: dict, cfg: AppConfig) -> str:
 
 def _translator_model_for(provider: str, request: dict, cfg: AppConfig) -> str:
     """Resolve the model string actually used for a translator provider."""
-    if request.get("translatorModel"):
+    if request.get("translatorProvider") and request.get("translatorModel"):
         return request["translatorModel"]
     if provider == "gemini":
         return cfg.gemini_model

@@ -208,8 +208,8 @@ def test_pipeline_translator_model_for_custom_profile():
     assert _translator_model_for("custom:deepseek-1", {}, cfg) == "deepseek-chat"
 
 
-def test_pipeline_translator_model_override_still_wins_for_custom_profile():
-    from core.pipeline import _translator_model_for
+def test_pipeline_custom_override_model_matches_dispatch_and_metadata():
+    from core.pipeline import _make_translator, _translator_model_for
 
     cfg = AppConfig()
     cfg.custom_translators = [{
@@ -220,8 +220,30 @@ def test_pipeline_translator_model_override_still_wins_for_custom_profile():
         "model": "deepseek-chat",
     }]
 
+    request = {
+        "translatorProvider": "custom:deepseek-1",
+        "translatorModel": "deepseek-reasoner",
+    }
+    provider = _make_translator(request, cfg)
+
+    assert isinstance(provider, OpenAICompatTranslator)
+    assert provider.model == "deepseek-reasoner"
     assert _translator_model_for(
         "custom:deepseek-1",
-        {"translatorModel": "deepseek-reasoner"},
+        request,
         cfg,
     ) == "deepseek-reasoner"
+
+
+def test_pipeline_translator_model_ignores_orphan_model_override_without_provider():
+    from core.pipeline import _translator_model_for
+
+    cfg = AppConfig()
+    cfg.active_translator = "gemini"
+    cfg.gemini_model = "gemini-2.5-flash-lite"
+
+    assert _translator_model_for(
+        "gemini",
+        {"translatorModel": "not-actually-used"},
+        cfg,
+    ) == "gemini-2.5-flash-lite"
