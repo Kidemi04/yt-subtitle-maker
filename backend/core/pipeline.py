@@ -369,18 +369,7 @@ def run_pipeline(
         "sttSourceUsed": result.source,
         "durationMs": duration_ms,
         "transcribeId": t_id,
-        "translateId": (
-            library_runs.translate_id(
-                t_id,
-                _resolved_translator_provider(request, cfg),
-                _translator_model_for(
-                    _resolved_translator_provider(request, cfg), request, cfg
-                ),
-                request["targetLang"],
-            )
-            if translated_path
-            else None
-        ),
+        "translateId": tr_id if translated_path else None,
         "previewSegments": [
             {"id": s.id, "start": s.start, "end": s.end, "text": s.text, "translated": s.translated}
             for s in result.segments[:5]
@@ -390,11 +379,20 @@ def run_pipeline(
 
 def _resolved_translator_provider(request: dict, cfg: AppConfig) -> str:
     """Resolve the provider id used for translation metadata and run ids."""
-    return (
-        request.get("translatorProvider")
-        or cfg.active_translator
-        or cfg.translator_provider
-    )
+    if request.get("translatorProvider"):
+        return request["translatorProvider"]
+
+    active = cfg.active_translator
+    if not active:
+        return cfg.translator_provider
+    if active in {"gemini", "local_openai", "openai"}:
+        return active
+    if active.startswith("custom:"):
+        profile_id = active[len("custom:"):]
+        if any(e.get("id") == profile_id for e in cfg.custom_translators):
+            return active
+        return "gemini"
+    return "gemini"
 
 
 def _translator_model_for(provider: str, request: dict, cfg: AppConfig) -> str:

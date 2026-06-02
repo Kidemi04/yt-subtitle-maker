@@ -139,6 +139,13 @@ def test_pipeline_resolved_provider_uses_active_translator_without_override():
 
     cfg = AppConfig()
     cfg.active_translator = "custom:deepseek-1"
+    cfg.custom_translators = [{
+        "id": "deepseek-1",
+        "name": "DeepSeek",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "ds-key",
+        "model": "deepseek-chat",
+    }]
     cfg.translator_provider = "gemini"
 
     assert _resolved_translator_provider({}, cfg) == "custom:deepseek-1"
@@ -152,6 +159,17 @@ def test_pipeline_resolved_provider_uses_legacy_when_active_missing():
     cfg.translator_provider = "local_openai"
 
     assert _resolved_translator_provider({}, cfg) == "local_openai"
+
+
+def test_pipeline_resolved_provider_falls_back_when_active_custom_missing():
+    from core.pipeline import _resolved_translator_provider
+
+    cfg = AppConfig()
+    cfg.active_translator = "custom:nope"
+    cfg.custom_translators = []
+    cfg.translator_provider = "local_openai"
+
+    assert _resolved_translator_provider({}, cfg) == "gemini"
 
 
 def test_pipeline_translator_model_for_custom_profile():
