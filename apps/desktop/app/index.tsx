@@ -38,6 +38,14 @@ import {
   Timestamp,
 } from "@yt-subtitle-maker/ui";
 import { useGenerate } from "../src/state/generate";
+import {
+  type GenerateSelectionDirty,
+  type GenerateSelectionFields,
+  type GenerateSelectionOverrides,
+  mergeGenerateSelection,
+  selectionDefaultsFromConfig,
+  setGenerateSelectionField,
+} from "../src/state/generateSelection";
 import { apiClient } from "../src/state/client";
 import { useSettings } from "../src/components/settings/SettingsContext";
 import { engineVerdict } from "../src/components/settings/engineVerdict";
@@ -46,7 +54,6 @@ import { LanguagePicker } from "../src/components/settings/LanguagePicker";
 import { useRouter } from "expo-router";
 import type {
   SttSource,
-  SttEngine,
   WhisperModel,
   WhisperDevice,
 } from "@yt-subtitle-maker/api-client";
@@ -227,6 +234,9 @@ export default function Generate() {
   // (persisted in-memory across route navigations; SettingsProvider lives in
   // the root layout so it is always mounted).
   const {
+    draft,
+    deps,
+    installedEngines,
     lastTestResult,
     activeTranslator,
     customTranslators,
@@ -259,74 +269,51 @@ export default function Generate() {
   const activeLastTest = lastTestResult[activeProfileId];
   const translationMayFail = Boolean(activeLastTest && !activeLastTest.ok);
 
-  /* form state — defaults match the spec's recommended pick (Auto + faster-whisper + turbo + EN→ZH) */
-  const [sttSource, setSttSource] = React.useState<SttSource>("auto");
-  const [sourceLang, setSourceLang] = React.useState("en");
-  const [enableTranslation, setEnableTranslation] = React.useState(true);
-  const [targetLang, setTargetLang] = React.useState("zh");
-  const [downloadOnly, setDownloadOnly] = React.useState(false);
   const [configureOpen, setConfigureOpen] = React.useState(false);
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
-  // V1 backend currently only ships `openai-whisper`. The spec lists 4 engines
-  // but only this one is installed (faster-whisper / WhisperX / IFW are V1.1+).
-  // We probe /api/version.installedSttEngines on mount and switch if needed.
-  const [sttEngine, setSttEngine] = React.useState<SttEngine>("openai-whisper");
+  const [selectionOverrides, setSelectionOverrides] =
+    React.useState<GenerateSelectionOverrides>({});
+  const [selectionDirty, setSelectionDirty] =
+    React.useState<GenerateSelectionDirty>({});
 
-  React.useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .fetchVersion()
-      .then((v) => {
-        if (cancelled) return;
-        const installed = v.installedSttEngines ?? [];
-        if (installed.length > 0 && !installed.includes(sttEngine)) {
-          setSttEngine(installed[0] as SttEngine);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const [whisperModel, setWhisperModel] = React.useState<WhisperModel>("turbo");
-  const [whisperDevice, setWhisperDevice] = React.useState<WhisperDevice>("auto");
-  const [vadEnabled, setVadEnabled] = React.useState(true);
+  const selectionDefaults = React.useMemo(
+    () =>
+      selectionDefaultsFromConfig(draft, {
+        installedEngines,
+        deps,
+        engines,
+      }),
+    [draft, installedEngines, deps, engines],
+  );
 
-  // Installed Whisper models — drives the dropdown so the user can't pick a
-  // model they haven't downloaded (which would 422 mid-pipeline). undefined
-  // = not yet probed; show full list to avoid flash. Empty set after probe
-  // means "nothing installed" — the init flow handles that case.
-  const [installedWhisperModels, setInstalledWhisperModels] = React.useState<
-    Set<WhisperModel> | undefined
-  >(undefined);
+  const selection = React.useMemo(
+    () =>
+      mergeGenerateSelection(selectionDefaults, selectionOverrides, selectionDirty),
+    [selectionDefaults, selectionOverrides, selectionDirty],
+  );
 
-  React.useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .fetchDependencies()
-      .then((dep) => {
-        if (cancelled) return;
-        const installed = new Set<WhisperModel>(
-          (Object.entries(dep.models ?? {})
-            .filter(([, v]) => v === true)
-            .map(([k]) => k) as WhisperModel[]),
-        );
-        setInstalledWhisperModels(installed);
-        // If the current pick isn't installed, swap to the first installed
-        // model so submitting won't fail. Falls back to leaving as-is when
-        // nothing is installed (init flow will redirect first anyway).
-        if (installed.size > 0 && !installed.has(whisperModel)) {
-          const first = Array.from(installed)[0];
-          if (first) setWhisperModel(first);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const setJobField = React.useCallback(
+    <K extends keyof GenerateSelectionFields>(
+      key: K,
+      value: GenerateSelectionFields[K],
+    ) => {
+      setGenerateSelectionField(key, value, setSelectionOverrides, setSelectionDirty);
+    },
+    [],
+  );
+
+  const {
+    sttSource,
+    sttEngine,
+    whisperModel,
+    whisperDevice,
+    vadEnabled,
+    sourceLang,
+    enableTranslation,
+    targetLang,
+    translatorProvider,
+    downloadOnly,
+  } = selection;
 
   // Whisper model options enriched to match Settings → Transcription →
   // EnginePicker's per-model rows: each label shows the size in GB/MB and a
@@ -345,9 +332,10 @@ export default function Generate() {
         return { label: `${m.name} · ${gb}${downloaded}`, value: m.name as WhisperModel };
       });
     }
-    if (!installedWhisperModels) return WHISPER_MODELS;
-    return WHISPER_MODELS.filter((opt) => installedWhisperModels.has(opt.value));
-  }, [whisperEngine, installedWhisperModels]);
+    const installed = deps?.models ?? {};
+    if (!deps) return WHISPER_MODELS;
+    return WHISPER_MODELS.filter((opt) => installed[opt.value] === true);
+  }, [whisperEngine, deps]);
 
   // Verdict pill — mirrors Settings → Transcription. "✓ works (Apple MPS)"
   // / "⚠ runs but no acceleration here (…)" / etc.
@@ -355,28 +343,6 @@ export default function Generate() {
     if (!whisperEngine || !system) return null;
     return engineVerdict(whisperEngine, system);
   }, [whisperEngine, system]);
-
-  // Translator provider — initialized from Settings' `activeTranslator`
-  // (the named-profile model from Phase 4d). Per-job override stays in this
-  // state and is sent in the process request as `translatorProvider`, so
-  // switching between Gemini / Local AI / a saved DeepSeek profile / etc.
-  // doesn't require visiting Settings. Format mirrors `activeTranslator`:
-  // `"gemini" | "local_openai" | "custom:<id>"` — the backend's pipeline
-  // `_make_translator` accepts the same shapes for the override.
-  const [translatorProvider, setTranslatorProvider] =
-    React.useState<string>("gemini");
-
-  // When Settings' active translator finishes loading, seed this screen's
-  // default. Won't clobber a user's mid-session override because we only
-  // run when the source value first becomes defined.
-  const seededFromSettings = React.useRef(false);
-  React.useEffect(() => {
-    if (seededFromSettings.current) return;
-    if (activeTranslator) {
-      setTranslatorProvider(activeTranslator);
-      seededFromSettings.current = true;
-    }
-  }, [activeTranslator]);
 
   // Build the dropdown options from the live profile list. Built-ins first
   // (Gemini, Local AI), then every entry in `customTranslators` by its
@@ -705,7 +671,7 @@ export default function Generate() {
                   <CaptionUpper>Subtitle source</CaptionUpper>
                   <SegmentedControl
                     value={sttSource}
-                    onValueChange={(v) => setSttSource(v as SttSource)}
+                    onValueChange={(v) => setJobField("sttSource", v as SttSource)}
                     options={[
                       { label: "Auto", value: "auto" },
                       { label: "YouTube captions only", value: "yt_captions" },
@@ -728,7 +694,7 @@ export default function Generate() {
                     <CaptionUpper>Source language</CaptionUpper>
                     <LanguagePicker
                       value={sourceLang}
-                      onValueChange={setSourceLang}
+                      onValueChange={(v) => setJobField("sourceLang", v)}
                       width="100%"
                       aria-label="Source language"
                     />
@@ -737,7 +703,7 @@ export default function Generate() {
                     <CaptionUpper>Target language</CaptionUpper>
                     <LanguagePicker
                       value={targetLang}
-                      onValueChange={setTargetLang}
+                      onValueChange={(v) => setJobField("targetLang", v)}
                       width="100%"
                       disabled={!enableTranslation || downloadOnly}
                       aria-label="Target language"
@@ -765,7 +731,7 @@ export default function Generate() {
                     </YStack>
                     <Toggle
                       value={enableTranslation && !downloadOnly}
-                      onValueChange={setEnableTranslation}
+                      onValueChange={(v) => setJobField("enableTranslation", v)}
                       disabled={downloadOnly}
                       aria-label="Translate subtitles"
                     />
@@ -786,10 +752,10 @@ export default function Generate() {
                           (built-ins + custom_translators). Replaces the old
                           3-slot SegmentedControl that couldn't pick user-
                           configured custom profiles like DeepSeek. Initial
-                          value seeded from Settings' activeTranslator. */}
+                          value follows Settings until edited. */}
                       <Dropdown
                         value={translatorProvider}
-                        onValueChange={(v) => setTranslatorProvider(v)}
+                        onValueChange={(v) => setJobField("translatorProvider", v)}
                         options={translatorOptions}
                         width="100%"
                         aria-label="Translator profile"
@@ -839,7 +805,7 @@ export default function Generate() {
                     </YStack>
                     <Toggle
                       value={downloadOnly}
-                      onValueChange={setDownloadOnly}
+                      onValueChange={(v) => setJobField("downloadOnly", v)}
                       aria-label="Download only"
                     />
                   </XStack>
@@ -892,7 +858,7 @@ export default function Generate() {
                           <Dropdown
                             value={whisperModel}
                             onValueChange={(v) =>
-                              setWhisperModel(v as WhisperModel)
+                              setJobField("whisperModel", v as WhisperModel)
                             }
                             options={whisperModelOptions}
                             width="100%"
@@ -907,8 +873,8 @@ export default function Generate() {
                               Sizes from the live engine catalog. Download more
                               models in Settings.
                             </Caption>
-                          ) : installedWhisperModels &&
-                            installedWhisperModels.size <
+                          ) : deps &&
+                            Object.values(deps.models ?? {}).filter(Boolean).length <
                               WHISPER_MODELS.length ? (
                             <Caption>
                               Only installed models shown · install more in
@@ -921,7 +887,7 @@ export default function Generate() {
                           <Dropdown
                             value={whisperDevice}
                             onValueChange={(v) =>
-                              setWhisperDevice(v as WhisperDevice)
+                              setJobField("whisperDevice", v as WhisperDevice)
                             }
                             options={DEVICES}
                             width="100%"
@@ -941,7 +907,7 @@ export default function Generate() {
                         </XStack>
                         <Toggle
                           value={vadEnabled}
-                          onValueChange={setVadEnabled}
+                          onValueChange={(v) => setJobField("vadEnabled", v)}
                           aria-label="Enable VAD"
                         />
                       </XStack>
@@ -1259,7 +1225,13 @@ export default function Generate() {
                     </BodySm>
                   </XStack>
                 </ButtonSecondary>
-                <ButtonGhost onPress={reset}>
+                <ButtonGhost
+                  onPress={() => {
+                    setSelectionOverrides({});
+                    setSelectionDirty({});
+                    reset();
+                  }}
+                >
                   <BodySm fontWeight="500" color="$textSecondary">
                     New transcription
                   </BodySm>
