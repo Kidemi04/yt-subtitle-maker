@@ -56,3 +56,10 @@ apps/desktop/src-tauri/.pyinstaller-work/
 
 # Temp files
 actia.txt
+skills-lock.json
+
+# Agent design artifacts (not project code)
+docs/superpowers/
+
+# Binary test assets
+backend/packaging/*.mp4
