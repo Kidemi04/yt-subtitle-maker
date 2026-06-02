@@ -326,7 +326,7 @@ def run_pipeline(
         _check_cancel(cancel_event)
         translate_duration_ms = int((time.monotonic() - translate_started) * 1000)
 
-        translator_provider = request.get("translatorProvider") or cfg.translator_provider
+        translator_provider = _resolved_translator_provider(request, cfg)
         translator_model = _translator_model_for(translator_provider, request, cfg)
         tr_id = library_runs.translate_id(
             t_id, translator_provider, translator_model, request["targetLang"]
@@ -372,9 +372,9 @@ def run_pipeline(
         "translateId": (
             library_runs.translate_id(
                 t_id,
-                request.get("translatorProvider") or cfg.translator_provider,
+                _resolved_translator_provider(request, cfg),
                 _translator_model_for(
-                    request.get("translatorProvider") or cfg.translator_provider, request, cfg
+                    _resolved_translator_provider(request, cfg), request, cfg
                 ),
                 request["targetLang"],
             )
@@ -388,12 +388,31 @@ def run_pipeline(
     })
 
 
+def _resolved_translator_provider(request: dict, cfg: AppConfig) -> str:
+    """Resolve the provider id used for translation metadata and run ids."""
+    return (
+        request.get("translatorProvider")
+        or cfg.active_translator
+        or cfg.translator_provider
+    )
+
+
 def _translator_model_for(provider: str, request: dict, cfg: AppConfig) -> str:
     """Resolve the model string actually used for a translator provider."""
+    if request.get("translatorModel"):
+        return request["translatorModel"]
     if provider == "gemini":
-        return request.get("translatorModel") or cfg.gemini_model
+        return cfg.gemini_model
     if provider == "local_openai":
-        return request.get("translatorModel") or cfg.local_openai_model
+        return cfg.local_openai_model
     if provider == "openai":
-        return request.get("translatorModel") or cfg.openai_model
-    return request.get("translatorModel") or "unknown"
+        return cfg.openai_model
+    if provider.startswith("custom:"):
+        profile_id = provider[len("custom:"):]
+        entry = next(
+            (e for e in cfg.custom_translators if e.get("id") == profile_id),
+            None,
+        )
+        if entry:
+            return entry.get("model") or "unknown"
+    return "unknown"

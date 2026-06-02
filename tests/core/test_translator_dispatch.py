@@ -132,3 +132,57 @@ def test_pipeline_per_job_override_custom_profile():
             assert cfg_arg.active_translator == "custom:deepseek-1"
             # And the original cfg must NOT have been mutated.
             assert cfg.active_translator == "gemini"
+
+
+def test_pipeline_resolved_provider_uses_active_translator_without_override():
+    from core.pipeline import _resolved_translator_provider
+
+    cfg = AppConfig()
+    cfg.active_translator = "custom:deepseek-1"
+    cfg.translator_provider = "gemini"
+
+    assert _resolved_translator_provider({}, cfg) == "custom:deepseek-1"
+
+
+def test_pipeline_resolved_provider_uses_legacy_when_active_missing():
+    from core.pipeline import _resolved_translator_provider
+
+    cfg = AppConfig()
+    cfg.active_translator = ""
+    cfg.translator_provider = "local_openai"
+
+    assert _resolved_translator_provider({}, cfg) == "local_openai"
+
+
+def test_pipeline_translator_model_for_custom_profile():
+    from core.pipeline import _translator_model_for
+
+    cfg = AppConfig()
+    cfg.custom_translators = [{
+        "id": "deepseek-1",
+        "name": "DeepSeek",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "ds-key",
+        "model": "deepseek-chat",
+    }]
+
+    assert _translator_model_for("custom:deepseek-1", {}, cfg) == "deepseek-chat"
+
+
+def test_pipeline_translator_model_override_still_wins_for_custom_profile():
+    from core.pipeline import _translator_model_for
+
+    cfg = AppConfig()
+    cfg.custom_translators = [{
+        "id": "deepseek-1",
+        "name": "DeepSeek",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "ds-key",
+        "model": "deepseek-chat",
+    }]
+
+    assert _translator_model_for(
+        "custom:deepseek-1",
+        {"translatorModel": "deepseek-reasoner"},
+        cfg,
+    ) == "deepseek-reasoner"
