@@ -233,6 +233,7 @@ def test_pipeline_custom_override_model_matches_dispatch_and_metadata():
         request,
         cfg,
     ) == "deepseek-reasoner"
+    assert cfg.custom_translators[0]["model"] == "deepseek-chat"
 
 
 def test_pipeline_translator_model_ignores_orphan_model_override_without_provider():
