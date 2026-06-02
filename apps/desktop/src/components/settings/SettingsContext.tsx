@@ -173,10 +173,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const refreshEngines = React.useCallback(async () => {
     try {
-      const e = await apiClient.getEngines();
-      setEngines(e);
+      const [version, dependencies, nextEngines] = await Promise.all([
+        apiClient.fetchVersion(),
+        apiClient.fetchDependencies(),
+        apiClient.getEngines(),
+      ]);
+      setInstalledEngines(version.installedSttEngines ?? []);
+      setJsRuntime(version.jsRuntime ?? null);
+      setDeps(dependencies);
+      setEngines(nextEngines);
     } catch {
-      /* best-effort — ModelRow handles its own local error state */
+      /* best-effort — callers handle their own local error state */
     }
   }, []);
 
