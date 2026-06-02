@@ -15,7 +15,7 @@ def test_engines_returns_list():
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body, list)
-    assert len(body) >= 4  # openai-whisper + 3 planned stubs
+    assert len(body) >= 7  # openai-whisper + planned add-on families
 
 
 def test_openai_whisper_descriptor_shape():
@@ -58,7 +58,14 @@ def test_openai_whisper_descriptor_shape():
 def test_planned_stubs_present_and_unavailable():
     resp = client.get("/api/engines")
     descs = resp.json()
-    planned_ids = {"faster-whisper", "whisperx", "insanely-fast-whisper"}
+    planned_ids = {
+        "faster-whisper",
+        "whisperx",
+        "insanely-fast-whisper",
+        "whisper-cpp",
+        "mlx-whisper",
+        "stable-ts",
+    }
     found = {d["id"] for d in descs if d["id"] in planned_ids}
     assert found == planned_ids
 
@@ -68,7 +75,20 @@ def test_planned_stubs_present_and_unavailable():
             assert d["models"] == []
             assert isinstance(d["packageSizeMb"], int)
             assert d["packageSizeMb"] > 0
+            assert isinstance(d.get("modelVariants"), list)
+            assert len(d["modelVariants"]) > 0
             assert isinstance(d.get("note"), str)
+
+
+def test_whisper_family_addons_expose_model_variants():
+    resp = client.get("/api/engines")
+    descs = resp.json()
+    expected = {"tiny", "base", "small", "medium", "large-v3", "turbo"}
+
+    for engine_id in {"faster-whisper", "whisperx", "insanely-fast-whisper"}:
+        desc = next(d for d in descs if d["id"] == engine_id)
+        variants = {m["name"] for m in desc["modelVariants"]}
+        assert expected.issubset(variants)
 
 
 def test_model_sizes_match_known_values():

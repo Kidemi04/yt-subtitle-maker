@@ -1,29 +1,45 @@
-/**
- * Provider presets — the curated list shown in the "+ Add provider" picker.
- *
- * Each entry is one preset the user can click to prefill a new
- * `TranslatorProfile`'s `name` + `baseUrl`. "Custom…" is the escape hatch:
- * an empty `name` + `baseUrl` means the form opens blank.
- *
- * Single source of truth for the preset list; `ProviderRow.tsx` re-exports
- * this so existing imports keep working, and `AddProviderModal.tsx` (Task 4)
- * pulls from the same const.
- */
-
 export interface ProviderPreset {
   label: string;
   name: string;
   baseUrl: string;
+  description: string;
 }
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
-  { label: "DeepSeek", name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1" },
-  { label: "Groq", name: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
-  { label: "OpenRouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
-  { label: "Together", name: "Together", baseUrl: "https://api.together.xyz/v1" },
-  { label: "Mistral", name: "Mistral", baseUrl: "https://api.mistral.ai/v1" },
-  { label: "xAI", name: "xAI", baseUrl: "https://api.x.ai/v1" },
-  { label: "Fireworks", name: "Fireworks", baseUrl: "https://api.fireworks.ai/inference/v1" },
-  { label: "OpenAI", name: "OpenAI", baseUrl: "https://api.openai.com/v1" },
-  { label: "Custom…", name: "", baseUrl: "" },
+  {
+    label: "OpenRouter",
+    name: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    description: "Routes OpenAI, Claude, DeepSeek, and many hosted models.",
+  },
+  {
+    label: "Fireworks.ai",
+    name: "Fireworks.ai",
+    baseUrl: "https://api.fireworks.ai/inference/v1",
+    description: "Fast hosted open models through an OpenAI-compatible API.",
+  },
+  {
+    label: "DeepSeek Platform",
+    name: "DeepSeek Platform",
+    baseUrl: "https://api.deepseek.com",
+    description: "DeepSeek chat and reasoning models.",
+  },
+  {
+    label: "OpenAI Platform",
+    name: "OpenAI Platform",
+    baseUrl: "https://api.openai.com/v1",
+    description: "Official OpenAI model endpoint.",
+  },
+  {
+    label: "Claude Platform",
+    name: "Claude Platform",
+    baseUrl: "https://api.anthropic.com/v1/",
+    description: "Anthropic Claude through its OpenAI SDK compatibility layer.",
+  },
+  {
+    label: "Custom",
+    name: "",
+    baseUrl: "",
+    description: "Bring any OpenAI-compatible endpoint.",
+  },
 ];

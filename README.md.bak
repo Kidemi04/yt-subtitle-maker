@@ -1,0 +1,317 @@
+# YouTube Subtitle Maker
+
+> ⚡️ Download YouTube audio, transcribe locally with OpenAI Whisper, and (optionally) translate subtitles with Google Gemini or any OpenAI-compatible API — all in a sleek desktop app.
+
+**Version**: 2.0.0-alpha  
+**License**: *(pending)*
+
+---
+
+## What is this?
+
+A cross-platform desktop application built as a **pnpm monorepo** that combines:
+
+- **Python FastAPI backend** — Handles YouTube audio extraction, local speech-to-text with OpenAI Whisper, subtitle translation, and SRT file generation.
+- **Expo + Tamagui + Tauri frontend** — A modern, responsive desktop UI rendered in a native Tauri 2 shell.
+
+The app runs entirely on your machine: audio processing and transcription happen **locally** (no cloud STT costs), while translation optionally taps into remote AI APIs.
+
+---
+
+## Features
+
+- **YouTube Audio Download** — Extract audio via yt-dlp (supports age-gated/private videos with browser cookies).
+- **Local Transcription** — OpenAI Whisper runs on-device (GPU/CPU). Choose from multiple model sizes.
+- **YouTube Captions Fallback** — Skip Whisper entirely and reuse YouTube's own captions when available.
+- **AI Translation** — Translate subtitles via Google Gemini, OpenAI, or any OpenAI-compatible endpoint (e.g., LM Studio).
+- **Multi-SRT Library** — Re-transcribe or re-translate the same video multiple times without re-downloading audio.
+- **MPV Integration** — Play generated videos with subtitles directly from the app.
+- **Streamed Progress** — Real-time progress updates during download, transcription, and translation.
+- **Modern Desktop UI** — Glass-morphism design, keyboard navigation, responsive layout, and first-run dependency checker.
+
+---
+
+## Tech Stack
+
+### Backend (`backend/`)
+| Technology | Purpose |
+|---|---|
+| Python 3.11–3.13 | Runtime |
+| FastAPI | HTTP API framework |
+| Uvicorn | ASGI server |
+| OpenAI Whisper | Local speech-to-text |
+| yt-dlp | YouTube audio extraction |
+| Google GenAI / OpenAI | Translation providers |
+| PyTorch | Whisper inference backend |
+| pytest | Testing |
+| ruff | Linting & formatting |
+| PyInstaller | Backend bundling for desktop |
+
+### Frontend (`apps/desktop/`)
+| Technology | Purpose |
+|---|---|
+| React 18.2 | UI framework |
+| React Native Web | Cross-platform rendering |
+| Expo SDK 51 | Tooling & routing |
+| Tamagui 1.115 | UI components & design tokens |
+| Tauri 2 | Desktop shell (Rust) |
+| Zustand | State management |
+
+### Shared Packages
+- `packages/api-client` — Typed TypeScript client mirroring the backend API.
+- `packages/ui` — Tamagui design system components shared across the frontend.
+
+---
+
+## Prerequisites
+
+- **Python** 3.11, 3.12, or 3.13 *(3.14 is NOT supported — PyTorch lacks wheels)*
+- **Node.js** ≥ 20
+- **pnpm** ≥ 10
+- **Rust** (with `rustup`) — required for Tauri
+- **ffmpeg** — required by Whisper
+- **mpv** — for the "play with subtitles" feature
+- **deno** or **node** — yt-dlp needs a JS runtime for YouTube deobfuscation
+
+> **Note**: `cargo`/`rustc`/`tauri` may not be on PATH in non-interactive shells. Run `source "$HOME/.cargo/env"` first.
+
+---
+
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Kidemi04/yt-subtitle-maker.git
+cd yt-subtitle-maker
+```
+
+### 2. Set up the backend
+
+```bash
+# Creates backend/.venv and installs all Python dependencies
+# (downloads ~2 GB of PyTorch — may take a while)
+PYTHON=python3.12 scripts/setup-backend.sh
+```
+
+### 3. Install frontend dependencies
+
+```bash
+pnpm install
+```
+
+---
+
+## Development
+
+### Quick Start (recommended)
+
+```bash
+pnpm dev
+```
+
+Opens two macOS Terminal windows:
+- **"yt backend"** — uvicorn with auto-reload on `127.0.0.1:8000`
+- **"yt web"** — Expo web dev server on `http://localhost:8081`
+
+Then open `http://localhost:8081` in your browser.
+
+> **macOS Automation permission**: On first run, macOS may ask to allow "Terminal wants to control Terminal" — click **Allow**.
+
+### Dev with native Tauri window
+
+```bash
+pnpm -F desktop tauri:dev
+```
+
+Spawns the backend, the web UI, and wraps them in a native desktop window. All logs in one terminal.
+
+### Web UI only (no backend)
+
+```bash
+pnpm web
+# → http://localhost:8081
+```
+
+### Backend only (manual)
+
+```bash
+cd backend
+../backend/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+---
+
+## Building
+
+### Packaged desktop app
+
+```bash
+pnpm -F desktop tauri:build
+```
+
+Outputs:
+- **macOS**: `apps/desktop/src-tauri/target/release/bundle/macos/`
+- **DMG**: `apps/desktop/src-tauri/target/release/bundle/dmg/`
+
+### Rebuild just the backend bundle
+
+```bash
+pnpm -F desktop build:backend
+```
+
+Generates `apps/desktop/src-tauri/backend-dist/` (used by Tauri bundling).
+
+---
+
+## Testing
+
+### Backend tests
+
+```bash
+# Run all tests
+backend/.venv/bin/python -m pytest
+
+# Run a specific test
+backend/.venv/bin/python -m pytest tests/api/test_process.py::test_name -v
+```
+
+### Backend lint
+
+```bash
+backend/.venv/bin/ruff check backend
+```
+
+### Frontend typecheck
+
+```bash
+pnpm -F desktop typecheck
+```
+
+---
+
+## Architecture
+
+### Backend — thin routes over a modular core
+
+`backend/api/main.py` wires together routers (`metadata`, `process`, `translator`, `version`, `config`, `dependencies`, `library`, `history`, `cookies`, `engines`, `system`, `fs`). All business logic lives in `backend/core/`:
+
+| Module | Role |
+|---|---|
+| `core/pipeline.py` | Main orchestrator: fetch metadata → select STT → download → transcribe → [translate] → write SRT |
+| `core/downloader/` | yt-dlp wrapper, browser cookie support, JS runtime probing |
+| `core/stt/` | Pluggable transcription engines (Whisper, YouTube captions) |
+| `core/translator/` | Pluggable translation (Gemini, OpenAI, local OpenAI) |
+| `core/library_runs.py` | Multi-SRT library management with concurrent-safe file ops |
+| `core/dependency_manager.py` | Whisper model downloader, ffmpeg/mpv checker |
+| `core/config.py` | Pydantic-settings config persisted to `~/.yt_subtitle_tool/config.json` |
+
+### Frontend — Expo Router + Tamagui
+
+| Route | Screen |
+|---|---|
+| `index.tsx` | Generate (main workflow) |
+| `library.tsx` | Library & video history |
+| `history.tsx` | Global run history |
+| `settings.tsx` | App settings |
+| `init.tsx` | First-run dependency checker |
+| `about.tsx` | About page |
+| `_layout.tsx` | Shell (sidebar, topbar, logs drawer) |
+
+State lives in Zustand stores under `apps/desktop/src/state/`.
+
+### Tauri Shell
+
+`apps/desktop/src-tauri/src/lib.rs` manages the backend subprocess:
+- **Debug** — spawns local Python virtualenv's uvicorn
+- **Release** — launches the PyInstaller-bundled binary
+- Both modes check `127.0.0.1:8000` first and attach if already running
+
+---
+
+## API Endpoints
+
+The backend exposes the following route groups (all under `/api`):
+
+- `GET /api/metadata` — Fetch YouTube video metadata
+- `POST /api/process` — Run the full pipeline (streaming NDJSON events)
+- `POST /api/translator/translate` — Translate SRT content
+- `GET /api/version` — App version info
+- `GET /api/config` / `POST /api/config` — App configuration
+- `GET /api/dependencies` — Check/download runtime dependencies
+- `GET /api/engines` — List available STT & translation engines
+- `GET /api/library` / `POST /api/library/*` — Video library management
+- `GET /api/history` — Processing history
+- `POST /api/cookies` — Browser cookie import
+- `POST /api/system/*` — System operations
+
+---
+
+## Project Structure
+
+```
+yt-subtitle-maker/
+├── backend/                    # Python FastAPI backend
+│   ├── api/                    # FastAPI routers & schemas
+│   ├── core/                   # Business logic (pipeline, STT, translation, etc.)
+│   ├── packaging/              # PyInstaller spec & entrypoint
+│   └── pyproject.toml          # Python dependencies
+├── apps/
+│   └── desktop/                # Desktop frontend
+│       ├── app/                # Expo Router pages
+│       ├── src/
+│       │   ├── components/     # UI components
+│       │   ├── hooks/          # Custom React hooks
+│       │   ├── lib/            # Utilities
+│       │   └── state/          # Zustand stores
+│       └── src-tauri/          # Tauri Rust shell
+├── packages/
+│   ├── api-client/             # Typed TS API client
+│   └── ui/                     # Tamagui design system
+├── scripts/                    # Dev & build scripts
+├── tests/                      # Backend test suite
+└── docs/superpowers/           # Design specs & implementation plans
+```
+
+---
+
+## Configuration
+
+App settings are persisted to:
+
+```
+~/.yt_subtitle_tool/config.json
+```
+
+Output folders (`output/`, `downloads/`) resolve relative to the backend's working directory:
+- **Development**: `backend/`
+- **Packaged app**: `~/.yt_subtitle_tool/`
+
+---
+
+## Roadmap / Branches
+
+| Branch | Status | Notes |
+|---|---|---|
+| `main` | **Active** | Current v2.0+ architecture (Tauri + Tamagui) |
+| `v1.5` | Legacy | In-progress work before v2.0 rewrite |
+| `v2.0` | Legacy | Settings tab production-ready |
+| `v2.1` | Merged into main | Library UX redesign |
+| `v2.2`, `v2.3` | Experimental | DeepSeek & other experiments |
+
+---
+
+## Acknowledgments
+
+- [OpenAI Whisper](https://github.com/openai/whisper) — Local speech-to-text
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — YouTube extraction
+- [FastAPI](https://fastapi.tiangolo.com/) — Python web framework
+- [Expo](https://expo.dev/) — React Native tooling
+- [Tamagui](https://tamagui.dev/) — Universal UI kit
+- [Tauri](https://tauri.app/) — Rust desktop framework
+
+---
+
+<p align="center">
+  Built with ❤️ for making subtitles accessible to everyone.
+</p>

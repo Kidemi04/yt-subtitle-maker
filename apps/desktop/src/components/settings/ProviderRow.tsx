@@ -1,33 +1,15 @@
-/**
- * ProviderRow — a single row in the Translation tab's provider list.
- *
- * Pure presentational component; all side effects come through props
- * (`onActivate`, `onTest`, `onEditToggle`, `onDuplicate`, `onDelete`,
- * `onSave`, `onCancelEdit`). Task 5 `TranslationTab` will wire these to
- * `SettingsContext`.
- *
- * Two visual states:
- *  - Collapsed (default): radio + name + endpoint subtitle + model badge
- *    + last-test StatusDot + relative timestamp + Test / Edit / ⋯ kebab.
- *  - Expanded (`isEditing === true`): the row body is replaced by an
- *    inline `<ProviderForm>` (see ProviderForm.tsx).
- *
- * `PROVIDER_PRESETS` lives in `./providerPresets.ts`; we re-export it
- * here for back-compat with any caller that imports from this module.
- */
-
 import * as React from "react";
 import { Stack, XStack, YStack } from "tamagui";
 import { MoreHorizontal } from "@tamagui/lucide-icons";
 import {
   BadgePill,
-  StatusDot,
-  ButtonSecondary,
-  ButtonGhost,
-  IconButton,
-  Caption,
-  TitleSm,
   BodySm,
+  ButtonGhost,
+  ButtonSecondary,
+  Caption,
+  IconButton,
+  StatusDot,
+  TitleSm,
 } from "@yt-subtitle-maker/ui";
 import {
   type TranslatorProvider,
@@ -35,19 +17,14 @@ import {
 } from "@yt-subtitle-maker/api-client";
 import { ProviderForm } from "./ProviderForm";
 
-// Re-export so existing imports (and Task 4 `AddProviderModal`) can grab
-// the preset list from either location.
 export {
   PROVIDER_PRESETS,
   type ProviderPreset,
 } from "./providerPresets";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
 export interface ProviderRowSavePayload {
   name: string;
   baseUrl: string;
-  /** Either `"***"` (keep saved key) or the new key the user typed. */
   apiKey: string;
   model: string;
 }
@@ -57,33 +34,21 @@ export interface ProviderRowProps {
   name: string;
   baseUrl: string;
   model: string;
-  /** true when the profile's saved apiKey is non-empty (masked to `"***"`
-   *  on GET /api/config). */
   apiKeyMasked: boolean;
   isActive: boolean;
   isBuiltIn: boolean;
   isEditing: boolean;
-  /** Last `apiClient.testTranslator(...)` result for this profile, plus
-   *  the wall-clock time it was recorded (driven by `SettingsContext`'s
-   *  `recordTestResult`). */
   lastTest?: TranslatorTestResult & { at: number };
-  /** Which provider shape to send when the form runs ad-hoc Test/Models.
-   *  `"gemini"` for the built-in Gemini row; `"openai"` for built-in
-   *  `local_openai` and every custom OpenAI-compatible profile. */
   formProvider: TranslatorProvider;
-  /** Default target language for the form's Test round-trip. */
   targetLang?: string;
   onActivate: () => void;
   onTest: () => Promise<void>;
   onEditToggle: () => void;
   onDuplicate?: () => void;
-  /** Absent for built-in profiles (gemini / local_openai). */
   onDelete?: () => void;
   onSave: (patch: ProviderRowSavePayload) => void;
   onCancelEdit: () => void;
 }
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function formatTimeAgo(at: number): string {
   const secs = Math.round((Date.now() - at) / 1000);
@@ -100,8 +65,6 @@ function testDotStatus(
   return lastTest.ok ? "ok" : "error";
 }
 
-// ─── Component ──────────────────────────────────────────────────────────────
-
 export function ProviderRow({
   profileId,
   name,
@@ -109,7 +72,7 @@ export function ProviderRow({
   model,
   apiKeyMasked,
   isActive,
-  isBuiltIn: _isBuiltIn,
+  isBuiltIn,
   isEditing,
   lastTest,
   formProvider,
@@ -134,15 +97,13 @@ export function ProviderRow({
     }
   };
 
-  const dotStatus = testDotStatus(lastTest);
-
   if (isEditing) {
     return (
       <Stack
         borderRadius="$lg"
-        backgroundColor="$surfaceGlass"
+        backgroundColor="$bgBase"
         borderWidth={1}
-        borderColor="$borderSubtle"
+        borderColor="$accentDim"
         padding="$md"
       >
         <ProviderForm
@@ -160,62 +121,132 @@ export function ProviderRow({
     );
   }
 
+  const dotStatus = testDotStatus(lastTest);
+  const hasMoreActions = Boolean(onDuplicate || onDelete);
+
   return (
-    <XStack
-      alignItems="center"
+    <YStack
       gap="$sm"
-      paddingHorizontal="$md"
-      paddingVertical="$sm"
+      padding="$md"
       borderRadius="$lg"
-      backgroundColor="$surfaceGlass"
+      backgroundColor={isActive ? "$accentSoft" : "$bgBase"}
       borderWidth={1}
       borderColor={isActive ? "$accent" : "$borderSubtle"}
     >
-      {/* Radio selector */}
-      <Stack
-        tag="button"
-        role="radio"
-        aria-checked={isActive}
-        width={20}
-        height={20}
-        borderRadius="$pill"
-        borderWidth={2}
-        borderColor={isActive ? "$accent" : "$borderSubtle"}
-        backgroundColor={isActive ? "$accent" : "transparent"}
-        alignItems="center"
-        justifyContent="center"
-        cursor="pointer"
-        pressStyle={{ scale: 0.9 }}
-        animation="quick"
-        onPress={onActivate}
-        flexShrink={0}
-      >
-        {isActive ? (
-          <Stack width={8} height={8} borderRadius="$pill" backgroundColor="$background" />
-        ) : null}
-      </Stack>
+      <XStack alignItems="flex-start" gap="$sm">
+        <Stack
+          tag="button"
+          role="radio"
+          aria-label={`Activate ${name || "provider"}`}
+          aria-checked={isActive}
+          width={22}
+          height={22}
+          marginTop={3}
+          borderRadius="$pill"
+          borderWidth={2}
+          borderColor={isActive ? "$accent" : "$borderStrong"}
+          backgroundColor={isActive ? "$accent" : "transparent"}
+          alignItems="center"
+          justifyContent="center"
+          cursor="pointer"
+          pressStyle={{ scale: 0.9 }}
+          animation="quick"
+          onPress={onActivate}
+          flexShrink={0}
+        >
+          {isActive ? (
+            <Stack
+              width={8}
+              height={8}
+              borderRadius="$pill"
+              backgroundColor="$bgBase"
+            />
+          ) : null}
+        </Stack>
 
-      {/* Name + endpoint */}
-      <YStack flex={1} minWidth={0} gap={2}>
-        <TitleSm numberOfLines={1}>{name || "(unnamed)"}</TitleSm>
-        {baseUrl ? (
-          <Caption color="$textSecondary" numberOfLines={1}>
-            {baseUrl}
+        <YStack flex={1} minWidth={0} gap="$xs">
+          <XStack alignItems="center" gap="$sm" flexWrap="wrap">
+            <TitleSm>{name || "(unnamed)"}</TitleSm>
+            {isActive ? <BadgePill tone="accent">Active</BadgePill> : null}
+            {isBuiltIn ? <BadgePill tone="neutral">Built-in</BadgePill> : null}
+            {model ? <BadgePill tone="neutral">{model}</BadgePill> : null}
+          </XStack>
+          <Caption color={baseUrl ? "$textSecondary" : "$textMuted"} numberOfLines={2}>
+            {baseUrl || "No endpoint configured"}
           </Caption>
-        ) : null}
-      </YStack>
+        </YStack>
 
-      {/* Model badge */}
-      {model ? <BadgePill tone="neutral">{model}</BadgePill> : null}
+        <XStack gap="$xs" alignItems="center" flexShrink={0}>
+          <ButtonSecondary onPress={handleTest} disabled={testing} height={48}>
+            {testing ? "Testing..." : "Test"}
+          </ButtonSecondary>
+          <ButtonGhost onPress={onEditToggle} height={48}>
+            Edit
+          </ButtonGhost>
+          {hasMoreActions ? (
+            <Stack position="relative">
+              <IconButton
+                icon={<MoreHorizontal size={16} color="$textSecondary" />}
+                size={52}
+                aria-label="More actions"
+                onPress={() => setKebabOpen((v) => !v)}
+              />
+              {kebabOpen ? (
+                <Stack
+                  position="absolute"
+                  top={44}
+                  right={0}
+                  zIndex={100}
+                  backgroundColor="$bgBase"
+                  borderWidth={1}
+                  borderColor="$borderSubtle"
+                  borderRadius="$md"
+                  padding="$xs"
+                  minWidth={132}
+                  style={{ boxShadow: "0 12px 24px rgba(33,26,24,0.10)" }}
+                >
+                  {onDuplicate ? (
+                    <Stack
+                      tag="button"
+                      role="button"
+                      paddingHorizontal="$sm"
+                      paddingVertical="$xs"
+                      borderRadius="$sm"
+                      hoverStyle={{ backgroundColor: "$surfaceGlass" }}
+                      cursor="pointer"
+                      onPress={() => {
+                        setKebabOpen(false);
+                        onDuplicate();
+                      }}
+                    >
+                      <BodySm>Duplicate</BodySm>
+                    </Stack>
+                  ) : null}
+                  {onDelete ? (
+                    <Stack
+                      tag="button"
+                      role="button"
+                      paddingHorizontal="$sm"
+                      paddingVertical="$xs"
+                      borderRadius="$sm"
+                      hoverStyle={{ backgroundColor: "$surfaceGlass" }}
+                      cursor="pointer"
+                      onPress={() => {
+                        setKebabOpen(false);
+                        onDelete();
+                      }}
+                    >
+                      <BodySm color="$error">Delete</BodySm>
+                    </Stack>
+                  ) : null}
+                </Stack>
+              ) : null}
+            </Stack>
+          ) : null}
+        </XStack>
+      </XStack>
 
-      {/* Last-test dot + a human-readable result string.
-          Phase 4d post-fix: the row's only feedback used to be the 8px dot
-          + a "just now" timestamp, which was effectively invisible — users
-          clicked Test, got a successful ping, and thought nothing happened.
-          We now render the actual outcome inline ("✓ Connected · 327ms" /
-          "⚠ Authentication failed (check the API key)") so the result is
-          visible without opening the edit form. */}
-      <XStack alignItems="center" gap="$xs" maxWidth={260}>
+      <XStack alignItems="center" gap="$xs">
         <StatusDot status={dotStatus} size={8} />
         {lastTest ? (
           <YStack flex={1} minWidth={0}>
@@ -224,83 +255,17 @@ export function ProviderRow({
               numberOfLines={1}
             >
               {lastTest.ok
-                ? `✓ Connected${
-                    lastTest.latencyMs ? ` · ${lastTest.latencyMs}ms` : ""
-                  }`
-                : `⚠ ${lastTest.error ?? "Test failed"}`}
+                ? `Connected${lastTest.latencyMs ? ` · ${lastTest.latencyMs}ms` : ""}`
+                : lastTest.error ?? "Test failed"}
             </Caption>
             <Caption color="$textMuted" numberOfLines={1}>
               {formatTimeAgo(lastTest.at)}
             </Caption>
           </YStack>
-        ) : null}
+        ) : (
+          <Caption color="$textMuted">Not tested yet</Caption>
+        )}
       </XStack>
-
-      {/* Actions */}
-      <XStack gap="$xs" alignItems="center">
-        <ButtonSecondary onPress={handleTest} disabled={testing}>
-          {testing ? "Testing…" : "Test"}
-        </ButtonSecondary>
-        <ButtonGhost onPress={onEditToggle}>Edit</ButtonGhost>
-        {/* Kebab menu — Duplicate + Delete (built-ins: only Duplicate) */}
-        <Stack position="relative">
-          <IconButton
-            icon={<MoreHorizontal size={16} color="$textSecondary" />}
-            size={44}
-            aria-label="More actions"
-            onPress={() => setKebabOpen((v) => !v)}
-          />
-          {kebabOpen ? (
-            <Stack
-              position="absolute"
-              top={36}
-              right={0}
-              zIndex={100}
-              backgroundColor="$surfaceGlass"
-              borderWidth={1}
-              borderColor="$borderSubtle"
-              borderRadius="$md"
-              padding="$xs"
-              minWidth={120}
-            >
-              {onDuplicate ? (
-                <Stack
-                  tag="button"
-                  role="button"
-                  paddingHorizontal="$sm"
-                  paddingVertical="$xs"
-                  borderRadius="$sm"
-                  hoverStyle={{ backgroundColor: "$surfaceGlass" }}
-                  cursor="pointer"
-                  onPress={() => {
-                    setKebabOpen(false);
-                    onDuplicate();
-                  }}
-                >
-                  <BodySm>Duplicate</BodySm>
-                </Stack>
-              ) : null}
-              {onDelete ? (
-                <Stack
-                  tag="button"
-                  role="button"
-                  paddingHorizontal="$sm"
-                  paddingVertical="$xs"
-                  borderRadius="$sm"
-                  hoverStyle={{ backgroundColor: "$surfaceGlass" }}
-                  cursor="pointer"
-                  onPress={() => {
-                    setKebabOpen(false);
-                    onDelete();
-                  }}
-                >
-                  <BodySm color="$error">Delete</BodySm>
-                </Stack>
-              ) : null}
-            </Stack>
-          ) : null}
-        </Stack>
-      </XStack>
-    </XStack>
+    </YStack>
   );
 }

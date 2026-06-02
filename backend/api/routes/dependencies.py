@@ -13,12 +13,15 @@ from pydantic import BaseModel
 from core.dependency_manager import (
     MODELS_URLS,
     IntegrityError,
+    STT_ENGINE_ADDONS,
     UnsupportedPlatformError,
     check_ffmpeg,
     check_mpv,
     check_mpv_status,
+    check_stt_engine_addon,
     check_whisper_model,
     download_whisper_model_generator,
+    install_stt_engine_addon_generator,
     install_mpv_generator,
 )
 
@@ -28,6 +31,10 @@ router = APIRouter(prefix="/api/dependencies", tags=["dependencies"])
 class InstallRequest(BaseModel):
     model: str
     engine: str | None = None
+
+
+class InstallEngineRequest(BaseModel):
+    engine: str
 
 
 @router.get("")
@@ -102,6 +109,60 @@ def install_model(req: InstallRequest):
                     "percent": percent,
                 })
             q.put({"status": "done", "model": req.model})
+        except Exception as e:
+            q.put({"status": "error", "error": str(e), "recoverable": False})
+        finally:
+            q.put(SENTINEL)
+
+    threading.Thread(target=runner, daemon=True).start()
+
+    def gen():
+        while True:
+            evt = q.get()
+            if evt is SENTINEL:
+                break
+            yield json.dumps(evt) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@router.post("/install-engine")
+def install_engine(req: InstallEngineRequest):
+    """Stream NDJSON progress while installing an optional STT add-on package."""
+    if req.engine not in STT_ENGINE_ADDONS:
+        return {
+            "ok": False,
+            "error": (
+                f"Unknown add-on engine: {req.engine!r}. "
+                f"Known: {list(STT_ENGINE_ADDONS.keys())}"
+            ),
+        }
+
+    if check_stt_engine_addon(req.engine):
+        addon = STT_ENGINE_ADDONS[req.engine]
+        return StreamingResponse(
+            iter(
+                [
+                    json.dumps(
+                        {
+                            "status": "done",
+                            "engine": req.engine,
+                            "packageName": addon["package"],
+                        }
+                    )
+                    + "\n"
+                ]
+            ),
+            media_type="application/x-ndjson",
+        )
+
+    q: queue.Queue = queue.Queue()
+    SENTINEL = object()
+
+    def runner() -> None:
+        try:
+            for evt in install_stt_engine_addon_generator(req.engine):
+                q.put(evt)
         except Exception as e:
             q.put({"status": "error", "error": str(e), "recoverable": False})
         finally:

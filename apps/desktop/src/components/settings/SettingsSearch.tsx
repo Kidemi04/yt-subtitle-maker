@@ -1,19 +1,14 @@
 import * as React from "react";
-import { Stack, XStack, YStack } from "tamagui";
-import { TextInput, GlassCard, BodySm, Caption } from "@yt-subtitle-maker/ui";
+import { Search } from "@tamagui/lucide-icons";
+import { Input, Stack, XStack, YStack } from "tamagui";
+import { GlassCard, BodySm, Caption, CaptionUpper } from "@yt-subtitle-maker/ui";
 import { useSettings } from "./SettingsContext";
 import { TABS } from "./constants";
 import { SETTINGS_INDEX, type SearchEntry } from "./searchIndex";
 
-/**
- * SettingsSearch — a search box that filters SETTINGS_INDEX on label + keywords
- * (≥2 chars), shows results as clickable "Tab › Setting" rows inside a GlassCard,
- * and on click: clears the query, switches to the matching tab, then defers a
- * setHighlightedSettingId call so SettingRow's scroll+pulse effect fires after
- * the tab content has re-mounted.
- */
 export function SettingsSearch() {
-  const { searchQuery, setSearchQuery, setActiveTab, setHighlightedSettingId } = useSettings();
+  const { searchQuery, setSearchQuery, setActiveTab, setHighlightedSettingId } =
+    useSettings();
 
   const results = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -28,7 +23,6 @@ export function SettingsSearch() {
   const jump = (e: SearchEntry) => {
     setSearchQuery("");
     setActiveTab(e.tab);
-    // defer so the active tab re-mounts before SettingRow tries to scroll
     setTimeout(() => setHighlightedSettingId(e.id), 0);
   };
 
@@ -36,12 +30,45 @@ export function SettingsSearch() {
 
   return (
     <YStack gap="$sm">
-      <TextInput
-        placeholder="Search settings…"
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        aria-label="Search settings"
-      />
+      <XStack alignItems="center" justifyContent="space-between">
+        <CaptionUpper>Find a setting</CaptionUpper>
+        <Caption color="$textMuted">Type at least 2 characters</Caption>
+      </XStack>
+
+      <XStack
+        alignItems="center"
+        height={54}
+        paddingHorizontal="$md"
+        gap="$sm"
+        borderRadius="$md"
+        borderWidth={1}
+        borderColor="$borderSubtle"
+        backgroundColor="$bgBase"
+        hoverStyle={{ borderColor: "$borderStrong" }}
+        focusStyle={{ borderColor: "$accent", borderWidth: 2 }}
+      >
+        <Search size={18} color="$textMuted" />
+        <Input
+          unstyled
+          flex={1}
+          height="100%"
+          placeholder="Search paths, cookies, model, subtitles..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          aria-label="Search settings"
+          fontFamily="$body"
+          fontSize={17}
+          color="$textPrimary"
+          placeholderTextColor="$textMuted"
+          style={
+            {
+              color: "#141413",
+              caretColor: "#a9583e",
+              outline: "none",
+            } as React.CSSProperties as never
+          }
+        />
+      </XStack>
 
       {showDropdown ? (
         <GlassCard variant="mid" padding="$sm">
@@ -58,7 +85,7 @@ export function SettingsSearch() {
                     key={e.id}
                     tag="button"
                     role="button"
-                    borderRadius="$md"
+                    borderRadius="$sm"
                     paddingVertical="$sm"
                     paddingHorizontal="$sm"
                     backgroundColor="transparent"
@@ -66,12 +93,10 @@ export function SettingsSearch() {
                     animation="quick"
                     cursor="pointer"
                     onPress={() => jump(e)}
-                    aria-label={`${tabLabel} › ${e.label}`}
+                    aria-label={`${tabLabel} > ${e.label}`}
                   >
                     <XStack alignItems="center" gap="$xs">
-                      <Caption color="$textMuted">
-                        {tabLabel} ›
-                      </Caption>
+                      <Caption color="$textMuted">{tabLabel} &gt;</Caption>
                       <BodySm>{e.label}</BodySm>
                     </XStack>
                   </Stack>

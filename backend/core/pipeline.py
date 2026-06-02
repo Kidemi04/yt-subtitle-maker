@@ -218,6 +218,7 @@ def run_pipeline(
             cookie_browser=cfg.cookie_browser,
             cookie_profile=cfg.cookie_profile,
             cookies_txt_path=cfg.cookies_txt_path,
+            resample_16k=cfg.ffmpeg_resample_16k,
             progress=_dl_only_progress,
         )
         _check_cancel(cancel_event)
@@ -256,6 +257,7 @@ def run_pipeline(
             cookie_browser=cfg.cookie_browser,
             cookie_profile=cfg.cookie_profile,
             cookies_txt_path=cfg.cookies_txt_path,
+            resample_16k=cfg.ffmpeg_resample_16k,
             progress=_dl_progress,
         )
         _check_cancel(cancel_event)

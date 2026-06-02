@@ -380,6 +380,9 @@ export default function Generate() {
     return translatorProvider;
   }, [translatorProvider, customTranslators]);
 
+  const sttEngineLabel =
+    sttEngine === "openai-whisper" ? "OpenAI Whisper" : sttEngine;
+
   // MPV launch feedback — tells the user the click did something even when
   // the mpv window pops up behind/off-screen, and surfaces backend errors
   // (mpv-not-found, etc.) inline instead of via window.alert.
@@ -506,12 +509,15 @@ export default function Generate() {
             backgroundColor="$bgBase"
             borderWidth={1}
             borderColor="$borderSubtle"
+            flexWrap="wrap"
             style={{
               boxShadow: "0 10px 24px rgba(33,26,24,0.06)",
             }}
           >
             <XStack
               flex={1}
+              minWidth={260}
+              flexShrink={1}
               height={68}
               alignItems="center"
               borderWidth={0}
@@ -536,6 +542,7 @@ export default function Generate() {
               <Input
                 unstyled
                 flex={1}
+                minWidth={0}
                 height="100%"
                 paddingLeft={0}
                 paddingRight={16}
@@ -562,6 +569,8 @@ export default function Generate() {
               onPress={loadMetadata}
               disabled={!url.trim() || status === "loading-meta"}
               height={68}
+              minWidth={118}
+              flexShrink={0}
               borderRadius="$lg"
             >
               {status === "loading-meta" ? "Loading…" : "Load"}
@@ -656,10 +665,10 @@ export default function Generate() {
               </XStack>
               <Caption>
                 {sttSource === "auto"
-                  ? "Auto + faster-whisper"
+                  ? `Auto + ${sttEngineLabel}`
                   : sttSource === "yt_captions"
                   ? "YouTube captions only"
-                  : sttEngine}
+                  : sttEngineLabel}
                 {" · "}
                 {sourceLang.toUpperCase()}
                 {enableTranslation && !downloadOnly
@@ -913,15 +922,16 @@ export default function Generate() {
                           <BodyMd fontWeight="500">
                             VAD (Voice Activity Detection)
                           </BodyMd>
-                          <Tooltip content="Skips silent sections of the audio. Prevents Whisper from inventing text in silence.">
+                          <Tooltip content="Not active with the current OpenAI Whisper adapter. Future add-on engines can expose real VAD.">
                             <Stack>
                               <Info size={14} color="$textMuted" />
                             </Stack>
                           </Tooltip>
                         </XStack>
                         <Toggle
-                          value={vadEnabled}
+                          value={false}
                           onValueChange={(v) => setJobField("vadEnabled", v)}
+                          disabled
                           aria-label="Enable VAD"
                         />
                       </XStack>

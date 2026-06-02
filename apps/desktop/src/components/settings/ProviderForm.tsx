@@ -1,44 +1,13 @@
-/**
- * ProviderForm — inline edit form for one translator profile.
- *
- * Pure presentational component (Task 5 `TranslationTab` will wire it to
- * `SettingsContext`). All side-effecting callbacks come through props
- * (`onSave`, `onCancel`); the form reads `targetLang` + `formProvider` as
- * props rather than calling `useSettings()` directly.
- *
- * Fields:
- *  1. Name              — TextInput
- *  2. Endpoint / baseUrl— TextInput (validates http:// or https://; blank
- *                         allowed for the Gemini form, which has no baseUrl)
- *  3. API key           — masked pill with "Replace" toggle OR a
- *                         `secureTextEntry` TextInput with Show/Hide eye.
- *                         The "Replace" state is local to this form
- *                         (`isReplacingKey: boolean`) — on Save, send "***"
- *                         to keep the saved key, or the typed value to
- *                         overwrite it.
- *  4. Model             — TextInput free-text fallback + Dropdown overlay
- *                         once `↻` populates the fetched list.
- *  5. Test result       — inline `✓ src → dst · ms` or `⚠ error`
- *  6. Test / Save / Cancel buttons
- *
- * The `formProvider` prop ("gemini" | "openai") tells the Test / list-models
- * calls which provider shape to send when the user is editing ad-hoc fields
- * (i.e. the saved key isn't being reused). For saved-key flows, we route
- * through `{ profileId, useSavedKey: true }` regardless.
- */
-
 import * as React from "react";
-import { Stack, XStack, YStack } from "tamagui";
+import { Input, Stack, XStack, YStack } from "tamagui";
 import { Eye, EyeOff, RefreshCcw } from "@tamagui/lucide-icons";
 import {
-  TextInput,
   Dropdown,
   ButtonSecondary,
   ButtonGhost,
   IconButton,
   Caption,
   TitleSm,
-  BodySm,
 } from "@yt-subtitle-maker/ui";
 import {
   type TranslatorProvider,
@@ -50,29 +19,118 @@ import { buildModelOptions } from "./constants";
 export interface ProviderFormSavePayload {
   name: string;
   baseUrl: string;
-  /** Either `"***"` (keep saved key) or the new key the user typed. */
   apiKey: string;
   model: string;
 }
 
 export interface ProviderFormProps {
-  /** Stable id of the profile being edited. Used for saved-key Test/Models. */
   profileId: string;
   initialName: string;
   initialBaseUrl: string;
   initialModel: string;
-  /** true when the profile currently has a non-empty saved apiKey
-   *  (returned as `"***"` by GET /api/config). */
   apiKeyMasked: boolean;
-  /** Which provider shape to send when calling `testTranslator` /
-   *  `listTranslatorModels` with ad-hoc form fields. Pick `"gemini"` when
-   *  editing the built-in Gemini row, `"openai"` for everything else
-   *  (built-in local_openai + every custom OpenAI-compatible profile). */
   formProvider: TranslatorProvider;
-  /** Target language to round-trip through the Test endpoint. */
   targetLang?: string;
+  autoFetchModels?: boolean;
+  autoFetchLabel?: string;
   onSave: (patch: ProviderFormSavePayload) => void;
   onCancel: () => void;
+}
+
+function ProviderInput({
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  right,
+  ariaLabel,
+  invalid = false,
+  autoFocus = false,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  secureTextEntry?: boolean;
+  right?: React.ReactNode;
+  ariaLabel: string;
+  invalid?: boolean;
+  autoFocus?: boolean;
+}) {
+  const [focused, setFocused] = React.useState(false);
+  const borderColor = invalid
+    ? "$error"
+    : focused
+      ? "$accent"
+      : "$borderStrong";
+
+  return (
+    <XStack
+      alignItems="center"
+      minHeight={56}
+      borderRadius="$md"
+      borderWidth={focused ? 2 : 1}
+      borderColor={borderColor}
+      backgroundColor="$bgBase"
+      paddingLeft="$md"
+      paddingRight={right ? "$xs" : "$md"}
+      gap="$xs"
+      hoverStyle={{ borderColor: invalid ? "$error" : "$accentDim" }}
+      style={{
+        boxShadow: focused
+          ? "0 0 0 3px rgba(169, 88, 62, 0.12), inset 0 1px 0 rgba(20,20,19,0.03)"
+          : "inset 0 1px 0 rgba(20,20,19,0.03)",
+      }}
+    >
+      <Input
+        unstyled
+        flex={1}
+        minWidth={0}
+        height={54}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        secureTextEntry={secureTextEntry}
+        aria-label={ariaLabel}
+        autoFocus={autoFocus}
+        autoCapitalize="none"
+        autoCorrect={false}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        fontFamily="$body"
+        fontSize={17}
+        color="$textPrimary"
+        placeholderTextColor="$textMuted"
+        style={
+          {
+            color: "#141413",
+            caretColor: "#a9583e",
+            outline: "none",
+          } as React.CSSProperties as never
+        }
+      />
+      {right}
+    </XStack>
+  );
+}
+
+function FieldBlock({
+  label,
+  helper,
+  children,
+}: {
+  label: string;
+  helper?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <YStack gap="$xs" flex={1} minWidth={240}>
+      <YStack gap={2}>
+        <TitleSm>{label}</TitleSm>
+        {helper ? <Caption color="$textMuted">{helper}</Caption> : null}
+      </YStack>
+      {children}
+    </YStack>
+  );
 }
 
 export function ProviderForm({
@@ -83,49 +141,59 @@ export function ProviderForm({
   apiKeyMasked,
   formProvider,
   targetLang,
+  autoFetchModels = false,
+  autoFetchLabel,
   onSave,
   onCancel,
 }: ProviderFormProps) {
   const [name, setName] = React.useState(initialName);
   const [baseUrl, setBaseUrl] = React.useState(initialBaseUrl);
   const [model, setModel] = React.useState(initialModel);
-
-  // API-key replacement flow: this state is LOCAL to ProviderForm (per the
-  // plan's "Replace local-only" decision). It does NOT extend the global
-  // `replacingKey` map in SettingsContext.
-  //
-  // - When the profile already has a saved key (`apiKeyMasked === true`),
-  //   we start with `isReplacingKey === false` → render the "•••• key on
-  //   file [Replace]" pill. Clicking Replace flips it to true → real input.
-  // - When the profile has no saved key yet (new profile or empty key), we
-  //   start with `isReplacingKey === true` → render the input immediately.
   const [isReplacingKey, setIsReplacingKey] = React.useState(!apiKeyMasked);
   const [apiKey, setApiKey] = React.useState("");
   const [showKey, setShowKey] = React.useState(false);
-
-  // Model-fetch state
   const [fetchedModels, setFetchedModels] = React.useState<string[]>([]);
   const [modelsBusy, setModelsBusy] = React.useState(false);
-
-  // Test state
-  const [testResult, setTestResult] = React.useState<TranslatorTestResult | undefined>(
+  const [modelsStatus, setModelsStatus] = React.useState<
+    "idle" | "needs-key" | "loading" | "loaded" | "empty" | "error"
+  >("idle");
+  const [modelsError, setModelsError] = React.useState<string | undefined>(
     undefined,
   );
+  const [testResult, setTestResult] = React.useState<
+    TranslatorTestResult | undefined
+  >(undefined);
   const [testing, setTesting] = React.useState(false);
 
-  // URL validation — blank is allowed (gemini has no baseUrl); otherwise
-  // must be http:// or https://.
   const urlValid =
     baseUrl === "" ||
     baseUrl.startsWith("http://") ||
     baseUrl.startsWith("https://");
-
-  // Whether we should route Test / Models through the saved profile
-  // (server-side credentials) vs. send the ad-hoc form values.
   const useSavedKey = apiKeyMasked && !isReplacingKey;
+  const modelReady = model.trim().length > 0;
+  const apiKeyReady =
+    useSavedKey || formProvider !== "openai" || apiKey.trim().length > 0;
+  const requiresApiKeyForModels = formProvider === "openai" && !useSavedKey;
+  const canFetchModels =
+    urlValid && (!requiresApiKeyForModels || apiKey.trim().length > 0);
+  const canSave =
+    name.trim().length > 0 && urlValid && modelReady && apiKeyReady;
 
-  const handleFetchModels = async () => {
+  const handleFetchModels = React.useCallback(async () => {
+    if (!urlValid) {
+      setModelsStatus("idle");
+      return;
+    }
+    if (!canFetchModels) {
+      setFetchedModels([]);
+      setModelsError(undefined);
+      setModelsStatus("needs-key");
+      return;
+    }
+
     setModelsBusy(true);
+    setModelsStatus("loading");
+    setModelsError(undefined);
     try {
       const res = useSavedKey
         ? await apiClient.listTranslatorModels({ profileId, useSavedKey: true })
@@ -134,13 +202,53 @@ export function ProviderForm({
             baseUrl: baseUrl || undefined,
             apiKey: apiKey || undefined,
           });
-      if (res.ok) setFetchedModels(res.models);
-    } catch {
-      /* swallow — the dropdown stays in free-text mode */
+      if (!res.ok) {
+        setFetchedModels([]);
+        setModelsError(res.error ?? "Model fetch failed");
+        setModelsStatus("error");
+        return;
+      }
+
+      setFetchedModels(res.models);
+      if (res.models.length > 0) {
+        setModelsStatus("loaded");
+        setModel((current) => (current.trim() ? current : res.models[0]));
+      } else {
+        setModelsStatus("empty");
+      }
+    } catch (err) {
+      setFetchedModels([]);
+      setModelsError(err instanceof Error ? err.message : String(err));
+      setModelsStatus("error");
     } finally {
       setModelsBusy(false);
     }
-  };
+  }, [
+    apiKey,
+    baseUrl,
+    canFetchModels,
+    formProvider,
+    profileId,
+    urlValid,
+    useSavedKey,
+  ]);
+
+  React.useEffect(() => {
+    if (!autoFetchModels) return;
+    if (!baseUrl && !useSavedKey) return;
+
+    const timeout = window.setTimeout(() => {
+      void handleFetchModels();
+    }, canFetchModels ? 650 : 100);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    autoFetchModels,
+    baseUrl,
+    canFetchModels,
+    handleFetchModels,
+    useSavedKey,
+  ]);
 
   const handleTest = async () => {
     setTesting(true);
@@ -171,94 +279,117 @@ export function ProviderForm({
   };
 
   const handleSave = () => {
-    // If we haven't replaced the saved key, send "***" so the backend
-    // keeps the existing credential. Otherwise send whatever the user
-    // typed (which may be "" for "clear the key").
-    const finalApiKey = isReplacingKey ? apiKey : "***";
-    onSave({ name, baseUrl, apiKey: finalApiKey, model });
+    onSave({
+      name: name.trim(),
+      baseUrl: baseUrl.trim(),
+      apiKey: isReplacingKey ? apiKey : "***",
+      model: model.trim(),
+    });
   };
 
   const modelDropdownOptions = buildModelOptions(fetchedModels, model);
+  const modelsSource = autoFetchLabel || name || "provider";
 
   return (
-    <YStack gap="$sm">
-      {/* Name */}
-      <YStack gap={2}>
-        <TitleSm>Name</TitleSm>
-        <TextInput value={name} onChangeText={setName} placeholder="e.g. DeepSeek" />
-      </YStack>
+    <YStack gap="$md">
+      <XStack gap="$md" flexWrap="wrap">
+        <FieldBlock
+          label="Provider name"
+          helper="Shown in Generate and in this provider list."
+        >
+          <ProviderInput
+            value={name}
+            onChangeText={setName}
+            placeholder="e.g. DeepSeek"
+            ariaLabel="Provider name"
+          />
+        </FieldBlock>
 
-      {/* Endpoint */}
-      <YStack gap={2}>
-        <TitleSm>Endpoint</TitleSm>
-        <TextInput
-          value={baseUrl}
-          onChangeText={setBaseUrl}
-          placeholder="https://api.example.com/v1"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {!urlValid ? (
-          <Caption color="$error">Must start with http:// or https://</Caption>
-        ) : null}
-      </YStack>
+        <FieldBlock
+          label="Endpoint"
+          helper="OpenAI-compatible base URL. Leave blank only for Gemini."
+        >
+          <ProviderInput
+            value={baseUrl}
+            onChangeText={setBaseUrl}
+            placeholder="https://api.example.com/v1"
+            ariaLabel="Provider endpoint"
+            invalid={!urlValid}
+          />
+          {!urlValid ? (
+            <Caption color="$error">Must start with http:// or https://</Caption>
+          ) : null}
+        </FieldBlock>
+      </XStack>
 
-      {/* API key */}
-      <YStack gap={2}>
-        <TitleSm>API key</TitleSm>
+      <FieldBlock
+        label="API key"
+        helper={
+          useSavedKey
+            ? "A saved key is on file. Replace it only if you need to update it."
+            : "Stored in the backend config after you save."
+        }
+      >
         {apiKeyMasked && !isReplacingKey ? (
           <XStack gap="$sm" alignItems="center">
-            <Stack
+            <XStack
               flex={1}
-              padding="$sm"
+              minHeight={56}
+              alignItems="center"
               borderRadius="$md"
-              backgroundColor="$surfaceGlass"
               borderWidth={1}
-              borderColor="$borderSubtle"
+              borderColor="$borderStrong"
+              backgroundColor="$bgBase"
+              paddingHorizontal="$md"
             >
-              <BodySm color="$textSecondary">•••• key on file</BodySm>
-            </Stack>
+              <Caption color="$textSecondary">Key saved securely</Caption>
+            </XStack>
             <ButtonGhost
+              height={56}
               onPress={() => {
                 setIsReplacingKey(true);
                 setApiKey("");
               }}
             >
-              Replace
+              Replace key
             </ButtonGhost>
           </XStack>
         ) : (
-          <XStack alignItems="center" position="relative">
-            <TextInput
-              flex={1}
+          <YStack gap="$xs">
+            <ProviderInput
               value={apiKey}
               onChangeText={setApiKey}
               secureTextEntry={!showKey}
-              placeholder="sk-…"
-              autoCapitalize="none"
-              autoCorrect={false}
+              placeholder="sk-..."
+              ariaLabel="Provider API key"
+              autoFocus={isReplacingKey}
+              invalid={!apiKeyReady}
+              right={
+                <IconButton
+                  icon={
+                    showKey ? (
+                      <EyeOff size={14} color="$textSecondary" />
+                    ) : (
+                      <Eye size={14} color="$textSecondary" />
+                    )
+                  }
+                  aria-label="Toggle key visibility"
+                  size={44}
+                  onPress={() => setShowKey((v) => !v)}
+                />
+              }
             />
-            <Stack position="absolute" right={8}>
-              <IconButton
-                icon={
-                  showKey ? (
-                    <EyeOff size={14} color="$textSecondary" />
-                  ) : (
-                    <Eye size={14} color="$textSecondary" />
-                  )
-                }
-                aria-label="Toggle key visibility"
-                size={44}
-                onPress={() => setShowKey((v) => !v)}
-              />
-            </Stack>
-          </XStack>
+            {!apiKeyReady ? (
+              <Caption color="$error">API key is required for this provider.</Caption>
+            ) : null}
+          </YStack>
         )}
-      </YStack>
+      </FieldBlock>
 
-      {/* Model */}
-      <YStack gap={2}>
-        <TitleSm>Model</TitleSm>
+      <FieldBlock
+        label="Model"
+        helper="Type a model id, or fetch available models from the endpoint."
+      >
         <XStack gap="$sm" alignItems="center">
           <Stack flex={1}>
             {fetchedModels.length > 0 ? (
@@ -270,67 +401,86 @@ export function ProviderForm({
                 width="100%"
               />
             ) : (
-              <TextInput
+              <ProviderInput
                 value={model}
                 onChangeText={setModel}
                 placeholder="e.g. deepseek-chat"
-                autoCapitalize="none"
-                autoCorrect={false}
+                ariaLabel="Provider model"
+                invalid={!modelReady}
               />
             )}
           </Stack>
           <IconButton
             icon={<RefreshCcw size={14} color="$textSecondary" />}
             aria-label="Fetch models from this endpoint"
-            size={44}
-            onPress={handleFetchModels}
-            disabled={modelsBusy}
+            size={52}
+            onPress={() => {
+              void handleFetchModels();
+            }}
+            disabled={modelsBusy || !urlValid || !canFetchModels}
           />
         </XStack>
-        {fetchedModels.length === 0 ? (
-          <Caption color="$textSecondary">
-            Click ↻ to fetch models from this endpoint.
+        {modelsStatus === "needs-key" ? (
+          <Caption color="$textMuted">
+            Models will fetch automatically after an API key is entered.
           </Caption>
         ) : null}
-      </YStack>
+        {modelsStatus === "loading" ? (
+          <Caption color="$textSecondary">
+            Fetching models from {modelsSource}...
+          </Caption>
+        ) : null}
+        {modelsStatus === "loaded" ? (
+          <Caption color="$success">
+            Loaded {fetchedModels.length} model{fetchedModels.length === 1 ? "" : "s"} from {modelsSource}.
+          </Caption>
+        ) : null}
+        {modelsStatus === "empty" ? (
+          <Caption color="$warning">
+            The endpoint responded, but did not return any models. You can type a model id manually.
+          </Caption>
+        ) : null}
+        {modelsStatus === "error" ? (
+          <Caption color="$warning">
+            Could not fetch models{modelsError ? `: ${modelsError}` : ""}. You can type a model id manually.
+          </Caption>
+        ) : null}
+        {!modelReady ? (
+          <Caption color="$error">Choose or type a model before saving.</Caption>
+        ) : null}
+      </FieldBlock>
 
-      {/* Test result inline */}
       {testResult ? (
         <Stack
           padding="$sm"
           borderRadius="$md"
-          backgroundColor="$surfaceGlass"
+          backgroundColor={testResult.ok ? "rgba(93,184,114,0.10)" : "rgba(232,165,90,0.10)"}
           borderWidth={1}
           borderColor={testResult.ok ? "$success" : "$warning"}
         >
           {testResult.ok ? (
             <Caption color="$success">
               {testResult.sample
-                ? // Legacy success shape (round-trip): keep showing the
-                  // translation. Won't occur anymore now that /api/translator/test
-                  // does a ping-only smoke check, but harmless to keep.
-                  `✓ ${testResult.sample.src} → ${testResult.sample.dst}${
+                ? `Connected: ${testResult.sample.src} -> ${testResult.sample.dst}${
                     testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ""
                   }`
-                : // Ping-only success — no translation sample.
-                  `✓ Connected${
+                : `Connected${
                     testResult.model ? ` · ${testResult.model}` : ""
                   }${testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ""}`}
             </Caption>
           ) : (
-            <Caption color="$warning">{`⚠ ${testResult.error ?? "Unknown error"}`}</Caption>
+            <Caption color="$warning">{testResult.error ?? "Test failed"}</Caption>
           )}
         </Stack>
       ) : null}
 
-      {/* Test + Cancel + Save */}
       <XStack gap="$sm" alignItems="center" justifyContent="flex-end">
-        <ButtonGhost onPress={handleTest} disabled={testing}>
-          {testing ? "Testing…" : "Test"}
+        <ButtonGhost onPress={handleTest} disabled={testing || !urlValid}>
+          {testing ? "Testing..." : "Test connection"}
         </ButtonGhost>
         <ButtonGhost onPress={onCancel}>Cancel</ButtonGhost>
-        <ButtonSecondary onPress={handleSave} disabled={!urlValid}>
-          Save
+        <ButtonSecondary onPress={handleSave} disabled={!canSave}>
+          Save provider
         </ButtonSecondary>
       </XStack>
     </YStack>

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { LibraryItem, VideoDetail } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "./client";
+import { formatErrorMessage } from "../lib/errors";
 
 export type LibraryView = "rows" | "cards";
 
@@ -51,12 +52,13 @@ export const useLibrary = create<LibraryState>()(
           set({ items: res.items, loading: false });
           // Auto-select most recent if nothing selected and we're on a wide viewport.
           const state = get();
-          const wideViewport = typeof window !== "undefined" && window.innerWidth > 720;
+          const wideViewport =
+            typeof window !== "undefined" && window.innerWidth > 1040;
           if (!state.selectedId && res.items.length > 0 && wideViewport) {
             state.selectVideo(res.items[0].videoId);
           }
         } catch (e) {
-          set({ loading: false, error: (e as Error).message });
+          set({ loading: false, error: formatErrorMessage(e) });
         }
       },
 
@@ -81,7 +83,7 @@ export const useLibrary = create<LibraryState>()(
           set({ detail, loadingDetail: false });
         } catch (e) {
           if (get().selectedId !== videoId) return;
-          set({ loadingDetail: false, error: (e as Error).message });
+          set({ loadingDetail: false, error: formatErrorMessage(e) });
         }
       },
 

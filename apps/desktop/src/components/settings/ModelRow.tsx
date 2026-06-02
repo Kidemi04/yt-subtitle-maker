@@ -1,14 +1,14 @@
-// apps/desktop/src/components/settings/ModelRow.tsx
 import * as React from "react";
-import { XStack, YStack } from "tamagui";
-import { CheckCircle } from "@tamagui/lucide-icons";
+import { Stack, XStack, YStack } from "tamagui";
+import { CheckCircle, Download, TriangleAlert } from "@tamagui/lucide-icons";
 import {
-  ButtonSecondary,
-  ButtonGhost,
-  ProgressBar,
-  Caption,
-  TitleSm,
   BadgePill,
+  BodySm,
+  ButtonGhost,
+  ButtonSecondary,
+  Caption,
+  ProgressBar,
+  TitleSm,
 } from "@yt-subtitle-maker/ui";
 import type { EngineModel, WhisperModel } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "../../state/client";
@@ -19,8 +19,8 @@ type DownloadState = "idle" | "downloading" | "done" | "error";
 interface Props {
   model: EngineModel;
   engineId: string;
-  /** Whether this model is the currently-selected default. */
   selected: boolean;
+  configuredDefault: boolean;
   onSelect: (name: string) => void;
 }
 
@@ -29,7 +29,32 @@ function formatSize(mb: number): string {
   return `${mb} MB`;
 }
 
-export function ModelRow({ model, engineId, selected, onSelect }: Props) {
+function modelHint(name: string): string {
+  switch (name) {
+    case "tiny":
+      return "Fastest smoke tests and rough drafts.";
+    case "base":
+      return "Quick drafts with better accuracy than tiny.";
+    case "small":
+      return "Good everyday balance for longer videos.";
+    case "medium":
+      return "Higher accuracy, slower on CPU.";
+    case "large-v3":
+      return "Best accuracy, largest local download.";
+    case "turbo":
+      return "Recommended when you want speed with strong accuracy.";
+    default:
+      return "Whisper model checkpoint.";
+  }
+}
+
+export function ModelRow({
+  model,
+  engineId,
+  selected,
+  configuredDefault,
+  onSelect,
+}: Props) {
   const { refreshEngines } = useSettings();
   const [dlState, setDlState] = React.useState<DownloadState>("idle");
   const [progress, setProgress] = React.useState(0);
@@ -37,7 +62,6 @@ export function ModelRow({ model, engineId, selected, onSelect }: Props) {
   const [dlError, setDlError] = React.useState<string | undefined>();
   const abortRef = React.useRef<AbortController | null>(null);
 
-  // Clean up on unmount — cancel any in-progress download
   React.useEffect(() => {
     return () => {
       abortRef.current?.abort();
@@ -47,10 +71,11 @@ export function ModelRow({ model, engineId, selected, onSelect }: Props) {
   const startDownload = async () => {
     setDlState("downloading");
     setProgress(0);
-    setProgressMsg("Starting…");
+    setProgressMsg("Starting...");
     setDlError(undefined);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+
     try {
       for await (const ev of apiClient.installDependency(
         model.name as WhisperModel,
@@ -58,6 +83,7 @@ export function ModelRow({ model, engineId, selected, onSelect }: Props) {
         engineId,
       )) {
         if (ctrl.signal.aborted) return;
+
         if (ev.status === "downloading") {
           const pct = typeof ev.percent === "number" ? ev.percent / 100 : 0;
           setProgress(pct);
@@ -69,19 +95,21 @@ export function ModelRow({ model, engineId, selected, onSelect }: Props) {
             const totMb = (ev.total / 1024 / 1024).toFixed(0);
             const speedPart =
               typeof ev.speed === "number"
-                ? ` · ${(ev.speed / 1024 / 1024).toFixed(1)} MB/s`
+                ? `, ${(ev.speed / 1024 / 1024).toFixed(1)} MB/s`
                 : "";
             setProgressMsg(`${dlMb} / ${totMb} MB${speedPart}`);
           }
         }
+
         if (ev.status === "done") {
           setProgress(1);
           setProgressMsg("Done");
           setDlState("done");
-          // Refresh the engine descriptor so the downloaded flag flips to true
           await refreshEngines();
+          onSelect(model.name);
           return;
         }
+
         if (ev.status === "error") {
           setDlError(ev.error ?? "Download failed");
           setDlState("error");
@@ -106,70 +134,118 @@ export function ModelRow({ model, engineId, selected, onSelect }: Props) {
   };
 
   const isDownloaded = model.downloaded || dlState === "done";
+  const canSelect = isDownloaded && dlState !== "downloading";
 
   return (
     <YStack
-      paddingVertical="$xs"
-      paddingHorizontal="$sm"
-      borderRadius="$sm"
-      backgroundColor={selected ? "$accentSoft" : "transparent"}
-      borderWidth={selected ? 1 : 0}
-      borderColor={selected ? "$accentDim" : "transparent"}
-      gap="$xxs"
+      padding="$sm"
+      borderRadius="$md"
+      backgroundColor={selected ? "$accentSoft" : "$bgBase"}
+      borderWidth={1}
+      borderColor={
+        selected ? "$accent" : configuredDefault ? "$warning" : "$borderSubtle"
+      }
+      gap="$xs"
     >
       <XStack alignItems="center" gap="$sm">
-        {/* Model name + size — pressing the name/left side selects this model */}
-        <YStack flex={1} gap={2} onPress={() => onSelect(model.name)} cursor="pointer">
-          <XStack alignItems="center" gap="$xs">
+        <Stack
+          tag="button"
+          role="button"
+          aria-label={
+            canSelect
+              ? `Use ${model.name} as the default Whisper model`
+              : `${model.name} is not installed`
+          }
+          width={28}
+          height={28}
+          borderRadius="$pill"
+          alignItems="center"
+          justifyContent="center"
+          backgroundColor={selected ? "$accent" : "transparent"}
+          borderWidth={selected ? 0 : 1}
+          borderColor={
+            configuredDefault ? "$warning" : isDownloaded ? "$borderStrong" : "$borderSubtle"
+          }
+          cursor={canSelect ? "pointer" : "not-allowed"}
+          opacity={canSelect ? 1 : 0.6}
+          disabled={!canSelect}
+          onPress={canSelect ? () => onSelect(model.name) : undefined}
+          flexShrink={0}
+        >
+          {selected ? (
+            <CheckCircle size={16} color="$bgBase" />
+          ) : configuredDefault ? (
+            <TriangleAlert size={14} color="$warning" />
+          ) : isDownloaded ? (
+            <CheckCircle size={15} color="$success" />
+          ) : (
+            <Download size={14} color="$textMuted" />
+          )}
+        </Stack>
+
+        <YStack
+          flex={1}
+          minWidth={0}
+          gap={2}
+          cursor={canSelect ? "pointer" : "default"}
+          onPress={canSelect ? () => onSelect(model.name) : undefined}
+        >
+          <XStack alignItems="center" gap="$xs" flexWrap="wrap">
             <TitleSm color={selected ? "$accent" : "$text"}>
               {model.name}
             </TitleSm>
-            <BadgePill tone={isDownloaded ? "success" : "neutral"}>
-              {formatSize(model.sizeMb)}
-            </BadgePill>
-            {isDownloaded ? (
-              <CheckCircle size={13} color="$success" />
+            {selected ? <BadgePill tone="accent">Default</BadgePill> : null}
+            {configuredDefault && !selected ? (
+              <BadgePill tone="warning">Needs download</BadgePill>
             ) : null}
+            <BadgePill tone={isDownloaded ? "success" : "neutral"}>
+              {isDownloaded ? "Installed" : "Not installed"}
+            </BadgePill>
+            <BadgePill tone="neutral">{formatSize(model.sizeMb)}</BadgePill>
           </XStack>
-          {isDownloaded ? (
-            <Caption color="$textSecondary">Downloaded · tap to select as default</Caption>
-          ) : (
-            <Caption color="$textMuted">Not downloaded</Caption>
-          )}
+          <Caption color={isDownloaded ? "$textSecondary" : "$textMuted"}>
+            {configuredDefault && !isDownloaded
+              ? `${modelHint(model.name)} This is configured as default, but it must be downloaded before use.`
+              : isDownloaded
+              ? `${modelHint(model.name)} Click to use as default.`
+              : `${modelHint(model.name)} Download before selecting.`}
+          </Caption>
         </YStack>
 
-        {/* Action buttons — separate hit area, do not propagate to the row's onSelect */}
         {!isDownloaded && dlState === "idle" ? (
-          <ButtonSecondary onPress={startDownload}>
-            Download ({formatSize(model.sizeMb)})
+          <ButtonSecondary onPress={startDownload} height={42}>
+            Download
           </ButtonSecondary>
         ) : null}
         {dlState === "downloading" ? (
-          <ButtonGhost onPress={cancelDownload}>
+          <ButtonGhost onPress={cancelDownload} height={42}>
             Cancel
           </ButtonGhost>
         ) : null}
         {dlState === "error" ? (
-          <ButtonSecondary onPress={startDownload}>
+          <ButtonSecondary onPress={startDownload} height={42}>
             Retry
           </ButtonSecondary>
         ) : null}
       </XStack>
 
-      {/* Progress */}
       {dlState === "downloading" ? (
-        <YStack gap={4}>
+        <YStack gap="$xs">
           <ProgressBar value={progress} />
-          <XStack justifyContent="space-between">
-            <Caption color="$textSecondary">{progressMsg ?? "Downloading…"}</Caption>
+          <XStack justifyContent="space-between" gap="$sm">
+            <Caption color="$textSecondary">
+              {progressMsg ?? "Downloading..."}
+            </Caption>
             <Caption color="$textMuted">{Math.round(progress * 100)}%</Caption>
           </XStack>
         </YStack>
       ) : null}
 
-      {/* Error message */}
       {dlError && dlState === "error" ? (
-        <Caption color="$error">{dlError}</Caption>
+        <XStack alignItems="center" gap="$xs">
+          <TriangleAlert size={14} color="$error" />
+          <BodySm color="$error">{dlError}</BodySm>
+        </XStack>
       ) : null}
     </YStack>
   );

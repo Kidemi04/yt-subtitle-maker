@@ -5,6 +5,7 @@ import type {
   EngineDescriptor,
   HistoryItem,
   InstallEvent,
+  InstallEngineEvent,
   InstallMpvEvent,
   InstallMpvUnsupported,
   LibraryItem,
@@ -84,6 +85,7 @@ export class ApiClient {
   // ─── System report ────────────────────────────────────────────────────
   async getSystem(): Promise<SystemReport> {
     const res = await fetch(`${this.baseUrl}/api/system`, {
+      cache: "no-store",
       headers: this.headers(),
     });
     if (!res.ok) throw new Error(`/api/system ${res.status}`);
@@ -93,6 +95,7 @@ export class ApiClient {
   // ─── Engine descriptors ───────────────────────────────────────────────
   async getEngines(): Promise<EngineDescriptor[]> {
     const res = await fetch(`${this.baseUrl}/api/engines`, {
+      cache: "no-store",
       headers: this.headers(),
     });
     if (!res.ok) throw new Error(`/api/engines ${res.status}`);
@@ -375,6 +378,17 @@ export class ApiClient {
     yield* this.streamNdjson<InstallEvent>(
       "/api/dependencies/install",
       engine ? { model, engine } : { model },
+      signal,
+    );
+  }
+
+  async *installEngine(
+    engine: string,
+    signal?: AbortSignal,
+  ): AsyncIterable<InstallEngineEvent> {
+    yield* this.streamNdjson<InstallEngineEvent>(
+      "/api/dependencies/install-engine",
+      { engine },
       signal,
     );
   }

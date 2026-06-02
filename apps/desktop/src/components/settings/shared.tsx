@@ -136,14 +136,13 @@ export function SettingRow({
     return () => clearTimeout(t);
   }, [highlighted, setHighlightedSettingId]);
 
-  const highlightProps = highlighted
-    ? ({
-        borderColor: "$accent",
-        borderWidth: 1,
-        borderRadius: "$md",
-        padding: "$xs",
-      } as const)
-    : undefined;
+  const rowProps = {
+    borderRadius: "$md",
+    padding: "$md",
+    borderWidth: 1,
+    borderColor: highlighted ? "$accent" : "$borderSubtle",
+    backgroundColor: highlighted ? "$accentSoft" : "$bgBase",
+  } as const;
 
   // Does this row own a config field, and does its current value differ from
   // the shipped/effective default? Only then do we show the ↺ button.
@@ -170,7 +169,7 @@ export function SettingRow({
 
   if (layout === "row") {
     return (
-      <YStack ref={ref} nativeID={id} {...highlightProps}>
+      <YStack ref={ref} nativeID={id} gap="$xs" {...rowProps}>
         <XStack alignItems="center" justifyContent="space-between" gap="$sm">
           <YStack flex={1}>{labelHeader}</YStack>
           {children}
@@ -180,7 +179,7 @@ export function SettingRow({
     );
   }
   return (
-    <YStack ref={ref} nativeID={id} gap="$xs" {...highlightProps}>
+    <YStack ref={ref} nativeID={id} gap="$sm" {...rowProps}>
       {labelHeader}
       {children}
       {failed ? <RetryRow onRetrySave={retrySave} /> : null}

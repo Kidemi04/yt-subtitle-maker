@@ -1,5 +1,5 @@
 import { Slot, usePathname, useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SettingsProvider } from "../src/components/settings/SettingsContext";
 import {
   TamaguiProvider,
@@ -58,6 +58,8 @@ import { useGenerate } from "../src/state/generate";
 
 type NavRoute = "/" | "/library" | "/history" | "/settings" | "/about";
 
+const COMPACT_SHELL_BREAKPOINT = 1040;
+
 const NAV_ITEMS: ReadonlyArray<{
   href: NavRoute;
   label: string;
@@ -88,7 +90,26 @@ const ROUTE_SUBTITLES: Record<string, string> = {
   "/init": "One-time setup",
 };
 
-function Sidebar() {
+function useViewportIsCompact() {
+  const [isCompact, setIsCompact] = useState(
+    typeof window !== "undefined"
+      ? window.innerWidth <= COMPACT_SHELL_BREAKPOINT
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () =>
+      setIsCompact(window.innerWidth <= COMPACT_SHELL_BREAKPOINT);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return isCompact;
+}
+
+function Sidebar({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const resetGenerate = useGenerate((s) => s.reset);
@@ -97,29 +118,48 @@ function Sidebar() {
 
   return (
     <YStack
-      width={300}
+      width={compact ? 88 : 300}
       height="100%"
-      paddingHorizontal="$md"
+      paddingHorizontal={compact ? "$sm" : "$md"}
       paddingTop="$lg"
       paddingBottom="$md"
       gap="$xs"
+      alignItems={compact ? "center" : undefined}
       backgroundColor="$bgBase"
       borderRightWidth={1}
       borderRightColor="$borderSubtle"
     >
-      <YStack paddingHorizontal={2} paddingBottom="$lg" gap="$md">
-        <YStack paddingHorizontal="$xs" gap={2}>
-          <TitleMd fontSize={20} lineHeight={28}>
-            Translator Subtitle Studio
-          </TitleMd>
-          <CaptionUpper letterSpacing={1.2} fontSize={13}>
-            Workspace Beta
-          </CaptionUpper>
-        </YStack>
+      <YStack
+        paddingHorizontal={2}
+        paddingBottom="$lg"
+        gap="$md"
+        alignItems={compact ? "center" : undefined}
+      >
+        {compact ? (
+          <YStack alignItems="center" gap={2}>
+            <TitleMd fontSize={20} lineHeight={24}>
+              YT
+            </TitleMd>
+            <CaptionUpper letterSpacing={1.2} fontSize={10}>
+              Beta
+            </CaptionUpper>
+          </YStack>
+        ) : (
+          <YStack paddingHorizontal="$xs" gap={2}>
+            <TitleMd fontSize={20} lineHeight={28}>
+              Translator Subtitle Studio
+            </TitleMd>
+            <CaptionUpper letterSpacing={1.2} fontSize={13}>
+              Workspace Beta
+            </CaptionUpper>
+          </YStack>
+        )}
 
         <Stack
           tag="button"
           role="button"
+          aria-label="New Project"
+          width={compact ? 52 : undefined}
           height={52}
           borderRadius="$md"
           backgroundColor="$accent"
@@ -138,20 +178,29 @@ function Sidebar() {
         >
           <XStack alignItems="center" gap="$xs">
             <Plus size={18} color="#ffffff" />
-            <Text fontFamily="$body" fontSize={18} fontWeight="500" color="$onAccent">
-              New Project
-            </Text>
+            {compact ? null : (
+              <Text
+                fontFamily="$body"
+                fontSize={18}
+                fontWeight="500"
+                color="$onAccent"
+              >
+                New Project
+              </Text>
+            )}
           </XStack>
         </Stack>
       </YStack>
 
-      <YStack paddingLeft={14} paddingBottom={6}>
-        <CaptionUpper letterSpacing={1.5} fontSize={13} opacity={0.65}>
-          Workspace
-        </CaptionUpper>
-      </YStack>
+      {compact ? null : (
+        <YStack paddingLeft={14} paddingBottom={6}>
+          <CaptionUpper letterSpacing={1.5} fontSize={13} opacity={0.65}>
+            Workspace
+          </CaptionUpper>
+        </YStack>
+      )}
 
-      <YStack flex={1} gap={2}>
+      <YStack flex={1} gap={2} alignItems={compact ? "center" : undefined}>
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -163,6 +212,7 @@ function Sidebar() {
               }
               label={item.label}
               active={active}
+              compact={compact}
               onPress={() => router.push(item.href as never)}
             />
           );
@@ -177,13 +227,13 @@ function Sidebar() {
         borderRadius="$sm"
       >
         <HelpCircle size={18} color="$textMuted" />
-        <Caption>Help Support</Caption>
+        {compact ? null : <Caption>Help Support</Caption>}
       </XStack>
     </YStack>
   );
 }
 
-function Topbar() {
+function Topbar({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
   const title = ROUTE_TITLES[pathname] ?? "";
   const subtitle = ROUTE_SUBTITLES[pathname];
@@ -209,18 +259,20 @@ function Topbar() {
         <Stack />
       )}
       <XStack gap="$sm" alignItems="center">
-        <XStack
-          width={300}
-          height={40}
-          alignItems="center"
-          gap="$xs"
-          paddingHorizontal="$sm"
-          borderRadius="$pill"
-          backgroundColor="$accentSoft"
-        >
-          <Search size={16} color="$textMuted" />
-          <Caption fontSize={15}>Search projects...</Caption>
-        </XStack>
+        {compact ? null : (
+          <XStack
+            width={300}
+            height={40}
+            alignItems="center"
+            gap="$xs"
+            paddingHorizontal="$sm"
+            borderRadius="$pill"
+            backgroundColor="$accentSoft"
+          >
+            <Search size={16} color="$textMuted" />
+            <Caption fontSize={15}>Search projects...</Caption>
+          </XStack>
+        )}
         <IconButton
           icon={<Bell size={22} color="$textSecondary" />}
           aria-label="Notifications"
@@ -396,6 +448,7 @@ export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const toggleDrawer = useLogs((s) => s.toggleDrawer);
+  const compactShell = useViewportIsCompact();
 
   const [frauncesLoaded] = useFraunces({ Fraunces_400Regular });
   const [interLoaded] = useInter({
@@ -473,20 +526,21 @@ export default function RootLayout() {
       <SettingsProvider>
         <Stack flex={1} backgroundColor="$bgBase">
           <XStack flex={1}>
-            <Sidebar />
+            <Sidebar compact={compactShell} />
             <YStack flex={1}>
-              <Topbar />
+              <Topbar compact={compactShell} />
               {pathname === "/library" ? (
                 <YStack flex={1}>
                   <Slot />
                 </YStack>
               ) : (
                 <ScrollView
+                  key={pathname}
                   flex={1}
                   contentContainerStyle={{
                     flexGrow: 1,
-                    paddingHorizontal: 48,
-                    paddingVertical: 44,
+                    paddingHorizontal: compactShell ? 24 : 48,
+                    paddingVertical: compactShell ? 28 : 44,
                   }}
                 >
                   <YStack

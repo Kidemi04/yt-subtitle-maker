@@ -16,7 +16,7 @@ import { LibraryCardCompact } from "./LibraryCardCompact";
 
 const PANE_WIDTH = 360;
 
-export function LibraryPane() {
+export function LibraryPane({ fullWidth = false }: { fullWidth?: boolean }) {
   const items = useLibrary((s) => s.items);
   const loading = useLibrary((s) => s.loading);
   const error = useLibrary((s) => s.error);
@@ -46,9 +46,10 @@ export function LibraryPane() {
 
   return (
     <YStack
-      width={PANE_WIDTH}
-      maxWidth={PANE_WIDTH}
-      flexShrink={0}
+      width={fullWidth ? "100%" : PANE_WIDTH}
+      maxWidth={fullWidth ? undefined : PANE_WIDTH}
+      flexShrink={fullWidth ? 1 : 0}
+      flex={fullWidth ? 1 : undefined}
       borderRightWidth={1}
       borderRightColor="$borderSubtle"
       backgroundColor="$bgElevated"
@@ -134,6 +135,13 @@ export function LibraryPane() {
         {loading && items.length === 0 ? (
           <YStack padding="$md">
             <BodySm color="$textMuted">Loading…</BodySm>
+          </YStack>
+        ) : filtered.length === 0 && !search ? (
+          <YStack padding="$lg" gap="$xs">
+            <BodyMd color="$textPrimary">Your library is empty</BodyMd>
+            <BodySm color="$textSecondary">
+              Generate subtitles and finished videos will appear here.
+            </BodySm>
           </YStack>
         ) : filtered.length === 0 && search ? (
           <YStack padding="$md" gap="$sm">

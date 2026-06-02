@@ -25,6 +25,7 @@ export type SidebarItemProps = {
   icon: React.ReactNode;
   label: string;
   active: boolean;
+  compact?: boolean;
   onPress?: () => void;
 } & Omit<StackProps, "children" | "onPress">;
 
@@ -32,6 +33,7 @@ export function SidebarItem({
   icon,
   label,
   active,
+  compact = false,
   onPress,
   ...rest
 }: SidebarItemProps) {
@@ -40,11 +42,14 @@ export function SidebarItem({
       tag="button"
       role="button"
       position="relative"
-      height={58}
+      height={compact ? 52 : 58}
+      width={compact ? 52 : undefined}
       borderRadius="$sm"
-      paddingLeft={14}
-      paddingRight="$sm"
+      paddingLeft={compact ? 0 : 14}
+      paddingRight={compact ? 0 : "$sm"}
       paddingVertical="$xs"
+      alignItems={compact ? "center" : undefined}
+      justifyContent={compact ? "center" : undefined}
       borderWidth={0}
       outlineWidth={0}
       backgroundColor={active ? "$surfaceGlassMid" : "transparent"}
@@ -82,17 +87,24 @@ export function SidebarItem({
         />
       ) : null}
 
-      <XStack flex={1} alignItems="center" gap={14}>
+      <XStack
+        flex={1}
+        alignItems="center"
+        justifyContent={compact ? "center" : undefined}
+        gap={14}
+      >
         {icon}
-        <Text
-          fontFamily="$body"
-          fontSize={18}
-          fontWeight={active ? "600" : "500"}
-          letterSpacing={0.1}
-          color={active ? "$accent" : "$textSecondary"}
-        >
-          {label}
-        </Text>
+        {compact ? null : (
+          <Text
+            fontFamily="$body"
+            fontSize={18}
+            fontWeight={active ? "600" : "500"}
+            letterSpacing={0.1}
+            color={active ? "$accent" : "$textSecondary"}
+          >
+            {label}
+          </Text>
+        )}
       </XStack>
     </Stack>
   );

@@ -6,6 +6,7 @@ import type {
   VideoMetadata,
 } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "./client";
+import { formatErrorMessage } from "../lib/errors";
 
 /**
  * generate store — single-flight state machine for the Generate screen.
@@ -100,7 +101,7 @@ export const useGenerate = create<GenerateState>((set, get) => ({
     } catch (err) {
       set({
         status: "idle",
-        metaError: err instanceof Error ? err.message : String(err),
+        metaError: formatErrorMessage(err),
       });
     }
   },
@@ -177,7 +178,7 @@ export const useGenerate = create<GenerateState>((set, get) => ({
       }
       set({
         status: "error",
-        errorMessage: err instanceof Error ? err.message : String(err),
+        errorMessage: formatErrorMessage(err),
         abort: undefined,
       });
     }

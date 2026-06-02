@@ -1,4 +1,6 @@
-from core.downloader.youtube import safe_folder_name
+from pathlib import Path
+
+from core.downloader.youtube import download_audio, safe_folder_name
 
 
 def test_strips_filesystem_unsafe_chars():
@@ -29,3 +31,52 @@ def test_truncates_long_titles():
 
 def test_collapses_whitespace():
     assert safe_folder_name("Hello    World", "abc12345678") == "Hello_World_abc12345678"
+
+
+class _FakeYoutubeDL:
+    captured_opts: dict | None = None
+
+    def __init__(self, opts):
+        type(self).captured_opts = opts
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def extract_info(self, url, download):
+        for hook in self.captured_opts["progress_hooks"]:
+            hook({"status": "finished", "filename": str(Path("abc12345678.webm"))})
+        return {"id": "abc12345678", "duration": 12}
+
+
+def test_download_audio_resamples_to_16k_by_default(tmp_path, monkeypatch):
+    from core.downloader import youtube
+
+    monkeypatch.setattr(youtube.yt_dlp, "YoutubeDL", _FakeYoutubeDL)
+    monkeypatch.setattr(youtube, "load_config", lambda: type("Cfg", (), {"js_runtime_path": ""})())
+    monkeypatch.setattr(youtube.os.path, "exists", lambda path: True)
+
+    download_audio("https://example.test/video", str(tmp_path))
+
+    assert _FakeYoutubeDL.captured_opts is not None
+    assert _FakeYoutubeDL.captured_opts["postprocessor_args"] == [
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+    ]
+
+
+def test_download_audio_can_skip_16k_resample(tmp_path, monkeypatch):
+    from core.downloader import youtube
+
+    monkeypatch.setattr(youtube.yt_dlp, "YoutubeDL", _FakeYoutubeDL)
+    monkeypatch.setattr(youtube, "load_config", lambda: type("Cfg", (), {"js_runtime_path": ""})())
+    monkeypatch.setattr(youtube.os.path, "exists", lambda path: True)
+
+    download_audio("https://example.test/video", str(tmp_path), resample_16k=False)
+
+    assert _FakeYoutubeDL.captured_opts is not None
+    assert "postprocessor_args" not in _FakeYoutubeDL.captured_opts

@@ -13,6 +13,39 @@ from typing import TypedDict
 import requests
 
 
+class SttEngineAddon(TypedDict):
+    package: str
+    import_name: str
+
+
+STT_ENGINE_ADDONS: dict[str, SttEngineAddon] = {
+    "faster-whisper": {
+        "package": "faster-whisper",
+        "import_name": "faster_whisper",
+    },
+    "whisperx": {
+        "package": "whisperx",
+        "import_name": "whisperx",
+    },
+    "insanely-fast-whisper": {
+        "package": "insanely-fast-whisper",
+        "import_name": "insanely_fast_whisper",
+    },
+    "whisper-cpp": {
+        "package": "pywhispercpp",
+        "import_name": "pywhispercpp",
+    },
+    "mlx-whisper": {
+        "package": "mlx-whisper",
+        "import_name": "mlx_whisper",
+    },
+    "stable-ts": {
+        "package": "stable-ts",
+        "import_name": "stable_whisper",
+    },
+}
+
+
 class MpvStatus(TypedDict):
     installed: bool
     source: str | None  # "system" | "bundled" | None
@@ -156,6 +189,55 @@ def check_ffmpeg() -> bool:
     """Checks if ffmpeg is available in PATH."""
     return shutil.which("ffmpeg") is not None
 
+
+def check_stt_engine_addon(engine: str) -> bool:
+    """Return whether an optional STT engine package can be imported."""
+    import importlib.util
+
+    addon = STT_ENGINE_ADDONS.get(engine)
+    if addon is None:
+        return False
+    return importlib.util.find_spec(addon["import_name"]) is not None
+
+
+def install_stt_engine_addon_generator(engine: str):
+    """Yield install progress while installing an optional STT engine package."""
+    addon = STT_ENGINE_ADDONS.get(engine)
+    if addon is None:
+        raise ValueError(f"Unknown add-on engine: {engine!r}")
+
+    package = addon["package"]
+    yield {
+        "status": "resolving",
+        "message": f"Installing {package} into the current Python environment",
+    }
+
+    cmd = [sys.executable, "-m", "pip", "install", package]
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    assert process.stdout is not None
+    for line in process.stdout:
+        message = line.strip()
+        if message:
+            yield {"status": "installing", "message": message}
+
+    return_code = process.wait()
+    if return_code != 0:
+        raise RuntimeError(f"pip install {package} failed with exit code {return_code}")
+
+    if not check_stt_engine_addon(engine):
+        raise RuntimeError(
+            f"{package} installed, but Python still cannot import {addon['import_name']}"
+        )
+
+    yield {"status": "done", "engine": engine, "packageName": package}
+
 def check_mpv() -> bool:
     """Checks if mpv is available in PATH."""
     return shutil.which("mpv") is not None
@@ -298,7 +380,11 @@ def install_mpv_generator():
     tmp_root = _app_data_dir() / ".tmp"
     tmp_root.mkdir(parents=True, exist_ok=True)
     suffix = ".tar.gz" if entry["archive"] == "tar.gz" else ".zip"
-    archive_path = Path(tempfile.mkstemp(prefix="mpv-", suffix=suffix, dir=tmp_root)[1])
+    archive_fd, archive_name = tempfile.mkstemp(
+        prefix="mpv-", suffix=suffix, dir=tmp_root
+    )
+    os.close(archive_fd)
+    archive_path = Path(archive_name)
 
     extract_dest: Path | None = None
     try:

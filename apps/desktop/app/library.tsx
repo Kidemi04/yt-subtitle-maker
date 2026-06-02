@@ -9,7 +9,7 @@ import { useLibrary } from "../src/state/library";
 import { useMpvStatusPolling } from "../src/hooks/useMpvStatusPolling";
 import { useLibraryKeyboardNav } from "../src/hooks/useLibraryKeyboardNav";
 
-const NARROW_BREAKPOINT = 720;
+const NARROW_BREAKPOINT = 1040;
 
 function useViewportIsNarrow() {
   const [isNarrow, setIsNarrow] = useState(
@@ -56,7 +56,7 @@ export default function LibraryRoute() {
             <DetailPane />
           </YStack>
         ) : (
-          <LibraryPane />
+          <LibraryPane fullWidth />
         )}
       </YStack>
     );

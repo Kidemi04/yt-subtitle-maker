@@ -31,9 +31,10 @@ export const SETTINGS_INDEX: SearchEntry[] = [
     tab: "translation",
     label: "Active translation provider",
     keywords: [
-      "translate", "provider", "translator", "gemini", "deepseek", "groq",
-      "openrouter", "together", "mistral", "xai", "fireworks", "openai",
-      "local ai", "lm studio", "ollama", "custom", "api key", "endpoint",
+      "translate", "provider", "translator", "gemini", "deepseek",
+      "openrouter", "fireworks", "fireworks.ai", "openai", "claude",
+      "anthropic", "local ai", "lm studio", "ollama", "custom", "api key",
+      "endpoint", "model",
     ],
   },
   {
@@ -41,8 +42,9 @@ export const SETTINGS_INDEX: SearchEntry[] = [
     tab: "translation",
     label: "Add translation provider",
     keywords: [
-      "add provider", "new provider", "custom translator", "deepseek", "groq",
-      "openrouter", "together", "mistral", "xai", "fireworks", "openai",
+      "add provider", "new provider", "custom translator", "deepseek",
+      "openrouter", "fireworks", "fireworks.ai", "openai", "claude",
+      "anthropic", "model fetch",
     ],
   },
   { id: "translation.target-lang", tab: "translation", label: "Default target language", keywords: ["target", "language", "translate to"] },

@@ -19,6 +19,7 @@
 //     sentinel ("***") are never POSTed — the backend keeps the saved value.
 import * as React from "react";
 import { apiClient } from "../../state/client";
+import { formatErrorMessage } from "../../lib/errors";
 import type { AppConfig } from "@yt-subtitle-maker/api-client";
 import { MASK, SETTING_FIELD, tabOfSettingId, type TabId } from "./constants";
 
@@ -84,7 +85,7 @@ export function useSettingsDraft(): SettingsDraft {
         setConfig(c);
         setDraft(c);
       })
-      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : String(err)))
+      .catch((err) => !cancelled && setError(formatErrorMessage(err)))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -158,7 +159,7 @@ export function useSettingsDraft(): SettingsDraft {
         for (const k of sentKeys) n.add(k);
         return n;
       });
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatErrorMessage(err));
       setSaveStatus("error");
     } finally {
       inFlight.current = false;

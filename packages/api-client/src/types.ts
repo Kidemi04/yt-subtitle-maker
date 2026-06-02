@@ -42,7 +42,10 @@ export type SttEngine =
   | "openai-whisper"
   | "faster-whisper"
   | "whisperx"
-  | "insanely-fast-whisper";
+  | "insanely-fast-whisper"
+  | "whisper-cpp"
+  | "mlx-whisper"
+  | "stable-ts";
 export type WhisperModel =
   | "tiny"
   | "base"
@@ -376,6 +379,12 @@ export type InstallEvent =
   | { status: "done"; model: string; path?: string }
   | { status: "error"; error: string; recoverable?: boolean };
 
+export type InstallEngineEvent =
+  | { status: "resolving"; message: string }
+  | { status: "installing"; message: string }
+  | { status: "done"; engine: string; packageName: string }
+  | { status: "error"; error: string; recoverable?: boolean };
+
 // ─── System report (GET /api/system) ──────────────────────────────────────
 
 export interface GpuInfo {
@@ -414,10 +423,32 @@ export interface EngineModel {
   downloaded: boolean;
 }
 
+export interface EngineModelVariant {
+  name: string;
+  /** Optional model size when it matches the OpenAI Whisper checkpoint family. */
+  sizeMb?: number | null;
+  /** Short note for variants that require conversion or a different model format. */
+  note?: string | null;
+}
+
+export interface EnginePerformanceProfile {
+  /** Short relative speed label shown in settings. */
+  speed: string;
+  /** Best-fit workload or user goal. */
+  bestFor: string;
+  /** Main accuracy / setup / feature trade-off. */
+  tradeoff: string;
+  /** Human-readable hardware note, especially GPU acceleration details. */
+  hardware: string;
+}
+
 export interface EngineDescriptor {
   id: string;
   label: string;
   available: boolean;
+  installable?: boolean;
+  installed?: boolean;
+  packageName?: string | null;
   /** Package download size in MB; null if the engine is bundled (openai-whisper). */
   packageSizeMb: number | null;
   requirements: {
@@ -425,7 +456,9 @@ export interface EngineDescriptor {
     accelerators: string[];
   };
   models: EngineModel[];
+  modelVariants?: EngineModelVariant[];
   tunables: EngineTunable[];
+  performance?: EnginePerformanceProfile;
   note: string | null;
 }
 

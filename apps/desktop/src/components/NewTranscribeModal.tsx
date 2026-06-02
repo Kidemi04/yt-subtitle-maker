@@ -154,7 +154,7 @@ export function NewTranscribeModal({
           sttEngine,
           whisperModel: isYtCaptions ? null : whisperModel,
           whisperDevice: isYtCaptions ? null : whisperDevice,
-          vadEnabled: isYtCaptions ? false : vadEnabled,
+          vadEnabled: false,
           sourceLang,
         },
         abort.signal,
@@ -238,12 +238,14 @@ export function NewTranscribeModal({
             <XStack alignItems="center" justifyContent="space-between">
               <YStack gap={2} flex={1}>
                 <BodySm>Voice Activity Detection</BodySm>
-                <Caption>Skip silence; faster on long videos.</Caption>
+                <Caption>
+                  Not active with the current OpenAI Whisper adapter.
+                </Caption>
               </YStack>
               <Toggle
-                value={vadEnabled}
+                value={false}
                 onValueChange={setVadEnabled}
-                disabled={phase === "transcribing"}
+                disabled
                 aria-label="VAD"
               />
             </XStack>

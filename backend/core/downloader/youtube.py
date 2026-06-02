@@ -48,6 +48,7 @@ def download_audio(
     cookie_browser: str = "",
     cookie_profile: str = "",
     cookies_txt_path: str = "",
+    resample_16k: bool = True,
     progress: Callable[[dict], None] | None = None,
 ) -> tuple[str, float]:
     """Download YouTube audio. Returns (audio_path, duration_seconds).
@@ -84,9 +85,9 @@ def download_audio(
                 "key": "FFmpegMetadata",
             },
         ],
-        # Convert to 16kHz mono via FFmpeg postprocessor args
-        "postprocessor_args": ["-ar", "16000", "-ac", "1"],
     }
+    if resample_16k:
+        opts["postprocessor_args"] = ["-ar", "16000", "-ac", "1"]
     opts.update(build_cookie_opts(cookie_browser, cookie_profile, cookies_txt_path))
     opts.update(build_js_runtime_opts(load_config().js_runtime_path))
 

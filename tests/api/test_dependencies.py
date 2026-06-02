@@ -1,5 +1,6 @@
 import hashlib
 import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -124,6 +125,64 @@ def test_dependencies_install_planned_engine_returns_error():
     assert "faster-whisper" in body["error"]
 
 
+def test_install_engine_rejects_unknown_addon():
+    resp = client.post("/api/dependencies/install-engine", json={"engine": "nope"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert "Unknown add-on engine" in body["error"]
+
+
+@patch("api.routes.dependencies.install_stt_engine_addon_generator")
+@patch("api.routes.dependencies.check_stt_engine_addon")
+def test_install_engine_streams_ndjson(mock_check, mock_gen):
+    mock_check.return_value = False
+
+    def fake_events(engine):
+        yield {"status": "resolving", "message": f"installing {engine}"}
+        yield {"status": "installing", "message": "Collecting faster-whisper"}
+        yield {
+            "status": "done",
+            "engine": engine,
+            "packageName": "faster-whisper",
+        }
+
+    mock_gen.side_effect = fake_events
+
+    resp = client.post(
+        "/api/dependencies/install-engine",
+        json={"engine": "faster-whisper"},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/x-ndjson")
+
+    import json as _json
+
+    lines = [_json.loads(line) for line in resp.text.strip().split("\n") if line.strip()]
+    assert [line["status"] for line in lines] == ["resolving", "installing", "done"]
+    assert lines[-1]["engine"] == "faster-whisper"
+
+
+@patch("api.routes.dependencies.check_stt_engine_addon")
+def test_install_engine_already_installed_returns_done(mock_check):
+    mock_check.return_value = True
+    resp = client.post(
+        "/api/dependencies/install-engine",
+        json={"engine": "faster-whisper"},
+    )
+    assert resp.status_code == 200
+    import json as _json
+
+    lines = [_json.loads(line) for line in resp.text.strip().split("\n") if line.strip()]
+    assert lines == [
+        {
+            "status": "done",
+            "engine": "faster-whisper",
+            "packageName": "faster-whisper",
+        }
+    ]
+
+
 # ── Task 2: check_mpv_status() lookup-order priority ──────────────────────────
 
 
@@ -245,7 +304,8 @@ def test_install_mpv_generator_streams_events(tmp_path, monkeypatch):
 
     final = events[-1]
     assert final["path"].endswith("mpv") or final["path"].endswith("mpv.exe")
-    assert (tmp_path / "bin" / "mpv").exists()  # binary copied into place
+    binary_name = "mpv.exe" if sys.platform == "win32" else "mpv"
+    assert (tmp_path / "bin" / binary_name).exists()  # binary copied into place
 
 
 def test_install_mpv_generator_sha_mismatch(tmp_path, monkeypatch):
