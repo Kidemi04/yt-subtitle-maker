@@ -16,6 +16,7 @@ import { YStack } from "tamagui";
 import { SegmentedControl } from "@yt-subtitle-maker/ui";
 import type { SegmentedControlOption } from "@yt-subtitle-maker/ui";
 import type { AppConfig } from "@yt-subtitle-maker/api-client";
+import { deriveSourceModeFromConfig } from "../../state/generateSelection";
 import { SettingRow } from "./shared";
 
 type SourceMode = "auto" | "whisper" | "yt_captions";
@@ -26,11 +27,6 @@ const SOURCE_OPTIONS: ReadonlyArray<SegmentedControlOption<SourceMode>> = [
   { label: "YouTube captions only", value: "yt_captions" },
 ];
 
-function deriveMode(draft: AppConfig): SourceMode {
-  if (draft.defaultSttEngine === "yt_captions") return "yt_captions";
-  return draft.ytCaptionsFirst ? "auto" : "whisper";
-}
-
 interface Props {
   draft: AppConfig;
   update: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
@@ -39,7 +35,7 @@ interface Props {
 }
 
 export function SourceModeControl({ draft, update, prevWhisperEngine }: Props) {
-  const current = deriveMode(draft);
+  const current = deriveSourceModeFromConfig(draft);
 
   const handleChange = (mode: SourceMode) => {
     if (mode === "auto") {
