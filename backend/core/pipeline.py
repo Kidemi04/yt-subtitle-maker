@@ -123,6 +123,11 @@ def _make_translator(request: dict, cfg: AppConfig):
             # look up the entry by id and build an OpenAICompatTranslator from
             # the saved credentials. Override on a shallow copy so cfg itself
             # isn't mutated.
+            profile_id = override_provider[len("custom:"):]
+            if not any(e.get("id") == profile_id for e in cfg.custom_translators):
+                raise ValueError(
+                    f"unknown custom translator profile: {profile_id!r}"
+                )
             tmp_cfg = copy.copy(cfg)
             tmp_cfg.active_translator = override_provider
             return get_active_translator(tmp_cfg)

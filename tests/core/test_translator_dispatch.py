@@ -1,6 +1,8 @@
 """Tests for get_active_translator — the AppConfig-aware dispatcher."""
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from core.config import AppConfig
 from core.translator import get_active_translator
 from core.translator.gemini import GeminiTranslator
@@ -132,6 +134,25 @@ def test_pipeline_per_job_override_custom_profile():
             assert cfg_arg.active_translator == "custom:deepseek-1"
             # And the original cfg must NOT have been mutated.
             assert cfg.active_translator == "gemini"
+
+
+def test_pipeline_per_job_override_missing_custom_profile_raises_without_dispatch():
+    from core.pipeline import _make_translator
+
+    cfg = AppConfig()
+    cfg.custom_translators = []
+    cfg.active_translator = "gemini"
+
+    with patch("core.pipeline.get_active_translator") as mock_gat:
+        with patch("core.pipeline.get_translator") as mock_gt:
+            with pytest.raises(
+                ValueError,
+                match="unknown custom translator profile.*nope",
+            ):
+                _make_translator({"translatorProvider": "custom:nope"}, cfg)
+
+            mock_gat.assert_not_called()
+            mock_gt.assert_not_called()
 
 
 def test_pipeline_resolved_provider_uses_active_translator_without_override():
