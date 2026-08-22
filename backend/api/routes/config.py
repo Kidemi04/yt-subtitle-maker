@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body
 
-from core.config import AppConfig, load_config, save_config
+from core.config import AppConfig, last_load_error, load_config, save_config
 from core.dependency_manager import get_whisper_cache_dir
 
 router = APIRouter(prefix="/api", tags=["config"])
@@ -145,6 +145,10 @@ def _config_response(cfg: AppConfig) -> dict:
     defaults_out = _mask_secrets(_to_camel(defaults_d))
     defaults_out["customTranslators"] = _mask_profile_keys(defaults_profiles)
     out["_defaults"] = defaults_out
+    # Non-null when the config on disk was damaged or held invalid values, so
+    # the UI can say "your settings were quarantined" instead of silently
+    # presenting defaults that look like a reset.
+    out["_loadError"] = last_load_error()
     return out
 
 

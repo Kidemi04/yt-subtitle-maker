@@ -1,14 +1,34 @@
-"""User configuration. Persisted to ~/.yt_subtitle_tool/config.json."""
+"""User configuration. Persisted to ~/.yt_subtitle_tool/config.json.
+
+Persistence contract (matters because this file holds the user's API keys):
+
+* **Writes are atomic.** `save_config` writes a sibling temp file, fsyncs it,
+  then `os.replace`s it over the real one. A crash or quit mid-write can no
+  longer leave a truncated `config.json`.
+* **Corruption is never silent.** An unreadable/unparseable config is moved
+  aside to `config.json.corrupt-<n>` and recorded in `last_load_error()`
+  instead of being discarded. Previously a truncated file made every setting
+  — API keys included — revert to defaults with no warning, and the next
+  autosave overwrote the original for good.
+* **Values are validated.** `AppConfig` is a plain dataclass, so nothing
+  type-checks the JSON on the way in. `_coerce` does that explicitly:
+  garbage like `sub_font_size="not-a-number"` used to flow straight through
+  into an mpv command line.
+* **The file is 0600.** It contains plaintext provider keys.
+"""
 from __future__ import annotations
 
+import contextlib
 import json
 import os
-from dataclasses import asdict, dataclass, field
+import tempfile
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args, get_origin, get_type_hints
 
 CONFIG_FILENAME = "config.json"
 CONFIG_DIR_NAME = ".yt_subtitle_tool"
+CONFIG_MODE = 0o600
 
 
 def config_dir() -> Path:
@@ -36,7 +56,11 @@ class AppConfig:
     default_stt_engine: str = "openai-whisper"
     default_whisper_model: str = "turbo"
     default_whisper_device: str = "auto"
-    default_source_lang: str = "en"      # NOT 'auto' — see spec §14 #6
+    # "auto" lets each Whisper engine run its own language detection. The old
+    # default was a hard-coded "en", which silently mis-transcribed every
+    # non-English video: Whisper doesn't error on a wrong forced language, it
+    # confidently emits garbage. Users who want a pinned language still set one.
+    default_source_lang: str = "auto"
     yt_captions_first: bool = False
     vad_enabled: bool = True
     ffmpeg_resample_16k: bool = True
@@ -151,20 +175,217 @@ def _migrate_config(data: dict) -> dict:
     return data
 
 
+# ─── Validation ──────────────────────────────────────────────────────────────
+# AppConfig is a dataclass, so neither the annotations nor the `Literal`s are
+# enforced at construction. These tables are the enforcement.
+
+# field -> (min, max). Upper bounds are "clearly a mistake" guards, not taste:
+# a 10^9-pixel margin is not a preference, it's a corrupt file.
+_NUM_BOUNDS: dict[str, tuple[float, float]] = {
+    "sub_font_size": (0, 400),
+    "sub_margin_y": (0, 2000),
+    "sub_border_size": (-1, 50),
+}
+
+# Allowed values for plain-`str` fields that are really enums. Fields already
+# annotated `Literal[...]` don't belong here — `_coerce` checks those against
+# the annotation itself.
+_ENUMS: dict[str, set[str]] = {
+    "default_whisper_device": {"auto", "cpu", "gpu", "cuda"},
+}
+
+_last_load_error: str | None = None
+
+
+def last_load_error() -> str | None:
+    """Why the most recent `load_config()` fell back to defaults, if it did.
+
+    `None` on a clean load. Surfaced through GET /api/config so a corrupt
+    config is visible in the UI instead of looking like a settings reset.
+    """
+    return _last_load_error
+
+
+def _defaults() -> dict:
+    return asdict(AppConfig())
+
+
+def _coerce(data: dict) -> tuple[dict, list[str]]:
+    """Drop/repair values that don't match their declared field type.
+
+    Returns the cleaned dict plus a human-readable note per rejected value.
+    Anything unrecognised is dropped (not guessed at) so a bad edit degrades
+    to the default for that one field instead of failing the whole load.
+    """
+    hints = get_type_hints(AppConfig)
+    defaults = _defaults()
+    known = {f.name for f in fields(AppConfig)}
+    out: dict = {}
+    notes: list[str] = []
+
+    def reject(key: str, default: object, why: str) -> None:
+        # Takes key/default as arguments rather than closing over the loop
+        # variables — a closure here would report whichever field the loop
+        # happened to be on when it ran.
+        notes.append(f"{key}: {why}; using default {default!r}")
+
+    for key, value in data.items():
+        if key not in known:
+            continue  # tolerate configs from older/newer versions
+        want = hints[key]
+        default = defaults[key]
+
+        # Literal[...] — the annotation the dataclass never checked.
+        if get_origin(want) is Literal:
+            if value in get_args(want):
+                out[key] = value
+            else:
+                reject(key, default, f"{value!r} is not one of {list(get_args(want))}")
+            continue
+
+        if want is bool:
+            if isinstance(value, bool):
+                out[key] = value
+            else:
+                reject(key, default, f"{value!r} is not a boolean")
+            continue
+
+        if want in (int, float):
+            # bool is an int subclass; a boolean here is a type error.
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                reject(key, default, f"{value!r} is not a number")
+                continue
+            lo, hi = _NUM_BOUNDS.get(key, (float("-inf"), float("inf")))
+            if not (lo <= value <= hi):
+                reject(key, default, f"{value!r} is outside {lo}..{hi}")
+                continue
+            out[key] = int(value) if want is int else float(value)
+            continue
+
+        if want is str:
+            if not isinstance(value, str):
+                reject(key, default, f"{value!r} is not a string")
+                continue
+            allowed = _ENUMS.get(key)
+            if allowed is not None and value not in allowed:
+                reject(key, default, f"{value!r} is not one of {sorted(allowed)}")
+                continue
+            out[key] = value
+            continue
+
+        if get_origin(want) is list:
+            if isinstance(value, list):
+                out[key] = value
+            else:
+                reject(key, default, f"{value!r} is not a list")
+            continue
+
+        if get_origin(want) is dict:
+            if isinstance(value, dict) and all(
+                isinstance(k, str) and isinstance(v, str) for k, v in value.items()
+            ):
+                out[key] = value
+            else:
+                reject(key, default, f"{value!r} is not a string->string mapping")
+            continue
+
+        out[key] = value  # no rule for this shape — pass through unchanged
+
+    return out, notes
+
+
+def _quarantine(p: Path, reason: str) -> str:
+    """Move an unusable config aside so its contents (API keys!) survive.
+
+    Returns the path we moved it to, or "" if even that failed — in which
+    case we still refuse to overwrite it silently.
+    """
+    for n in range(1, 100):
+        target = p.with_suffix(p.suffix + f".corrupt-{n}")
+        if not target.exists():
+            try:
+                p.replace(target)
+                return str(target)
+            except OSError:
+                return ""
+    return ""
+
+
 def load_config() -> AppConfig:
+    global _last_load_error
+    _last_load_error = None
+
     p = config_path()
     if not p.exists():
         return AppConfig()
+
+    # Tighten permissions on a config written by an older build, so the fix
+    # applies to existing installs instead of only to the next save.
+    with contextlib.suppress(OSError):
+        if p.stat().st_mode & 0o077:
+            os.chmod(p, CONFIG_MODE)
+
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-        data = _migrate_config(data)
-        # Filter out unknown keys to tolerate older configs
-        valid = {k: v for k, v in data.items() if k in AppConfig.__dataclass_fields__}
-        return AppConfig(**valid)
-    except Exception:
+        raw = p.read_text(encoding="utf-8")
+    except OSError as e:
+        _last_load_error = f"Could not read {p}: {e}. Using defaults."
+        return AppConfig()
+
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("top-level JSON value is not an object")
+    except Exception as e:
+        moved = _quarantine(p, str(e))
+        _last_load_error = (
+            f"{p.name} is not valid JSON ({e}). "
+            + (
+                f"Your previous settings were kept at {moved} — the app started "
+                "with defaults so nothing overwrites them."
+                if moved
+                else "Could not move the damaged file aside; settings were NOT "
+                "overwritten, but the app started with defaults."
+            )
+        )
+        return AppConfig()
+
+    data = _migrate_config(data)
+    cleaned, notes = _coerce(data)
+    if notes:
+        _last_load_error = "Some settings were invalid and reset: " + "; ".join(notes)
+
+    try:
+        return AppConfig(**cleaned)
+    except Exception as e:
+        # Shouldn't happen after _coerce, but never take the user's file down
+        # with us if it does.
+        _last_load_error = f"Could not apply {p.name} ({e}). Using defaults."
         return AppConfig()
 
 
 def save_config(cfg: AppConfig) -> None:
-    config_dir().mkdir(parents=True, exist_ok=True)
-    config_path().write_text(json.dumps(asdict(cfg), indent=2), encoding="utf-8")
+    """Persist atomically at 0600.
+
+    temp file in the same directory -> fsync -> os.replace. The rename is
+    atomic on POSIX and Windows (same volume), so a reader either sees the
+    whole old file or the whole new one, never a half-written one.
+    """
+    d = config_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    target = config_path()
+    payload = json.dumps(asdict(cfg), indent=2)
+
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(d), prefix=CONFIG_FILENAME + ".", suffix=".tmp"
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(tmp, CONFIG_MODE)  # before it becomes visible under the real name
+        os.replace(tmp, target)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise

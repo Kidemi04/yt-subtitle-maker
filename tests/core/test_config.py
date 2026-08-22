@@ -13,9 +13,17 @@ def test_default_translator_provider_is_gemini():
     assert cfg.translator_provider == "gemini"
 
 
-def test_default_source_lang_is_english_not_auto():
+def test_default_source_lang_is_auto():
+    """Detection is the safe default; a wrong pinned language is not.
+
+    This asserted "en" while `sourceLang="auto"` was rejected API-side. That
+    combination silently mis-transcribed every non-English video, because
+    Whisper forced to the wrong language emits confident nonsense rather than
+    an error. "auto" is now accepted end-to-end and every engine maps it to
+    its own detection path.
+    """
     cfg = AppConfig()
-    assert cfg.default_source_lang == "en"
+    assert cfg.default_source_lang == "auto"
 
 
 def test_save_and_load_roundtrip(tmp_path: Path, monkeypatch):
