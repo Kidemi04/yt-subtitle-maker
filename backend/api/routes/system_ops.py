@@ -14,8 +14,8 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from core import config as cfgmod
 from api.routes.library import _resolve_sub_font
+from core import config as cfgmod
 
 router = APIRouter(prefix="/api/system", tags=["system_ops"])
 
