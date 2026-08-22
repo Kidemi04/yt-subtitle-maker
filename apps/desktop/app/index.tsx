@@ -39,13 +39,10 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { useGenerate } from "../src/state/generate";
 import {
-  type GenerateSelectionDirty,
   type GenerateSelectionFields,
-  type GenerateSelectionOverrides,
   isTranslatorProviderAvailable,
   mergeGenerateSelection,
   selectionDefaultsFromConfig,
-  setGenerateSelectionField,
 } from "../src/state/generateSelection";
 import { apiClient } from "../src/state/client";
 import { useSettings } from "../src/components/settings/SettingsContext";
@@ -65,6 +62,24 @@ const BUILTIN_TRANSLATOR_LABELS: Record<string, string> = {
   gemini: "Gemini",
   local_openai: "Local AI",
 };
+
+// Human-readable names for the per-job override notice.
+const OVERRIDE_FIELD_LABELS: Partial<Record<keyof GenerateSelectionFields, string>> = {
+  sttSource: "subtitle source",
+  sttEngine: "engine",
+  whisperModel: "model",
+  whisperDevice: "device",
+  vadEnabled: "VAD",
+  sourceLang: "source language",
+  enableTranslation: "translation",
+  targetLang: "target language",
+  translatorProvider: "translator",
+  downloadOnly: "download-only",
+};
+
+function FIELD_LABELS_FOR_OVERRIDE(key: keyof GenerateSelectionFields): string {
+  return OVERRIDE_FIELD_LABELS[key] ?? key;
+}
 
 /* ───────────── helpers ───────────── */
 
@@ -229,6 +244,10 @@ export default function Generate() {
     runPipeline,
     cancel,
     reset,
+    selectionOverrides,
+    selectionDirty,
+    setSelectionField,
+    clearSelection,
   } = useGenerate();
 
   // Translation-may-fail banner — reads last test result from SettingsContext
@@ -272,10 +291,6 @@ export default function Generate() {
 
   const [configureOpen, setConfigureOpen] = React.useState(false);
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
-  const [selectionOverrides, setSelectionOverrides] =
-    React.useState<GenerateSelectionOverrides>({});
-  const [selectionDirty, setSelectionDirty] =
-    React.useState<GenerateSelectionDirty>({});
 
   const selectionDefaults = React.useMemo(
     () =>
@@ -293,14 +308,18 @@ export default function Generate() {
     [selectionDefaults, selectionOverrides, selectionDirty],
   );
 
-  const setJobField = React.useCallback(
-    <K extends keyof GenerateSelectionFields>(
-      key: K,
-      value: GenerateSelectionFields[K],
-    ) => {
-      setGenerateSelectionField(key, value, setSelectionOverrides, setSelectionDirty);
-    },
-    [],
+  const setJobField = setSelectionField;
+
+  // Which fields this job overrides relative to the Settings defaults. Shown
+  // to the user so a lingering override is visible rather than silently
+  // applied — that visibility is what makes it safe for overrides to outlive
+  // navigation instead of being wiped on unmount.
+  const overriddenFields = React.useMemo(
+    () =>
+      (Object.keys(selectionDirty) as (keyof GenerateSelectionFields)[]).filter(
+        (key) => selectionDirty[key] && selection[key] !== selectionDefaults[key],
+      ),
+    [selectionDirty, selection, selectionDefaults],
   );
 
   const {
@@ -681,6 +700,13 @@ export default function Generate() {
                   <ChevronRight size={16} color="$textSecondary" />
                 )}
                 <TitleMd>Configure</TitleMd>
+                {overriddenFields.length > 0 ? (
+                  // Visible even while the panel is collapsed — an override the
+                  // user can't see is an override they'll forget they set.
+                  <BadgePill tone="accent">
+                    {overriddenFields.length} overridden
+                  </BadgePill>
+                ) : null}
               </XStack>
               <Caption>
                 {sttSource === "auto"
@@ -698,6 +724,28 @@ export default function Generate() {
 
             {configureOpen ? (
               <YStack gap="$lg">
+                {overriddenFields.length > 0 ? (
+                  <XStack
+                    alignItems="center"
+                    justifyContent="space-between"
+                    gap="$sm"
+                    paddingHorizontal="$sm"
+                    paddingVertical="$xs"
+                    borderRadius="$sm"
+                    backgroundColor="$accentSoft"
+                  >
+                    <Caption>
+                      This job overrides your saved defaults:{" "}
+                      {overriddenFields.map(FIELD_LABELS_FOR_OVERRIDE).join(", ")}
+                    </Caption>
+                    <ButtonGhost onPress={clearSelection}>
+                      <BodySm fontWeight="500" color="$textSecondary">
+                        Reset to defaults
+                      </BodySm>
+                    </ButtonGhost>
+                  </XStack>
+                ) : null}
+
                 {/* Subtitle source — mirrors Settings → Transcription →
                     SourceModeControl: a SegmentedControl over the three
                     modes that map onto defaultSttEngine + ytCaptionsFirst.
@@ -732,6 +780,7 @@ export default function Generate() {
                       onValueChange={(v) => setJobField("sourceLang", v)}
                       width="100%"
                       aria-label="Source language"
+                      allowAuto
                     />
                   </YStack>
                   <YStack flex={1} gap="$xs">
@@ -1302,8 +1351,9 @@ export default function Generate() {
                 </ButtonSecondary>
                 <ButtonGhost
                   onPress={() => {
-                    setSelectionOverrides({});
-                    setSelectionDirty({});
+                    // The one deliberate job boundary: a new transcription
+                    // starts from the Settings defaults again.
+                    clearSelection();
                     reset();
                   }}
                 >

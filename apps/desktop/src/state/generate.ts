@@ -7,6 +7,11 @@ import type {
 } from "@yt-subtitle-maker/api-client";
 import { apiClient } from "./client";
 import { formatErrorMessage } from "../lib/errors";
+import type {
+  GenerateSelectionDirty,
+  GenerateSelectionFields,
+  GenerateSelectionOverrides,
+} from "./generateSelection";
 
 /**
  * generate store — single-flight state machine for the Generate screen.
@@ -55,13 +60,40 @@ interface GenerateState {
   errorMessage?: string;
   abort?: AbortController;
 
+  /**
+   * Per-job overrides of the Settings-derived defaults, plus which fields the
+   * user actually touched (`mergeGenerateSelection` follows Settings for every
+   * field that isn't dirty).
+   *
+   * These live in the store rather than in the Generate screen's local state so
+   * they survive navigation. As component state they were wiped on unmount —
+   * including when the user followed the screen's own "configure credentials"
+   * link to Settings, which meant fixing the problem the app asked you to fix
+   * silently discarded the setup you were in the middle of.
+   *
+   * Deliberately NOT persisted (this store has no `persist` middleware, unlike
+   * `useLibrary`): overrides are scoped to the session, so they can't quietly
+   * apply to unrelated videos days later. The explicit job boundary is
+   * `clearSelection()`, wired to "New transcription".
+   */
+  selectionOverrides: GenerateSelectionOverrides;
+  selectionDirty: GenerateSelectionDirty;
+
   setUrl: (url: string) => void;
   loadMetadata: () => Promise<void>;
   runPipeline: (
     req: Omit<ProcessRequest, "url"> & Partial<Pick<ProcessRequest, "url">>,
   ) => Promise<void>;
   cancel: () => void;
+  /** Clear job state (url, status, result). Leaves per-job selection intact so
+   *  "Try again" retries with the same settings. */
   reset: () => void;
+  setSelectionField: <K extends keyof GenerateSelectionFields>(
+    key: K,
+    value: GenerateSelectionFields[K],
+  ) => void;
+  /** Drop every per-job override, back to the Settings defaults. */
+  clearSelection: () => void;
 }
 
 const phaseFromEvent = (e: ProcessEvent): ProcessingPhase | undefined => {
@@ -82,9 +114,22 @@ const phaseFromEvent = (e: ProcessEvent): ProcessingPhase | undefined => {
 export const useGenerate = create<GenerateState>((set, get) => ({
   status: "idle",
   url: "",
+  selectionOverrides: {},
+  selectionDirty: {},
 
   setUrl(url) {
     set({ url, metadata: undefined, metaError: undefined });
+  },
+
+  setSelectionField(key, value) {
+    set((s) => ({
+      selectionOverrides: { ...s.selectionOverrides, [key]: value },
+      selectionDirty: { ...s.selectionDirty, [key]: true },
+    }));
+  },
+
+  clearSelection() {
+    set({ selectionOverrides: {}, selectionDirty: {} });
   },
 
   async loadMetadata() {

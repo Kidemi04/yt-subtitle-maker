@@ -8,6 +8,7 @@ import {
   YStack,
   Text,
   ScrollView,
+  Input,
 } from "tamagui";
 import {
   useFonts as useFraunces,
@@ -30,7 +31,6 @@ import {
   History as HistoryIcon,
   Settings as SettingsIcon,
   Info,
-  Bell,
   Terminal,
   X as XIcon,
   Trash2,
@@ -52,6 +52,7 @@ import {
 } from "@yt-subtitle-maker/ui";
 import { config } from "../tamagui.config";
 import { useLogs, type LogLevel } from "../src/state/logs";
+import { useLibrary } from "../src/state/library";
 import { apiClient } from "../src/state/client";
 import { anyModelInstalled } from "@yt-subtitle-maker/api-client";
 import { useGenerate } from "../src/state/generate";
@@ -235,10 +236,22 @@ function Sidebar({ compact = false }: { compact?: boolean }) {
 
 function Topbar({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
+  const router = useRouter();
   const title = ROUTE_TITLES[pathname] ?? "";
   const subtitle = ROUTE_SUBTITLES[pathname];
   const toggleDrawer = useLogs((s) => s.toggleDrawer);
   const showRouteTitle = pathname !== "/";
+
+  // Drives the same store field the Library route filters on, so typing here
+  // actually filters something. This used to be a static XStack + Caption that
+  // looked like a search field and swallowed every click.
+  const search = useLibrary((s) => s.search);
+  const setSearch = useLibrary((s) => s.setSearch);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    if (value && pathname !== "/library") router.push("/library");
+  };
 
   return (
     <XStack
@@ -265,19 +278,36 @@ function Topbar({ compact = false }: { compact?: boolean }) {
             height={40}
             alignItems="center"
             gap="$xs"
-            paddingHorizontal="$sm"
+            paddingLeft="$sm"
+            paddingRight="$xs"
             borderRadius="$pill"
             backgroundColor="$accentSoft"
           >
             <Search size={16} color="$textMuted" />
-            <Caption fontSize={15}>Search projects...</Caption>
+            <Input
+              flex={1}
+              unstyled
+              value={search}
+              onChangeText={handleSearch}
+              placeholder="Search projects..."
+              placeholderTextColor="$textMuted"
+              fontSize={15}
+              color="$textPrimary"
+              borderWidth={0}
+              backgroundColor="transparent"
+              outlineWidth={0}
+              aria-label="Search projects"
+            />
+            {search ? (
+              <IconButton
+                icon={<XIcon size={14} color="$textMuted" />}
+                aria-label="Clear search"
+                size={36}
+                onPress={() => setSearch("")}
+              />
+            ) : null}
           </XStack>
         )}
-        <IconButton
-          icon={<Bell size={22} color="$textSecondary" />}
-          aria-label="Notifications"
-          size={44}
-        />
         <IconButton
           icon={<Terminal size={22} color="$textSecondary" />}
           aria-label="Toggle logs (⌘L)"

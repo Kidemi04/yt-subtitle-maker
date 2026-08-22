@@ -1,4 +1,3 @@
-import type * as React from "react";
 import type {
   AppConfig,
   DependencyStatus,
@@ -37,7 +36,9 @@ export const FALLBACK_SELECTION: GenerateSelectionFields = {
   whisperModel: "turbo",
   whisperDevice: "auto",
   vadEnabled: false,
-  sourceLang: "en",
+  // Matches AppConfig.default_source_lang. Detection beats a wrong guess:
+  // Whisper forced to the wrong language emits confident nonsense, not an error.
+  sourceLang: "auto",
   enableTranslation: false,
   targetLang: "zh-CN",
   translatorProvider: "gemini",
@@ -164,12 +165,6 @@ export function mergeGenerateSelection(
   };
 }
 
-export function setGenerateSelectionField<K extends keyof GenerateSelectionFields>(
-  key: K,
-  value: GenerateSelectionFields[K],
-  setOverrides: React.Dispatch<React.SetStateAction<GenerateSelectionOverrides>>,
-  setDirty: React.Dispatch<React.SetStateAction<GenerateSelectionDirty>>,
-): void {
-  setOverrides((current) => ({ ...current, [key]: value }));
-  setDirty((current) => ({ ...current, [key]: true }));
-}
+// Field edits now go through `useGenerate.setSelectionField` — the overrides
+// live in the store so they survive navigation, so the old React-dispatcher
+// helper that used to drive component state has no callers left.

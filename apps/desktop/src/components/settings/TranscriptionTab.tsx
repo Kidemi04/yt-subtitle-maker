@@ -115,13 +115,14 @@ export function TranscriptionTab() {
           <SettingRow
             id="transcription.source-lang"
             label="Default source language"
-            helper="Setting a default prevents Whisper misdetection on intros / music."
+            helper="Pinning a language prevents Whisper misdetection on intros / music. Auto detect is safer for mixed-language libraries."
           >
             <LanguagePicker
               value={draft.defaultSourceLang}
               onValueChange={(v) => update("defaultSourceLang", v)}
               width="100%"
               aria-label="Default source language"
+              allowAuto
             />
           </SettingRow>
         </YStack>
