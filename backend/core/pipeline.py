@@ -17,9 +17,12 @@ share locks and stay consistent.
 """
 from __future__ import annotations
 
+import contextlib
 import copy
+import inspect
 import os
 import re
+import shutil
 import threading
 import time
 from collections.abc import Callable
@@ -32,6 +35,7 @@ from core.stt import get_provider
 from core.stt.base import TranscriptionProvider, TranscriptionResult
 from core.stt.yt_captions import YtCaptionsProvider
 from core.translator import get_active_translator, get_translator
+from core.translator.retry import translated_count
 
 # yt-dlp's `_percent_str` may include ANSI color codes (e.g. "\x1b[0;94m  0.0%\x1b[0m")
 # when its console output is colorized. We strip those before parsing.
@@ -147,6 +151,39 @@ def _make_translator(request: dict, cfg: AppConfig):
     return get_active_translator(cfg)
 
 
+def _translate_segments_compat(
+    translator,
+    segments,
+    target_lang: str,
+    *,
+    progress: Callable[[float], None],
+    on_notice: Callable[[str], None],
+) -> None:
+    """Call `translate_segments`, passing `on_notice` only if it's accepted.
+
+    `on_notice` (retry notifications) is a later addition to the
+    TranslationProvider protocol. Probing the signature keeps any provider
+    that predates it working instead of dying on an unexpected-keyword
+    TypeError — which is exactly what a translator is least able to afford,
+    since by then the transcript is already on disk.
+    """
+    accepts_notice = False
+    try:
+        params = inspect.signature(translator.translate_segments).parameters
+        accepts_notice = "on_notice" in params or any(
+            p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+    except (TypeError, ValueError):
+        pass  # builtins / C callables have no introspectable signature
+
+    if accepts_notice:
+        translator.translate_segments(
+            segments, target_lang, progress=progress, on_notice=on_notice
+        )
+    else:
+        translator.translate_segments(segments, target_lang, progress=progress)
+
+
 def _seed_metadata(
     folder: Path,
     *,
@@ -170,7 +207,55 @@ def _seed_metadata(
     )
 
 
+def _folder_for(request: dict, cfg: AppConfig) -> Path:
+    """The output folder this run targets. Pure — safe to call before the run."""
+    title = request.get("_meta_title", "")
+    video_id = request["_video_id"]
+    return Path(cfg.output_dir or "output", safe_folder_name(title, video_id, ascii_only=False))
+
+
+def _prune_if_barren(folder: Path) -> None:
+    """Delete a run folder that holds no actual output.
+
+    `list_library()` treats *any* directory named `<title>_<videoId>` as a
+    library entry, so a run that died during download used to leave a ghost
+    the user could click into and find nothing. Only removes folders whose
+    sole content is the sidecar we seeded ourselves — never touches real
+    transcripts, translations, or audio.
+    """
+    if not folder.is_dir():
+        return
+    for path in folder.rglob("*"):
+        if path.is_dir():
+            continue
+        if path.name != "_history.json":
+            return  # real output exists — leave the folder alone
+    # Best-effort tidy-up; never mask the original failure.
+    with contextlib.suppress(OSError):
+        shutil.rmtree(folder)
+
+
 def run_pipeline(
+    url: str,
+    request: dict,
+    cfg: AppConfig,
+    on_event: Callable[[dict], None],
+    cancel_event: threading.Event | None = None,
+) -> None:
+    """Run the chain, leaving no half-built library folder behind on failure."""
+    folder = _folder_for(request, cfg)
+    pre_existing = folder.exists()
+    try:
+        _run_pipeline(url, request, cfg, on_event, cancel_event=cancel_event)
+    except BaseException:
+        # Re-runs against an existing video must never lose the folder, so
+        # only clean up something this run created.
+        if not pre_existing:
+            _prune_if_barren(folder)
+        raise
+
+
+def _run_pipeline(
     url: str,
     request: dict,
     cfg: AppConfig,
@@ -185,8 +270,7 @@ def run_pipeline(
     # focused on the chain. Caller passes title via request['_meta_title'].
     title = request.get("_meta_title", "")
     video_id = request["_video_id"]
-    folder_name = safe_folder_name(title, video_id, ascii_only=False)
-    folder = Path(cfg.output_dir or "output", folder_name)
+    folder = _folder_for(request, cfg)
     folder.mkdir(parents=True, exist_ok=True)
 
     _seed_metadata(
@@ -335,50 +419,102 @@ def run_pipeline(
             _check_cancel(cancel_event)
             on_event({"status": "translating", "progress": p})
 
-        translator.translate_segments(
-            result.segments,
-            request["targetLang"],
-            progress=_tx_progress,
-        )
-        _check_cancel(cancel_event)
-
-        if cfg.auto_translate_title and title:
-            title_translated = translator.translate_title(title, request["targetLang"])
-            library_runs.update_metadata(folder, title_translated=title_translated)
-
-        translate_duration_ms = int((time.monotonic() - translate_started) * 1000)
+        def _tx_notice(msg: str) -> None:
+            # Retries used to be invisible: the run just looked stalled.
+            on_event({"status": "translating", "message": msg})
 
         translator_provider = _resolved_translator_provider(request, cfg)
         translator_model = _translator_model_for(translator_provider, request, cfg)
         tr_id = library_runs.translate_id(
             t_id, translator_provider, translator_model, request["targetLang"]
         )
-        translations_dir = folder / "translations"
-        translations_dir.mkdir(parents=True, exist_ok=True)
-        translated_filename = f"{tr_id}.srt"
-        translated_path = translations_dir / translated_filename
-        write_srt(
-            [
-                {"id": s.id, "start": s.start, "end": s.end, "translated": s.translated or ""}
-                for s in result.segments
-            ],
-            str(translated_path),
-            field="translated",
-        )
-        library_runs.append_translation(
-            folder,
-            {
-                "id": tr_id,
+
+        def _persist_translation(*, partial: bool) -> Path:
+            """Write the translation SRT + sidecar entry for whatever we have."""
+            translations_dir = folder / "translations"
+            translations_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{tr_id}.partial.srt" if partial else f"{tr_id}.srt"
+            path = translations_dir / filename
+            write_srt(
+                [
+                    {
+                        "id": s.id,
+                        "start": s.start,
+                        "end": s.end,
+                        "translated": s.translated or "",
+                    }
+                    for s in result.segments
+                ],
+                str(path),
+                field="translated",
+            )
+            entry = {
+                "id": f"{tr_id}-partial" if partial else tr_id,
                 "sourceTranscribeId": t_id,
                 "translator": translator_provider,
                 "translatorModel": translator_model,
                 "targetLang": request["targetLang"],
-                "filename": translated_filename,
+                "filename": filename,
                 "createdAt": library_runs._now_iso(),
-                "durationMs": translate_duration_ms,
+                "durationMs": int((time.monotonic() - translate_started) * 1000),
                 "segmentCount": len(result.segments),
-            },
-        )
+            }
+            if partial:
+                # Marked so the Library can show this as incomplete rather
+                # than passing a half-translated file off as finished.
+                entry["partial"] = True
+                entry["translatedSegmentCount"] = translated_count(result.segments)
+            library_runs.append_translation(folder, entry)
+            return path
+
+        try:
+            _translate_segments_compat(
+                translator,
+                result.segments,
+                request["targetLang"],
+                progress=_tx_progress,
+                on_notice=_tx_notice,
+            )
+        except BaseException as e:
+            # Segments are translated in place, so a mid-run failure still
+            # leaves real work on the table. Persist it — discarding hundreds
+            # of paid API calls because batch 19 of 20 timed out is the worst
+            # possible outcome for the user.
+            done = translated_count(result.segments)
+            if done:
+                saved = _persist_translation(partial=True)
+                on_event({
+                    "status": "warning",
+                    "message": (
+                        f"Translation stopped after {done}/{len(result.segments)} "
+                        f"segments ({e}). Partial subtitles saved to {saved.name}."
+                    ),
+                })
+            raise
+        _check_cancel(cancel_event)
+
+        # Duration is computed inside _persist_translation so the partial and
+        # complete paths report it identically.
+        translated_path = _persist_translation(partial=False)
+
+        # Title translation is cosmetic and runs LAST, after the SRT is safely
+        # on disk. It used to run before the write, which meant one failed
+        # one-line API call threw away a whole video's worth of paid
+        # translation. Never let it take the run down.
+        if cfg.auto_translate_title and title:
+            try:
+                title_translated = translator.translate_title(
+                    title, request["targetLang"]
+                )
+                if title_translated:
+                    library_runs.update_metadata(
+                        folder, title_translated=title_translated
+                    )
+            except Exception as e:
+                on_event({
+                    "status": "warning",
+                    "message": f"Subtitles saved; title translation failed: {e}",
+                })
 
     duration_ms = int((time.monotonic() - start_time) * 1000)
 

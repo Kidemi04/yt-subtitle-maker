@@ -7,6 +7,7 @@ from collections.abc import Callable
 from google import genai
 
 from core.stt.base import TranscriptionSegment
+from core.translator.retry import with_retries
 
 KNOWN_MODELS = [
     "gemini-2.5-flash-lite",
@@ -52,6 +53,7 @@ class GeminiTranslator:
         segments: list[TranscriptionSegment],
         target_lang: str,
         progress: Callable[[float], None] | None = None,
+        on_notice: Callable[[str], None] | None = None,
     ) -> None:
         if not self.api_key:
             raise ValueError("api_key required for Gemini translation")
@@ -62,12 +64,15 @@ class GeminiTranslator:
 
         for batch_start in range(0, total, BATCH_SIZE):
             batch = segments[batch_start : batch_start + BATCH_SIZE]
-            self._translate_batch(batch, target_lang)
+            self._translate_batch(batch, target_lang, on_notice=on_notice)
             if progress:
                 progress(min(1.0, (batch_start + len(batch)) / total))
 
     def _translate_batch(
-        self, batch: list[TranscriptionSegment], target_lang: str
+        self,
+        batch: list[TranscriptionSegment],
+        target_lang: str,
+        on_notice: Callable[[str], None] | None = None,
     ) -> None:
         if not batch:
             return
@@ -79,10 +84,21 @@ class GeminiTranslator:
             f"The output array MUST have EXACTLY {len(batch)} elements.\n\n"
             f"{numbered}"
         )
-        resp = self._client.models.generate_content(
-            model=self.model,
-            contents=prompt,
+        resp = with_retries(
+            lambda: self._client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+            ),
+            label=f"Gemini batch of {len(batch)}",
+            on_retry=on_notice,
         )
+        # `.text` is None when the response was blocked or returned no
+        # candidate — treat as a failed batch rather than an AttributeError.
+        if resp.text is None:
+            raise RuntimeError(
+                "Gemini returned no text (response blocked or empty) for a "
+                f"batch of {len(batch)} segments"
+            )
         text = resp.text.strip()
         # Strip optional code fences
         if text.startswith("```"):
@@ -102,17 +118,22 @@ class GeminiTranslator:
                 f"Gemini returned {len(translations)} translations for 1 segment"
             )
         mid = len(batch) // 2
-        self._translate_batch(batch[:mid], target_lang)
-        self._translate_batch(batch[mid:], target_lang)
+        self._translate_batch(batch[:mid], target_lang, on_notice=on_notice)
+        self._translate_batch(batch[mid:], target_lang, on_notice=on_notice)
 
     def translate_title(self, title: str, target_lang: str) -> str:
         if not self.api_key:
             raise ValueError("api_key required for Gemini translation")
-        resp = self._client.models.generate_content(
-            model=self.model,
-            contents=(
-                f"Translate this YouTube video title to {target_lang}. "
-                f"Output ONLY the translation, no quotes, no explanation:\n{title}"
+        resp = with_retries(
+            lambda: self._client.models.generate_content(
+                model=self.model,
+                contents=(
+                    f"Translate this YouTube video title to {target_lang}. "
+                    f"Output ONLY the translation, no quotes, no explanation:\n{title}"
+                ),
             ),
+            label="Gemini title translation",
         )
+        if resp.text is None:
+            raise RuntimeError("Gemini returned no text for the title")
         return resp.text.strip().strip('"').strip("'")

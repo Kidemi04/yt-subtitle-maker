@@ -15,6 +15,7 @@ from collections.abc import Callable
 from openai import OpenAI
 
 from core.stt.base import TranscriptionSegment
+from core.translator.retry import with_retries
 
 BATCH_SIZE = 30  # smaller than Gemini because local LLMs have shorter contexts
 
@@ -64,6 +65,7 @@ class OpenAICompatTranslator:
         segments: list[TranscriptionSegment],
         target_lang: str,
         progress: Callable[[float], None] | None = None,
+        on_notice: Callable[[str], None] | None = None,
     ) -> None:
         total = len(segments)
         if total == 0:
@@ -71,12 +73,15 @@ class OpenAICompatTranslator:
 
         for batch_start in range(0, total, BATCH_SIZE):
             batch = segments[batch_start : batch_start + BATCH_SIZE]
-            self._translate_batch(batch, target_lang)
+            self._translate_batch(batch, target_lang, on_notice=on_notice)
             if progress:
                 progress(min(1.0, (batch_start + len(batch)) / total))
 
     def _translate_batch(
-        self, batch: list[TranscriptionSegment], target_lang: str
+        self,
+        batch: list[TranscriptionSegment],
+        target_lang: str,
+        on_notice: Callable[[str], None] | None = None,
     ) -> None:
         if not batch:
             return
@@ -87,15 +92,24 @@ class OpenAICompatTranslator:
             f"line, in the same order. Do not merge or split lines. "
             f"The output array MUST have EXACTLY {len(batch)} elements."
         )
-        resp = self._client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": numbered},
-            ],
-            temperature=0.2,
+        resp = with_retries(
+            lambda: self._client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": numbered},
+                ],
+                temperature=0.2,
+            ),
+            label=f"{self.name} batch of {len(batch)}",
+            on_retry=on_notice,
         )
-        text = resp.choices[0].message.content.strip()
+        content = resp.choices[0].message.content
+        if content is None:
+            raise RuntimeError(
+                f"{self.name} returned an empty message for a batch of {len(batch)}"
+            )
+        text = content.strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         translations = json.loads(text)
@@ -116,21 +130,27 @@ class OpenAICompatTranslator:
                 f"Translator returned {len(translations)} for 1 segment"
             )
         mid = len(batch) // 2
-        self._translate_batch(batch[:mid], target_lang)
-        self._translate_batch(batch[mid:], target_lang)
+        self._translate_batch(batch[:mid], target_lang, on_notice=on_notice)
+        self._translate_batch(batch[mid:], target_lang, on_notice=on_notice)
 
     def translate_title(self, title: str, target_lang: str) -> str:
-        resp = self._client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Translate this YouTube video title to {target_lang}. "
-                        f"Output ONLY the translation:\n{title}"
-                    ),
-                }
-            ],
-            temperature=0.3,
+        resp = with_retries(
+            lambda: self._client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Translate this YouTube video title to {target_lang}. "
+                            f"Output ONLY the translation:\n{title}"
+                        ),
+                    }
+                ],
+                temperature=0.3,
+            ),
+            label=f"{self.name} title translation",
         )
-        return resp.choices[0].message.content.strip().strip('"').strip("'")
+        content = resp.choices[0].message.content
+        if content is None:
+            raise RuntimeError(f"{self.name} returned an empty message for the title")
+        return content.strip().strip('"').strip("'")
