@@ -836,7 +836,10 @@ def transcribe_existing(video_id: str, req: LibraryTranscribeRequest):
                 "error": "no audio file in folder; download a fresh job first",
             }
 
-    cancel_event = jobs.claim_slot()
+    try:
+        cancel_event = jobs.claim_slot()
+    except jobs.JobBusy as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     q: queue.Queue = queue.Queue()
     SENTINEL = object()
 
@@ -1025,7 +1028,10 @@ def translate_existing(video_id: str, req: LibraryTranslateRequest):
     provider_name = req.translatorProvider or cfg.translator_provider
     translator_model = _resolve_translator_model(provider_name, req, cfg)
 
-    cancel_event = jobs.claim_slot()
+    try:
+        cancel_event = jobs.claim_slot()
+    except jobs.JobBusy as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     q: queue.Queue = queue.Queue()
     SENTINEL = object()
 

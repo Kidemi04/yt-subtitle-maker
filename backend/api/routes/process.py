@@ -5,7 +5,7 @@ import json
 import queue
 import threading
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from api import jobs
@@ -24,28 +24,37 @@ def process(req: ProcessRequest):
     q: queue.Queue = queue.Queue()
     SENTINEL = object()
 
-    cancel_event = jobs.claim_slot()
-
-    # Pre-fetch metadata so pipeline can name folder by title
-    meta = fetch_video_metadata(
-        req.url,
-        browser=cfg.cookie_browser,
-        profile=cfg.cookie_profile,
-        txt_path=cfg.cookies_txt_path,
-    )
-    video_id = _video_id_from_url(req.url)
-    request_dict = req.model_dump()
-    request_dict["_meta_title"] = meta.get("title", "")
-    request_dict["_meta_thumbnail_url"] = meta.get("thumbnail_url")
-    request_dict["_meta_channel"] = meta.get("channel")
-    request_dict["_meta_duration"] = meta.get("duration")
-    request_dict["_video_id"] = video_id
+    try:
+        cancel_event = jobs.claim_slot()
+    except jobs.JobBusy as e:
+        # 409 rather than a stream: there is no job to report progress for.
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
     def on_event(evt: dict) -> None:
         q.put(evt)
 
     def runner() -> None:
         try:
+            # Metadata is fetched *inside* the thread so its failures become
+            # stream events. Fetching it in the request handler meant the most
+            # common error of all — a bad, private, or region-blocked URL —
+            # produced a bare HTTP 500 with a text/plain body instead of the
+            # NDJSON the client is reading, and leaked the job slot (the
+            # `finally` below never ran), after which /process/cancel would
+            # cheerfully report success with nothing running.
+            meta = fetch_video_metadata(
+                req.url,
+                browser=cfg.cookie_browser,
+                profile=cfg.cookie_profile,
+                txt_path=cfg.cookies_txt_path,
+            )
+            request_dict = req.model_dump()
+            request_dict["_meta_title"] = meta.get("title", "")
+            request_dict["_meta_thumbnail_url"] = meta.get("thumbnail_url")
+            request_dict["_meta_channel"] = meta.get("channel")
+            request_dict["_meta_duration"] = meta.get("duration")
+            request_dict["_video_id"] = _video_id_from_url(req.url)
+
             run_pipeline(req.url, request_dict, cfg, on_event, cancel_event=cancel_event)
         except PipelineCancelled:
             # Emit a structurally-compatible "error" event so the existing
