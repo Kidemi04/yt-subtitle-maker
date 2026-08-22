@@ -51,13 +51,19 @@ class YtCaptionsProvider:
         if progress:
             progress(0.0)
 
+        # "auto" means "let the source decide". For captions that is whatever
+        # track the video actually ships — asking yt-dlp for a literal "auto"
+        # language code would just fail to match anything.
+        wants_auto = (language or "").strip().lower() in {"auto", "auto detect", "auto-detect"}
+        requested_langs = ["all"] if wants_auto else [language or "en"]
+
         with tempfile.TemporaryDirectory() as tmp:
             opts: dict = {
                 "quiet": True,
                 "skip_download": True,
                 "writesubtitles": True,
                 "writeautomaticsub": True,
-                "subtitleslangs": [language or "en"],
+                "subtitleslangs": requested_langs,
                 "subtitlesformat": "vtt",
                 "outtmpl": str(Path(tmp) / "%(id)s.%(ext)s"),
             }
@@ -66,10 +72,17 @@ class YtCaptionsProvider:
                 info = ydl.extract_info(url, download=True)
                 video_id = info["id"]
 
-            vtt_files = list(Path(tmp).glob(f"{video_id}.*.vtt"))
+            vtt_files = sorted(Path(tmp).glob(f"{video_id}.*.vtt"))
             if not vtt_files:
-                raise RuntimeError(f"No captions returned for language={language}")
-            content = vtt_files[0].read_text(encoding="utf-8")
+                raise RuntimeError(
+                    "No captions returned for "
+                    + ("any language" if wants_auto else f"language={language}")
+                )
+            chosen = vtt_files[0]
+            content = chosen.read_text(encoding="utf-8")
+            # "<id>.<lang>.vtt" — report the track we actually got rather than
+            # echoing the request, which matters most on the "auto" path.
+            detected = chosen.name[len(video_id) + 1 : -len(".vtt")] or None
 
         segments = self._parse_vtt(content)
         if progress:
@@ -77,7 +90,7 @@ class YtCaptionsProvider:
 
         return TranscriptionResult(
             segments=segments,
-            language=language or "unknown",
+            language=detected or (None if wants_auto else language) or "unknown",
             source=self.name,
         )
 

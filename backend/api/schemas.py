@@ -8,9 +8,6 @@ from pydantic import BaseModel, field_validator
 # ─── STT ──────────────────────────────────────────────────────────────────────
 
 SttSource = Literal["auto", "yt_captions", "whisper"]
-SttEngine = Literal[
-    "openai-whisper", "faster-whisper", "whisperx", "insanely-fast-whisper"
-]
 WhisperModel = Literal["tiny", "base", "small", "medium", "turbo", "large-v3"]
 WhisperDevice = Literal["auto", "cpu", "gpu"]
 TranslatorProvider = Literal["gemini", "local_openai", "openai"]
@@ -27,10 +24,28 @@ class VideoMetadata(BaseModel):
     error: str | None = None
 
 
+def _valid_stt_engines() -> list[str]:
+    """Engine ids accepted for `sttEngine`, read from the live STT registry.
+
+    Imported lazily: `core.stt` pulls in torch/whisper at module level, and
+    this module is imported by every route. Deriving the list here (rather
+    than restating it as a Literal) is what keeps the API and
+    `core/stt/__init__.py::_REGISTRY` from drifting apart — a hand-written
+    Literal is how `mlx-whisper` ended up implemented, registered, and still
+    rejected with a 422.
+
+    `yt_captions` is excluded on purpose: captions are selected through
+    `sttSource="yt_captions"`, not as a Whisper engine.
+    """
+    from core.stt import list_providers
+
+    return [e for e in list_providers() if e != "yt_captions"]
+
+
 class ProcessRequest(BaseModel):
     url: str
     sttSource: SttSource
-    sttEngine: SttEngine | None = None
+    sttEngine: str | None = None
     whisperModel: WhisperModel
     whisperDevice: WhisperDevice
     vadEnabled: bool
@@ -53,14 +68,36 @@ class ProcessRequest(BaseModel):
 
     downloadOnly: bool = False
 
+    @field_validator("sttEngine")
+    @classmethod
+    def known_engine(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        valid = _valid_stt_engines()
+        if v not in valid:
+            raise ValueError(
+                f"unknown sttEngine {v!r}; installed engines: {sorted(valid)}"
+            )
+        return v
+
     @field_validator("sourceLang")
     @classmethod
-    def reject_auto(cls, v: str) -> str:
-        if v.lower() in {"auto", "auto detect", ""}:
-            raise ValueError(
-                "sourceLang must be a concrete language code; "
-                "frontend should resolve 'auto' to a real code (default 'en')"
-            )
+    def normalise_source_lang(cls, v: str) -> str:
+        """Accept 'auto' and let the engine detect the language itself.
+
+        Every Whisper provider already normalises "auto"/"auto detect" to
+        `None`, which is Whisper's own language-detection path; `yt_captions`
+        maps it to its caption-language default. Forcing a concrete code was
+        the bigger hazard: a Chinese video transcribed with the default 'en'
+        produces confident garbage rather than an error, with no warning.
+
+        An empty string still fails — that is a frontend bug, not a choice.
+        """
+        v = v.strip()
+        if not v:
+            raise ValueError("sourceLang must not be empty ('auto' is allowed)")
+        if v.lower() in {"auto", "auto detect", "auto-detect"}:
+            return "auto"
         return v
 
 
